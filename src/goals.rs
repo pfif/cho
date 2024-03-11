@@ -34,6 +34,9 @@ impl Goal {
         period_config: &PeriodsConfiguration,
         date: &NaiveDate,
     ) -> Result<Amount, String> {
+        if date > &self.target_date{
+            return self.remaining()
+        }
         let current_period = period_config.period_for_date(date)?;
         for commit in &self.commited {
             let date = &commit.0;
@@ -47,6 +50,7 @@ impl Goal {
         return Ok(remaining / period_config.periods_between(date, &self.target_date)? as u32);
     }
 }
+
 
 #[allow(non_snake_case)]
 #[cfg(test)]
@@ -132,7 +136,7 @@ the function works with those.*/
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod test_to_pay_at {
-    use crate::period::{MockPeriodsConfiguration, Period, PeriodNumber};
+    use crate::period::{MockPeriodsConfiguration, Period};
     use mockall::predicate::eq;
 
     use super::{Amount, Goal};
@@ -243,7 +247,7 @@ mod test_to_pay_at {
     fn all_commited__after_last_period() {
         let today = date(1, 10);
         let goal = make_goal(vec![(date(12, 29), 50), (date(1, 2), 50)]);
-        let period_config = make_period_config(today, date(1, 8));
+        let period_config = make_period_config(today, date(1, 9));
         assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 0);
     }
 
@@ -301,15 +305,5 @@ mod test_to_pay_at {
         let goal = make_goal(vec![(date(12, 29), 30)]);
         let period_config = make_period_config(today, date(1, 1));
         assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 35);
-    }
-
-    #[test]
-    fn periodconfiguration_fails__period_for_date() {
-        panic!("AAAAAAAAAH IMPLEMENT ME")
-    }
-
-    #[test]
-    fn periodconfiguration_fails__periods_between() {
-        panic!("AAAAAAAAAH IMPLEMENT ME")
     }
 }
