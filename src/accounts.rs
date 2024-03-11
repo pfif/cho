@@ -7,6 +7,8 @@ use chrono::NaiveDate;
 use serde::Deserialize;
 use serde_json::from_reader;
 
+// Public traits
+
 type Amount = u32;
 const ACCOUNT_DIR: &str = "accounts";
 
@@ -20,6 +22,8 @@ pub trait QueriableAccount {
     fn amount_at(&self, date: NaiveDate) -> Result<FoundAmount, &str>;
     fn currency(&self) -> &String;
 }
+
+// Finder
 
 pub fn get_accounts(directory: &Path) -> Result<Vec<AccountJson>, String> {
     let dir_reader = match read_dir(Path::join(directory, ACCOUNT_DIR)) {
@@ -156,6 +160,8 @@ mod tests_get_accounts {
         )
     }
 }
+
+// JSON implementation
 
 #[derive(Deserialize, Hash, Eq, PartialEq, Debug)]
 pub struct AccountJson {
