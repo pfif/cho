@@ -122,6 +122,13 @@ mod test_remaining {
     }
 }
 
+/* TODO
+Thinking back, these tests might be too complex.
+
+Instead of assigning such a complex behavior to the
+MockPeriodsConfiguration (which, at this point is almost as complex as
+the real thing), I should just dumbly assign values to it, and make sure
+the function works with those.*/
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod test_to_pay_at {
