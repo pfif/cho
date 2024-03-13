@@ -1,25 +1,28 @@
-/*use chrono::{Local, NaiveDate};
+use chrono::{Local, NaiveDate};
 
 use crate::accounts::{get_accounts, QueriableAccount};
-// use crate::goals::{GoalVaultValues, Goal};
+use crate::goals::{GoalVaultValues, Goal};
 use crate::period::{PeriodsConfiguration};
 
 type Amount = u32;
+type Currency = String;
 
-pub trait AccountBalance {
-    fn period_start_balance() -> Amount;
-    fn current_balance() -> Amount;
-    fn difference() -> Amount {
-        //TODO implement
-    }
-    fn currency() -> String;
+/*
+TODO Design a sample output here
+*/
+
+pub struct DisplayAccount {
+    period_start_balance: Amount,
+    current_balance: Amount,
+    currency: Currency,
 }
 
 pub struct RemainingMoneyScreen {
-    overall_balance: AccountSums,
+    overall_balance: DisplayAccount,
+    individual_balance: DisplayAccount,
     predicted_income: Option<Amount>,
-//    overall_goal: Amount,
-//    goals: Vec<Goals>,
+    overall_goal: Amount,
+    goals: Vec<Goal>,
     remaining: Amount,
 }
 
@@ -28,24 +31,26 @@ pub trait RemainingVaultParameters {
 }
 
 pub fn remaining_money(
-    exchange_rate: ((String, f64), (String, f64)),
-    target_currency: String,
-    vault_values: dyn RemainingVaultParameters,
-//    goals_vault_values: dyn GoalVaultValues,
+    exchange_rate: ((Currency, f64), (Currency, f64)),
+    target_currency: Currency,
     period_config: PeriodsConfiguration,
     include_predicted_income: bool,
 ) -> Result<RemainingMoneyScreen, String> {
     let date = Local::now().date_naive();
-    let accounts = get_accounts().map(|acc| {
-        return AccountForDate {
-            account: acc,
-            current_date: date,
-        };
-    });
+    let accounts = get_accounts();
+    let goals; // TODO do conversion
+    return _remaining_money(date, accounts, goals)
+}
 
-    let overall_balance = AccountSums::reduce_account(accounts);
-//    let goals = get_goals(goals_vault_values); // TODO do conversion
-//    let overall_goal: Amount; // TODO fold goals, add current_amount, convert to target_currency if need be
+fn _remaining_money<A: QueriableAccount>(
+    date: NaiveDate,
+    target_currency: Currency,
+    raw_accounts: Vec<A>,
+    goals: Vec<Goal>
+) -> Result<RemainingMoneyScreen, String> {
+    let accounts: Vec<DisplayAccount>;
+    let overall_balance = reduce_accounts(accounts, target_currency);
+    let overall_goal: Amount; // TODO fold goals, add current_amount, convert to target_currency if need be
 
     let predicted_income = vault_values.predicted_income();
 
@@ -53,41 +58,25 @@ pub fn remaining_money(
         predicted_income
     } else {
         0
-    } - overall_balance.difference();
-//        - overall_goal;
+    } - overall_balance.difference() - overall_goal;
 
     return Ok(RemainingMoneyScreen {
         overall_balance,
-//        overall_goal,
+        overall_goal,
         predicted_income: if include_predicted_income {
             predicted_income
         } else {
             None
         },
-//        goals,
+        goals,
         remaining,
     });
 }
 
-struct AccountSums {
-    period_start_balance: Amount,
-    current_balance: Amount,
-    currency: String,
+fn reduce_accounts(accounts: Vec<DisplayAccount>, target_currency: Currency) -> DisplayAccount {
+    // TODO actually this can be implemented with Fold
 }
 
-impl AccountSums {
-    fn reduce_accounts(accounts: Vec<AccountForDate>, target_currency: String) -> AccountSums {
-        // TODO actually this can be implemented with Fold
-    }
+fn account_for_date<A: QueriableAccount>(account: A, current_date: NaiveDate) -> DisplayAccount {
 
-    // TODO Implement
 }
-
-struct AccountForDate<T: QueriableAccount> {
-    account: T,
-    current_date: NaiveDate,
-}
-
-impl<T: QueriableAccount> AccountBalance for AccountForDate<T> {
-    // TODO implement
-}*/
