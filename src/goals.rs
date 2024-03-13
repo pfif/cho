@@ -10,6 +10,7 @@ pub trait GoalVaultValues {
 }
 
 pub struct Goal {
+    name: String,
     currency: String,
     target: Amount,
     commited: Vec<(NaiveDate, Amount)>,
