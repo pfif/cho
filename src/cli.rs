@@ -22,7 +22,7 @@ Current      | €0 (-€0)  | €54000.00 (-€547) | €3000 (+€28)    | ¥2
                | Commited | Commited this period | Target |
 Retirment fund | €15000   | … (€500)             | €60000 |
 New iPhone     | €300     | ✅                   | €1000  |
-Total          | €15300   | €2000 (€2500)        | €61000 |
+Total          | €15300   | … (€2500)            | €61000 |
 
 Remaining this period: €456
 */
