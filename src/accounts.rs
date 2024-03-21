@@ -6,6 +6,8 @@ use std::{
 use chrono::NaiveDate;
 use serde::Deserialize;
 use serde_json::from_reader;
+#[cfg(test)]
+use mockall::automock;
 
 // Public traits
 type Amount = u32;
@@ -17,6 +19,7 @@ pub struct FoundAmount {
     estimated: bool,
 }
 
+#[cfg_attr(test, automock)]
 pub trait QueriableAccount {
     fn amount_at(&self, date: NaiveDate) -> Result<FoundAmount, &str>;
     fn currency(&self) -> &String;

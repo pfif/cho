@@ -1,7 +1,7 @@
+use mockall_double::double;
 #[double]
 use crate::period::PeriodsConfiguration;
 use chrono::NaiveDate;
-use mockall_double::double;
 
 type Amount = u32;
 
