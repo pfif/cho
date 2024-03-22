@@ -1,8 +1,8 @@
 mod accounts;
 mod cli;
-mod remaining;
 mod goals;
 mod period;
+mod remaining;
 mod vault;
 
 fn main() {

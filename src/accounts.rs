@@ -4,10 +4,10 @@ use std::{
 };
 
 use chrono::NaiveDate;
-use serde::Deserialize;
-use serde_json::from_reader;
 #[cfg(test)]
 use mockall::automock;
+use serde::Deserialize;
+use serde_json::from_reader;
 
 // Public traits
 type Amount = u32;
@@ -187,12 +187,10 @@ impl QueriableAccount for AccountJson {
     /// If no amount was recorded for the passed date, the
     /// FoundAmount's `estimated` field is set to true.
     fn amount_at(&self, date: NaiveDate) -> Result<FoundAmount, &str> {
-
-
         let mut iter = self.amounts.iter().peekable();
 
         let Some(mut item_left) = &iter.next() else {
-            return Err("The account has no amount history")
+            return Err("The account has no amount history");
         };
 
         if date < item_left.date {

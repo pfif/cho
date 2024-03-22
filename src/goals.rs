@@ -1,7 +1,7 @@
-use mockall_double::double;
 #[double]
 use crate::period::PeriodsConfiguration;
 use chrono::NaiveDate;
+use mockall_double::double;
 
 type Amount = u32;
 
@@ -35,8 +35,8 @@ impl Goal {
         period_config: &PeriodsConfiguration,
         date: &NaiveDate,
     ) -> Result<Amount, String> {
-        if date > &self.target_date{
-            return self.remaining()
+        if date > &self.target_date {
+            return self.remaining();
         }
         let current_period = period_config.period_for_date(date)?;
         for commit in &self.commited {
@@ -51,7 +51,6 @@ impl Goal {
         return Ok(remaining / period_config.periods_between(date, &self.target_date)? as u32);
     }
 }
-
 
 #[allow(non_snake_case)]
 #[cfg(test)]
@@ -156,7 +155,7 @@ mod test_to_pay_at {
         let year = match month {
             12 => 2019,
             1 => 2020,
-            _ => panic!("Cannot make a date with this month")
+            _ => panic!("Cannot make a date with this month"),
         };
         return NaiveDate::from_ymd_opt(year, month, day).unwrap();
     }
