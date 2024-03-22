@@ -60,6 +60,7 @@ mod test_remaining {
 
     fn make_goal(commited: Vec<(NaiveDate, Amount)>) -> Goal {
         return Goal {
+            name: "Test goal".to_string(),
             currency: "JPY".to_string(),
             target: 100,
             target_date: NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
@@ -144,6 +145,7 @@ mod test_to_pay_at {
 
     fn make_goal(commited: Vec<(NaiveDate, Amount)>) -> Goal {
         return Goal {
+            name: "Test goal".to_string(),
             currency: "JPY".to_string(),
             target: 100,
             target_date: date(1, 7),
