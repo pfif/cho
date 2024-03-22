@@ -22,6 +22,7 @@ pub struct FoundAmount {
 #[cfg_attr(test, automock)]
 pub trait QueriableAccount {
     fn amount_at(&self, date: NaiveDate) -> Result<FoundAmount, String>;
+    fn name(&self) -> &String;
     fn currency(&self) -> &String;
 }
 
@@ -99,6 +100,7 @@ mod tests_get_accounts {
         create_dir(Path::join(directory.path(), ACCOUNT_DIR)).unwrap();
 
         let raw_account_left = r#"{
+"name": "account_left",
 "currency": "JPY",
 "amounts": [
     {"date": "2023-04-08", "amount": 55000},
@@ -109,6 +111,7 @@ mod tests_get_accounts {
         create_account_file(&directory, "account_left.json", raw_account_left);
 
         let raw_account_right = r#"{
+"name": "account_right",
 "currency": "EUR",
 "amounts": [
     {"date": "2023-02-03", "amount": 5000},
@@ -120,6 +123,7 @@ mod tests_get_accounts {
 
         let expected_accounts = HashSet::from([
             AccountJson {
+                name: "account_left".to_string(),
                 currency: String::from("JPY"),
                 amounts: vec![
                     AmountListItem {
@@ -137,6 +141,7 @@ mod tests_get_accounts {
                 ],
             },
             AccountJson {
+                name: "account_right".to_string(),
                 currency: String::from("EUR"),
                 amounts: vec![
                     AmountListItem {
@@ -165,6 +170,7 @@ mod tests_get_accounts {
 // JSON implementation
 #[derive(Deserialize, Hash, Eq, PartialEq, Debug)]
 pub struct AccountJson {
+    name: String,
     currency: String,
     amounts: Vec<AmountListItem>,
 }
@@ -230,6 +236,11 @@ impl QueriableAccount for AccountJson {
         }
     }
 
+
+    fn name(&self) -> &String{
+        return &self.name;
+    }
+
     fn currency(&self) -> &String {
         return &self.currency;
     }
@@ -273,6 +284,7 @@ mod tests_accountjson_amount_at {
 
     fn sample_account(list: Vec<AmountListItem>) -> AccountJson {
         return AccountJson {
+            name: "Test account".to_string(),
             currency: String::from("EN"),
             amounts: list,
         };
