@@ -13,20 +13,16 @@ use mockall_double::double;
 type Amount = u32;
 type Currency = String;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq, Eq)]
 pub struct DisplayAccount {
+    name: String,
     period_start_balance: Amount,
     current_balance: Amount,
+    difference: Amount,
     currency: Currency,
 }
 
-impl DisplayAccount {
-    fn difference(&self) -> Amount {
-        return self.period_start_balance - self.current_balance;
-    }
-}
-
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq, Eq)]
 pub struct DisplayGoal {
     name: String,
     commited: Amount,
@@ -108,7 +104,7 @@ impl<A: QueriableAccount> RemainingOperation<A> {
         let remaining = match self.predicted_income {
             Some(i) => i,
             None => 0,
-        } - overall_balance.difference()
+        } - overall_balance.difference
             - match overall_goal.to_commit_this_period {
                 Some(i) => i,
                 None => 0,
@@ -134,13 +130,25 @@ impl<A: QueriableAccount> RemainingOperation<A> {
 #[cfg(test)]
 mod tests_get_accounts {
     use super::RemainingOperation;
-    use crate::accounts::MockQueriableAccount;
+    use crate::accounts::{FoundAmount, MockQueriableAccount};
     use crate::period::{MockPeriodsConfiguration, Period};
+    use crate::remaining::DisplayAccount;
     use chrono::NaiveDate;
     use mockall::predicate::eq;
 
     fn mkdate(day: u32) -> NaiveDate {
         return NaiveDate::from_ymd_opt(2023, 12, day).unwrap();
+    }
+
+    fn mkperiodsconfig(start_date: &NaiveDate, end_date: &NaiveDate, today: &NaiveDate) -> MockPeriodsConfiguration {
+        let mut periods_configuration = MockPeriodsConfiguration::new();
+
+        periods_configuration
+            .expect_period_for_date()
+            .with(eq(today.clone()))
+            .return_const(Ok(Period {start_date: start_date.clone(), end_date: end_date.clone()}));
+
+        periods_configuration
     }
 
     fn defaultinstance() -> RemainingOperation<MockQueriableAccount> {
@@ -171,17 +179,7 @@ mod tests_get_accounts {
     #[test]
     fn test_period_start() {
         let today = mkdate(3);
-        let mut periods_configuration = MockPeriodsConfiguration::new();
-
-        let period = Period {
-            start_date: mkdate(1),
-            end_date: mkdate(4),
-        };
-
-        periods_configuration
-            .expect_period_for_date()
-            .with(eq(today))
-            .return_const(Ok(period));
+        let mut periods_configuration = mkperiodsconfig(&mkdate(1), &mkdate(4), &today);
 
         let instance = RemainingOperation {
             date: today,
@@ -213,6 +211,49 @@ mod tests_get_accounts {
         assert_eq!(
             result.unwrap_err(),
             "Failed to fetch Periods Configuration: inner error"
+        )
+    }
+
+    #[test]
+    fn test__account_conversion__same_currency(){
+        let today = mkdate(3);
+        let period_start = mkdate(1);
+
+        let periodsconfig = mkperiodsconfig(&period_start, &mkdate(4), &today);
+
+        let mut raw_account = MockQueriableAccount::new();
+        raw_account.expect_name().return_const("Galactic bank".to_string());
+        raw_account.expect_currency().return_const("CREDITS".to_string());
+        raw_account.expect_amount_at().with(eq(today)).return_const(Ok(FoundAmount{
+            estimated: false,
+            figure: 6
+        }));
+
+        raw_account.expect_amount_at().with(eq(period_start)).return_const(Ok(FoundAmount{
+            estimated: false,
+            figure: 10
+        }));
+
+        let instance = RemainingOperation {
+            date: today,
+            raw_accounts: vec![raw_account],
+            target_currency: "CREDITS".to_string(),
+            periods_configuration: periodsconfig,
+            ..defaultinstance()
+        };
+        let result = instance.execute();
+
+        assert_eq!(
+            result.unwrap().individual_balances,
+            vec![
+                DisplayAccount{
+                    name: "Galactic bank".to_string(),
+                    period_start_balance: 10,
+                    current_balance: 6,
+                    difference: 4,
+                    currency: "CREDITS".to_string(),
+                }
+            ]
         )
     }
 }

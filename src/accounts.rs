@@ -13,10 +13,10 @@ use serde_json::from_reader;
 type Amount = u32;
 const ACCOUNT_DIR: &str = "accounts";
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct FoundAmount {
-    figure: Amount,
-    estimated: bool,
+    pub figure: Amount,
+    pub estimated: bool,
 }
 
 #[cfg_attr(test, automock)]
