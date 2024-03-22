@@ -13,7 +13,7 @@ use mockall_double::double;
 type Amount = u32;
 type Currency = String;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct DisplayAccount {
     period_start_balance: Amount,
     current_balance: Amount,
@@ -26,7 +26,7 @@ impl DisplayAccount {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct DisplayGoal {
     name: String,
     commited: Amount,
@@ -35,6 +35,7 @@ pub struct DisplayGoal {
     currency: Currency,
 }
 
+#[derive(Debug)]
 pub struct RemainingMoneyScreen {
     period_start: NaiveDate,
 
@@ -93,7 +94,10 @@ impl<A: QueriableAccount> RemainingOperation<A> {
     }
 
     fn execute(&self) -> Result<RemainingMoneyScreen, String> {
-        let current_period = self.periods_configuration.period_for_date(self.date)?;
+        let current_period = self
+            .periods_configuration
+            .period_for_date(&self.date)
+            .map_err(|error| "Failed to fetch Periods Configuration: ".to_string() + &error)?;
 
         let accounts: Vec<DisplayAccount> = vec![]; // TODO go over this with account for date
         let overall_balance = reduce_accounts(&accounts, &self.target_currency);
@@ -122,7 +126,7 @@ impl<A: QueriableAccount> RemainingOperation<A> {
             goals,
 
             remaining,
-            currency: self.target_currency,
+            currency: self.target_currency.clone(),
         });
     }
 }
@@ -132,15 +136,14 @@ mod tests_get_accounts {
     use super::RemainingOperation;
     use crate::accounts::MockQueriableAccount;
     use crate::period::{MockPeriodsConfiguration, Period};
-    use chrono::Na
+    use chrono::NaiveDate;
     use mockall::predicate::eq;
-    use mockall::Predicate;
 
     fn mkdate(day: u32) -> NaiveDate {
         return NaiveDate::from_ymd_opt(2023, 12, day).unwrap();
     }
 
-    const defaultinstance = {
+    fn defaultinstance() -> RemainingOperation<MockQueriableAccount> {
         let mut period_configuration = MockPeriodsConfiguration::new();
 
         let period = Period {
@@ -151,7 +154,7 @@ mod tests_get_accounts {
             .expect_period_for_date()
             .return_const(Ok(period));
 
-        RemainingOperation::<MockQueriableAccount> {
+        RemainingOperation {
             exchange_rate: (("EUR".to_string(), 1.), ("JPN".to_string(), 2.)),
             target_currency: "EUR".to_string(),
 
@@ -163,8 +166,9 @@ mod tests_get_accounts {
 
             predicted_income: Some(0),
         }
-    };
+    }
 
+    #[test]
     fn test_period_start() {
         let today = mkdate(3);
         let mut periods_configuration = MockPeriodsConfiguration::new();
@@ -179,12 +183,37 @@ mod tests_get_accounts {
             .with(eq(today))
             .return_const(Ok(period));
 
-        let instance = RemainingOperation{
+        let instance = RemainingOperation {
             date: today,
             periods_configuration,
-            ..defaultinstance
+            ..defaultinstance()
         };
         let result = instance.execute();
+
+        assert_eq!(result.unwrap().period_start, mkdate(1))
+    }
+
+    #[test]
+    fn test_period_config_fails_initialization() {
+        let today = mkdate(3);
+        let mut periods_configuration = MockPeriodsConfiguration::new();
+
+        periods_configuration
+            .expect_period_for_date()
+            .with(eq(today))
+            .return_const(Err("inner error".to_string()));
+
+        let instance = RemainingOperation {
+            date: today,
+            periods_configuration,
+            ..defaultinstance()
+        };
+        let result = instance.execute();
+
+        assert_eq!(
+            result.unwrap_err(),
+            "Failed to fetch Periods Configuration: inner error"
+        )
     }
 }
 
