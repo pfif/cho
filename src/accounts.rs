@@ -21,7 +21,7 @@ pub struct FoundAmount {
 
 #[cfg_attr(test, automock)]
 pub trait QueriableAccount {
-    fn amount_at(&self, date: NaiveDate) -> Result<FoundAmount, &str>;
+    fn amount_at(&self, date: NaiveDate) -> Result<FoundAmount, String>;
     fn currency(&self) -> &String;
 }
 
@@ -186,22 +186,22 @@ impl QueriableAccount for AccountJson {
     ///
     /// If no amount was recorded for the passed date, the
     /// FoundAmount's `estimated` field is set to true.
-    fn amount_at(&self, date: NaiveDate) -> Result<FoundAmount, &str> {
+    fn amount_at(&self, date: NaiveDate) -> Result<FoundAmount, String> {
         let mut iter = self.amounts.iter().peekable();
 
         let Some(mut item_left) = &iter.next() else {
-            return Err("The account has no amount history");
+            return Err("The account has no amount history".to_string());
         };
 
         if date < item_left.date {
-            return Err("The requested date is before the start of the amount history");
+            return Err("The requested date is before the start of the amount history".to_string());
         }
 
         loop {
             let is_directly_after_next = match &iter.peek() {
                 Some(item_right) => {
                     if item_left.date > item_right.date {
-                        return Err("Amount history out of order");
+                        return Err("Amount history out of order".to_string());
                     }
 
                     date > item_left.date && date < item_right.date
@@ -225,7 +225,7 @@ impl QueriableAccount for AccountJson {
 
             item_left = match &iter.next() {
                 Some(v) => v,
-                None => return Err("Reached end of the list but did not return amount"),
+                None => return Err("Reached end of the list but did not return amount".to_string()),
             }
         }
     }
@@ -292,7 +292,7 @@ mod tests_accountjson_amount_at {
     fn before_start() {
         assert_eq!(
             sample_account(list_in_order()).amount_at(date(13)),
-            Result::Err("The requested date is before the start of the amount history")
+            Result::Err("The requested date is before the start of the amount history".to_string())
         )
     }
 
@@ -319,7 +319,7 @@ mod tests_accountjson_amount_at {
     fn assert_out_of_order(day: u32) {
         assert_eq!(
             sample_account(list_out_of_order()).amount_at(date(day)),
-            Result::Err("Amount history out of order")
+            Result::Err("Amount history out of order".to_string())
         )
     }
 
