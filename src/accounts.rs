@@ -10,7 +10,7 @@ use serde::Deserialize;
 use serde_json::from_reader;
 
 // Public traits
-type Amount = u32;
+pub type Amount = u32;
 const ACCOUNT_DIR: &str = "accounts";
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -21,7 +21,7 @@ pub struct FoundAmount {
 
 #[cfg_attr(test, automock)]
 pub trait QueriableAccount {
-    fn amount_at(&self, date: NaiveDate) -> Result<FoundAmount, String>;
+    fn amount_at(&self, date: &NaiveDate) -> Result<FoundAmount, String>;
     fn name(&self) -> &String;
     fn currency(&self) -> &String;
 }
@@ -192,14 +192,14 @@ impl QueriableAccount for AccountJson {
     ///
     /// If no amount was recorded for the passed date, the
     /// FoundAmount's `estimated` field is set to true.
-    fn amount_at(&self, date: NaiveDate) -> Result<FoundAmount, String> {
+    fn amount_at(&self, date: &NaiveDate) -> Result<FoundAmount, String> {
         let mut iter = self.amounts.iter().peekable();
 
         let Some(mut item_left) = &iter.next() else {
             return Err("The account has no amount history".to_string());
         };
 
-        if date < item_left.date {
+        if *date < item_left.date {
             return Err("The requested date is before the start of the amount history".to_string());
         }
 
@@ -210,12 +210,12 @@ impl QueriableAccount for AccountJson {
                         return Err("Amount history out of order".to_string());
                     }
 
-                    date > item_left.date && date < item_right.date
+                    *date > item_left.date && *date < item_right.date
                 }
                 None => true,
             };
 
-            if date == item_left.date {
+            if *date == item_left.date {
                 return Ok(FoundAmount {
                     figure: item_left.amount,
                     estimated: false,
@@ -236,8 +236,7 @@ impl QueriableAccount for AccountJson {
         }
     }
 
-
-    fn name(&self) -> &String{
+    fn name(&self) -> &String {
         return &self.name;
     }
 
@@ -292,7 +291,7 @@ mod tests_accountjson_amount_at {
 
     fn assert_correct(day: u32, amount: Amount, estimated: bool) {
         assert_eq!(
-            sample_account(list_in_order()).amount_at(date(day)),
+            sample_account(list_in_order()).amount_at(&date(day)),
             Result::Ok(FoundAmount {
                 figure: amount,
                 estimated: estimated
@@ -303,7 +302,7 @@ mod tests_accountjson_amount_at {
     #[test]
     fn before_start() {
         assert_eq!(
-            sample_account(list_in_order()).amount_at(date(13)),
+            sample_account(list_in_order()).amount_at(&date(13)),
             Result::Err("The requested date is before the start of the amount history".to_string())
         )
     }
@@ -330,7 +329,7 @@ mod tests_accountjson_amount_at {
 
     fn assert_out_of_order(day: u32) {
         assert_eq!(
-            sample_account(list_out_of_order()).amount_at(date(day)),
+            sample_account(list_out_of_order()).amount_at(&date(day)),
             Result::Err("Amount history out of order".to_string())
         )
     }
