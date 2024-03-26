@@ -60,7 +60,7 @@ pub struct PredictedIncome {
 // Public methods //
 ////////////////////
 
-pub struct RemainingOperation<A: QueriableAccount> {
+pub struct RemainingOperation<A: QueriableAccount, G: Goal> {
     rates: ExchangeRates,
     target_currency: Currency,
 
@@ -68,17 +68,17 @@ pub struct RemainingOperation<A: QueriableAccount> {
     periods_configuration: PeriodsConfiguration,
 
     raw_accounts: Vec<A>,
-    goals: Vec<Goal>,
+    goals: Vec<G>,
 
     predicted_income: Option<Amount>,
 }
 
-impl<A: QueriableAccount> RemainingOperation<A> {
+impl<A: QueriableAccount, G: Goal> RemainingOperation<A, G> {
     pub fn FromVaultValue(
         exchange_rate: ExchangeRates,
         target_currency: Currency,
         predicted_income: Option<Amount>,
-    ) -> Result<RemainingOperation<A>, String> {
+    ) -> Result<RemainingOperation<A, G>, String> {
         return Ok(RemainingOperation {
             rates: exchange_rate,
             target_currency,
@@ -129,8 +129,15 @@ impl<A: QueriableAccount> RemainingOperation<A> {
                             target_currency_value / account_currency_value
                         };
 
-                        period_start_balance = (period_start_balance * exchange_rate).round_dp_with_strategy(2, rust_decimal::RoundingStrategy::MidpointNearestEven);
-                        current_balance = (current_balance * exchange_rate).round_dp_with_strategy(2, rust_decimal::RoundingStrategy::MidpointNearestEven);
+                        period_start_balance = (period_start_balance * exchange_rate)
+                            .round_dp_with_strategy(
+                                2,
+                                rust_decimal::RoundingStrategy::MidpointNearestEven,
+                            );
+                        current_balance = (current_balance * exchange_rate).round_dp_with_strategy(
+                            2,
+                            rust_decimal::RoundingStrategy::MidpointNearestEven,
+                        );
                     }
 
                     return Ok((
@@ -229,6 +236,7 @@ mod tests_get_accounts {
     use crate::accounts::{Amount as AccountAmount, FoundAmount, MockQueriableAccount};
     use crate::period::{MockPeriodsConfiguration, Period};
     use crate::remaining::DisplayAccount;
+    use crate::goals::MockGoal;
     use chrono::NaiveDate;
     use derive_builder::Builder;
     use mockall::predicate::eq;
@@ -259,7 +267,12 @@ mod tests_get_accounts {
     }
 
     #[derive(Builder)]
-    #[builder(pattern = "immutable", build_fn(skip), setter(into), name = "MockAccountBuilder")]
+    #[builder(
+        pattern = "immutable",
+        build_fn(skip),
+        setter(into),
+        name = "MockAccountBuilder"
+    )]
     struct MockAccount {
         today_date: NaiveDate,
         period_start_date: NaiveDate,
@@ -299,7 +312,7 @@ mod tests_get_accounts {
         }
     }
 
-    fn defaultinstance() -> RemainingOperation<MockQueriableAccount> {
+    fn defaultinstance() -> RemainingOperation<MockQueriableAccount, MockGoal> {
         let mut period_configuration = MockPeriodsConfiguration::new();
 
         let period = Period {
@@ -567,11 +580,15 @@ mod tests_get_accounts {
 
     #[test]
     fn test__goal_conversion__different_currency() {
-        panic!("Next test to implement. Only test the overall DisplayGoal, the rest is just plumbing")
+        panic!(
+            "Next test to implement. Only test the overall DisplayGoal, the rest is just plumbing"
+        )
     }
 
     #[test]
     fn test__goal_conversion__multiple_goals() {
-        panic!("Next test to implement. Only test the overall DisplayGoal, the rest is just plumbing")
+        panic!(
+            "Next test to implement. Only test the overall DisplayGoal, the rest is just plumbing"
+        )
     }
 }
