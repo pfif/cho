@@ -1,4 +1,5 @@
 use chrono::{Local, NaiveDate};
+use rand::Error;
 use std::collections::HashMap;
 
 use crate::accounts::{get_accounts, QueriableAccount};
@@ -110,6 +111,7 @@ impl<A: QueriableAccount, G: Goal> RemainingOperation<A, G> {
                 );
             })
             .collect::<Result<Vec<DisplayAccount>, String>>()?;
+
         let overall_balance = {
             let (period_start_balance, current_balance) = accounts.iter().try_fold(
                 (dec!(0) as Amount, dec!(0) as Amount),
@@ -120,24 +122,9 @@ impl<A: QueriableAccount, G: Goal> RemainingOperation<A, G> {
                     let mut current_balance = account.current_balance;
 
                     if account.currency != self.target_currency {
-                        let exchange_rate = {
-                            let target_currency_value =
-                                self.rate_for_currency(&self.target_currency)?;
-                            let account_currency_value =
-                                self.rate_for_currency(&account.currency)?;
-
-                            target_currency_value / account_currency_value
-                        };
-
-                        period_start_balance = (period_start_balance * exchange_rate)
-                            .round_dp_with_strategy(
-                                2,
-                                rust_decimal::RoundingStrategy::MidpointNearestEven,
-                            );
-                        current_balance = (current_balance * exchange_rate).round_dp_with_strategy(
-                            2,
-                            rust_decimal::RoundingStrategy::MidpointNearestEven,
-                        );
+                        period_start_balance =
+                            self.convert(&period_start_balance, &account.currency)?;
+                        current_balance = self.convert(&current_balance, &account.currency)?;
                     }
 
                     return Ok((
@@ -155,8 +142,63 @@ impl<A: QueriableAccount, G: Goal> RemainingOperation<A, G> {
             )
         };
 
-        let goals: Vec<DisplayGoal> = vec![]; // TODO turn goals in to display goals
-        let overall_goal: DisplayGoal = DisplayGoal::default(); // TODO fold goals, add current_amount, convert to target_currency if need be
+        let goals = self
+            .goals
+            .iter()
+            .map(|goal| {
+                Ok(DisplayGoal {
+                    name: goal.name().clone(),
+                    commited: goal
+                        .commited()
+                        .iter()
+                        .fold(0, |acc, (_, amount)| acc + amount)
+                        .into(),
+                    to_commit_this_period: match goal
+                        .to_pay_at(&self.periods_configuration, &self.date)?
+                    {
+                        0 => None,
+                        i => Some(i.into()),
+                    },
+                    currency: goal.currency().clone(),
+                    target: Decimal::from(*goal.target()),
+                })
+            })
+            .collect::<Result<Vec<DisplayGoal>, String>>()?;
+        let overall_goal: DisplayGoal = goals.iter().try_fold(
+            DisplayGoal {
+                name: "Overall Goal".into(),
+                currency: self.target_currency.clone(),
+                target: dec!(0),
+                commited: dec!(0),
+                to_commit_this_period: None,
+            },
+            |acc, goal| -> Result<DisplayGoal, String> {
+                let mut target = goal.target;
+                let mut commited = goal.commited;
+                let mut to_commit_this_period = goal.to_commit_this_period;
+
+                if goal.currency != self.target_currency {
+                    target = self.convert(&target, &goal.currency)?;
+                    commited = self.convert(&commited, &goal.currency)?;
+                    to_commit_this_period = match to_commit_this_period {
+                        None => None,
+                        Some(i) => Some(self.convert(&i, &goal.currency)?),
+                    }
+                }
+
+                Ok(DisplayGoal {
+                    target: acc.target + target,
+                    commited: acc.commited + commited,
+                    to_commit_this_period: match to_commit_this_period {
+                        None => acc.to_commit_this_period,
+                        Some(amount) => {
+                            Some(acc.to_commit_this_period.unwrap_or(0.into()) + amount)
+                        }
+                    },
+                    ..acc
+                })
+            },
+        )?;
 
         let remaining = match self.predicted_income {
             Some(i) => i,
@@ -181,6 +223,23 @@ impl<A: QueriableAccount, G: Goal> RemainingOperation<A, G> {
             remaining,
             currency: self.target_currency.clone(),
         });
+    }
+
+    fn convert(&self, amount: &Amount, from: &Currency) -> Result<Amount, String> {
+        if from == &self.target_currency {
+            return Err(
+                "Attempt to convert from the target currency to the target currency".into(),
+            );
+        }
+        let exchange_rate = {
+            let target_currency_value = self.rate_for_currency(&self.target_currency)?;
+            let from_currency_value = self.rate_for_currency(from)?;
+
+            target_currency_value / from_currency_value
+        };
+
+        return Ok((amount * exchange_rate)
+            .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::MidpointNearestEven));
     }
 
     fn rate_for_currency(&self, name: &Currency) -> Result<Amount, String> {
@@ -230,13 +289,16 @@ impl DisplayAccount {
     }
 }
 
+/* TODO This should really be a table test that nicely follows the
+ * builder pattern. It should also be expanded to test all pipping */
 #[cfg(test)]
-mod tests_get_accounts {
-    use super::{Amount as RemainingAmount, Currency, RemainingOperation};
+mod tests_remaining_operation {
+    use super::{
+        Amount as RemainingAmount, Currency, DisplayAccount, DisplayGoal, RemainingOperation,
+    };
     use crate::accounts::{Amount as AccountAmount, FoundAmount, MockQueriableAccount};
+    use crate::goals::{Amount as GoalAmount, MockGoal};
     use crate::period::{MockPeriodsConfiguration, Period};
-    use crate::remaining::DisplayAccount;
-    use crate::goals::MockGoal;
     use chrono::NaiveDate;
     use derive_builder::Builder;
     use mockall::predicate::eq;
@@ -271,9 +333,9 @@ mod tests_get_accounts {
         pattern = "immutable",
         build_fn(skip),
         setter(into),
-        name = "MockAccountBuilder"
+        name = "MockQueriableAccountBuilder"
     )]
-    struct MockAccount {
+    struct MockQueriableAccountB {
         today_date: NaiveDate,
         period_start_date: NaiveDate,
 
@@ -284,7 +346,7 @@ mod tests_get_accounts {
         period_start_figure: AccountAmount,
     }
 
-    impl MockAccountBuilder {
+    impl MockQueriableAccountBuilder {
         fn build(&self) -> MockQueriableAccount {
             let mut raw_account = MockQueriableAccount::new();
             raw_account
@@ -309,6 +371,36 @@ mod tests_get_accounts {
                 }));
 
             return raw_account;
+        }
+    }
+
+    #[derive(Builder)]
+    #[builder(
+        pattern = "immutable",
+        build_fn(skip),
+        setter(into),
+        name = "MockGoalBuilder"
+    )]
+    struct MockGoalB {
+        commited: Vec<(NaiveDate, GoalAmount)>,
+        to_pay_at: GoalAmount,
+        target: GoalAmount,
+        currency: String,
+    }
+
+    impl MockGoalBuilder {
+        fn build(&self) -> MockGoal {
+            let mut mock = MockGoal::new();
+
+            mock.expect_name().return_const("Mocked goal".into());
+            mock.expect_currency()
+                .return_const(self.currency.clone().unwrap());
+            mock.expect_target().return_const(self.target.unwrap());
+            mock.expect_commited()
+                .return_const(self.commited.clone().unwrap());
+            mock.expect_to_pay_at()
+                .return_const(Ok(self.to_pay_at.unwrap()));
+            return mock;
         }
     }
 
@@ -422,7 +514,7 @@ mod tests_get_accounts {
 
             target_currency: "CREDIT".to_string(),
 
-            raw_accounts: vec![MockAccountBuilder::default()
+            raw_accounts: vec![MockQueriableAccountBuilder::default()
                 .period_start_date(mkdate(1))
                 .today_date(mkdate(3))
                 .name("Galactic bank")
@@ -473,7 +565,7 @@ mod tests_get_accounts {
                 ("EUR".to_string(), dec!(2.4)),
             ]),
 
-            raw_accounts: vec![MockAccountBuilder::default()
+            raw_accounts: vec![MockQueriableAccountBuilder::default()
                 .period_start_date(mkdate(1))
                 .today_date(mkdate(3))
                 .name("Galactic bank")
@@ -510,7 +602,7 @@ mod tests_get_accounts {
 
     #[test]
     fn test__account_conversion__multiple_account() {
-        let account_builder = MockAccountBuilder::default()
+        let account_builder = MockQueriableAccountBuilder::default()
             .period_start_date(mkdate(1))
             .today_date(mkdate(3));
 
@@ -580,6 +672,49 @@ mod tests_get_accounts {
 
     #[test]
     fn test__goal_conversion__different_currency() {
+        let instance = RemainingOperation {
+            target_currency: "EUR".to_string(),
+            rates: HashMap::from([
+                ("CREDIT".to_string(), dec!(1.0)),
+                ("EUR".to_string(), dec!(2.4)),
+            ]),
+
+            goals: vec![MockGoalBuilder::default()
+                .commited(vec![(mkdate(1), 2), (mkdate(1), 3)])
+                .to_pay_at(5 as GoalAmount)
+                .target(15 as GoalAmount)
+                .currency("CREDIT")
+                .build()],
+            ..defaultinstance()
+        };
+
+        let result = instance.execute().unwrap();
+
+        assert_eq!(result.goals);
+
+        assert_eq!(result.goals[0].commited, 5.into());
+
+        assert_eq!(
+            result.overall_goal,
+            DisplayGoal {
+                name: "Overall Goal".into(),
+                commited: 12.into(),
+                to_commit_this_period: Some(12.into()),
+                target: 36.into(),
+                currency: "EUR".into()
+            }
+        )
+    }
+
+    #[test]
+    fn test__goal_conversion__nothing_to_pay() {
+        panic!(
+            "Next test to implement. Only test the overall DisplayGoal, the rest is just plumbing"
+        )
+    }
+
+    #[test]
+    fn test__goal_conversion__nothing_commited() {
         panic!(
             "Next test to implement. Only test the overall DisplayGoal, the rest is just plumbing"
         )

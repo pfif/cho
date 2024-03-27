@@ -5,7 +5,7 @@ use chrono::NaiveDate;
 use mockall::automock;
 use mockall_double::double;
 
-type Amount = u32;
+pub type Amount = u32;
 
 pub trait GoalVaultValues {
     fn goals() -> Vec<GoalImplementation>;
@@ -13,11 +13,11 @@ pub trait GoalVaultValues {
 
 #[cfg_attr(test, automock)]
 pub trait Goal {
-    fn name(&self) -> String;
-    fn currency(&self) -> String;
-    fn target(&self) -> Amount;
-    fn commited(&self) -> Vec<(NaiveDate, Amount)>;
-    fn target_date(&self) -> NaiveDate;
+    fn name(&self) -> &String;
+    fn currency(&self) -> &String;
+    fn target(&self) -> &Amount;
+    fn commited(&self) -> &Vec<(NaiveDate, Amount)>;
+    fn target_date(&self) -> &NaiveDate;
 
     fn remaining(&self) -> Result<Amount, String>;
     fn to_pay_at(
@@ -36,24 +36,24 @@ pub struct GoalImplementation {
 }
 
 impl Goal for GoalImplementation {
-    fn name(&self) -> String {
-        return self.name;
+    fn name(&self) -> &String {
+        return &self.name;
     }
 
-    fn currency(&self) -> String {
-        return self.currency;
+    fn currency(&self) -> &String {
+        return &self.currency;
     }
 
-    fn target(&self) -> Amount {
-        return self.target;
+    fn target(&self) -> &Amount {
+        return &self.target;
     }
 
-    fn commited(&self) -> Vec<(NaiveDate, Amount)> {
-        return self.commited;
+    fn commited(&self) -> &Vec<(NaiveDate, Amount)> {
+        return &self.commited;
     }
 
-    fn target_date(&self) -> NaiveDate {
-        return self.target_date;
+    fn target_date(&self) -> &NaiveDate {
+        return &self.target_date;
     }
 
     fn remaining(&self) -> Result<Amount, String> {
@@ -93,7 +93,7 @@ impl Goal for GoalImplementation {
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod test_remaining {
-    use super::{Amount, GoalImplementation};
+    use super::{Amount, Goal, GoalImplementation};
     use chrono::NaiveDate;
 
     fn make_goal(commited: Vec<(NaiveDate, Amount)>) -> GoalImplementation {
@@ -178,7 +178,7 @@ mod test_to_pay_at {
     use crate::period::{MockPeriodsConfiguration, Period};
     use mockall::predicate::eq;
 
-    use super::{Amount, GoalImplementation};
+    use super::{Amount, Goal, GoalImplementation};
     use chrono::{Datelike, Days, NaiveDate};
 
     fn make_goal(commited: Vec<(NaiveDate, Amount)>) -> GoalImplementation {
