@@ -289,8 +289,6 @@ impl DisplayAccount {
     }
 }
 
-/* TODO This should really be a table test that nicely follows the
- * builder pattern. It should also be expanded to test all pipping */
 #[cfg(test)]
 mod tests_remaining_operation {
     use super::{
@@ -302,6 +300,7 @@ mod tests_remaining_operation {
     use chrono::NaiveDate;
     use derive_builder::Builder;
     use mockall::predicate::eq;
+    use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
     use std::collections::HashMap;
     use std::collections::HashSet;
@@ -426,6 +425,39 @@ mod tests_remaining_operation {
             goals: vec![],
 
             predicted_income: Some(dec!(0)),
+        }
+    }
+
+    /* TODO Make all tests use this table test */
+    pub struct TestRunner{
+        target_currency: String,
+        rate_credit: Decimal,
+        eur_credit: Decimal,
+        goals: Vec<MockGoal>,
+        expected_commited: Vec<Decimal>,
+        expected_overall_goal: DisplayGoal,
+    }
+
+    impl TestRunner {
+        pub fn test(self) {
+            let instance = RemainingOperation {
+                target_currency: self.target_currency,
+                rates: HashMap::from([
+                    ("CREDIT".to_string(), self.rate_credit),
+                    ("EUR".to_string(), self.eur_credit),
+                ]),
+                goals: self.goals,
+                ..defaultinstance()
+            };
+
+            let result = instance.execute().unwrap();
+
+            assert_eq!(
+                result.goals.iter().map(|goal| goal.commited).collect::<Vec<Decimal>>(),
+                self.expected_commited
+            );
+
+            assert_eq!(result.overall_goal, self.expected_overall_goal);
         }
     }
 
@@ -672,38 +704,26 @@ mod tests_remaining_operation {
 
     #[test]
     fn test__goal_conversion__different_currency() {
-        let instance = RemainingOperation {
-            target_currency: "EUR".to_string(),
-            rates: HashMap::from([
-                ("CREDIT".to_string(), dec!(1.0)),
-                ("EUR".to_string(), dec!(2.4)),
-            ]),
-
+        TestRunner{
+            target_currency: "EUR".into(),
+            rate_credit: dec!(1.0),
+            eur_credit: dec!(2.4),
             goals: vec![MockGoalBuilder::default()
                 .commited(vec![(mkdate(1), 2), (mkdate(1), 3)])
-                .to_pay_at(5 as GoalAmount)
-                .target(15 as GoalAmount)
+                .to_pay_at(5 as u32)
+                .target(15 as u32)
                 .currency("CREDIT")
                 .build()],
-            ..defaultinstance()
-        };
 
-        let result = instance.execute().unwrap();
-
-        assert_eq!(result.goals);
-
-        assert_eq!(result.goals[0].commited, 5.into());
-
-        assert_eq!(
-            result.overall_goal,
-            DisplayGoal {
+            expected_commited: vec![5.into()],
+            expected_overall_goal: DisplayGoal {
                 name: "Overall Goal".into(),
                 commited: 12.into(),
                 to_commit_this_period: Some(12.into()),
                 target: 36.into(),
-                currency: "EUR".into()
+                currency: "EUR".into(),
             }
-        )
+        }.test();
     }
 
     #[test]
