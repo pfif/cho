@@ -77,9 +77,42 @@ impl Goal for GoalImplementation {
             return self.remaining();
         }
         let current_period = period_config.period_for_date(date)?;
-        for commit in &self.commited {
-            let date = &commit.0;
-            if date >= &current_period.start_date && date <= &current_period.end_date {
+
+        let last_commit_opt = {
+            let mut commits_iter = self.commited.iter();
+            let mut current_commit_opt = commits_iter.next();
+            if let Some(mut current_commit) = current_commit_opt{
+                loop{
+                    let next_commit_opt = commits_iter.next();
+                    let Some(next_commit) = next_commit_opt else {
+                        break
+                    };
+
+                    let current_commit_date = current_commit.0;
+                    let next_commit_date = next_commit.0;
+                    if current_commit_date > next_commit_date {
+                        return Err(format!("Goal '{}': Commits should be in chronological order", self.name));
+                    }
+
+                    current_commit_opt = next_commit_opt;
+                    current_commit = next_commit;
+                }
+            };
+            current_commit_opt
+        };
+
+        if let Some(last_commit) = last_commit_opt {
+            let last_commit_date = &last_commit.0;
+            if last_commit_date > date {
+                return Err(format!(
+                    "Goal '{}': Computing what was to be paid in the past is not supported.",
+                    &self.name
+                ));
+            }
+
+            if last_commit_date >= &current_period.start_date
+                && last_commit_date <= &current_period.end_date
+            {
                 return Ok(0);
             }
         }
@@ -345,5 +378,27 @@ mod test_to_pay_at {
         let goal = make_goal(vec![(date(12, 29), 30)]);
         let period_config = make_period_config(today, date(1, 1));
         assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 35);
+    }
+
+    #[test]
+    fn commited_after_date() {
+        let today = date(1, 2);
+        let goal = make_goal(vec![(date(12, 30), 30), (date(1, 3), 30)]);
+        let period_config = make_period_config(today, date(1, 1));
+        assert_eq!(
+            goal.to_pay_at(&period_config, &today).unwrap_err(),
+            "Goal 'Test goal': Computing what was to be paid in the past is not supported."
+        );
+    }
+
+    #[test]
+    fn commited_not_in_chronological_order() {
+        let today = date(1, 2);
+        let goal = make_goal(vec![(date(12, 30), 30), (date(12, 29), 30)]);
+        let period_config = make_period_config(today, date(1, 1));
+        assert_eq!(
+            goal.to_pay_at(&period_config, &today).unwrap_err(),
+            "Goal 'Test goal': Commits should be in chronological order"
+        );
     }
 }
