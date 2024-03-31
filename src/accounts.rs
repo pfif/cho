@@ -204,7 +204,7 @@ impl QueriableAccount for AccountJson {
         }
 
         loop {
-            let is_directly_after_next = match &iter.peek() {
+            let date_between_left_and_right = match &iter.peek() {
                 Some(item_right) => {
                     if item_left.date > item_right.date {
                         return Err("Amount history out of order".to_string());
@@ -222,7 +222,7 @@ impl QueriableAccount for AccountJson {
                 });
             }
 
-            if is_directly_after_next {
+            if date_between_left_and_right {
                 return Ok(FoundAmount {
                     figure: item_left.amount,
                     estimated: true,
