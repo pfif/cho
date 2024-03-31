@@ -18,6 +18,13 @@ type Figure = Decimal;
 type Currency = String;
 type ExchangeRates = HashMap<Currency, Figure>;
 
+#[derive(Clone)]
+#[cfg_attr(test, derive(Debug, Eq, PartialEq))]
+pub struct Amount {
+    currency: Currency,
+    figure: Figure,
+}
+
 #[cfg_attr(test, derive(Default, Debug, PartialEq, Eq, Hash))]
 pub struct DisplayAccount {
     name: String,
@@ -43,7 +50,7 @@ pub struct RemainingMoneyScreen {
     overall_balance: DisplayAccount,
     individual_balances: Vec<DisplayAccount>,
 
-    predicted_income: Option<Figure>,
+    predicted_income: Option<Amount>,
 
     overall_goal: DisplayGoal,
     goals: Vec<DisplayGoal>,
@@ -71,14 +78,14 @@ pub struct RemainingOperation<A: QueriableAccount, G: Goal> {
     raw_accounts: Vec<A>,
     goals: Vec<G>,
 
-    predicted_income: Option<Figure>,
+    predicted_income: Option<Amount>,
 }
 
 impl<A: QueriableAccount, G: Goal> RemainingOperation<A, G> {
     pub fn FromVaultValue(
         exchange_rate: ExchangeRates,
         target_currency: Currency,
-        predicted_income: Option<Figure>,
+        predicted_income: Option<Amount>,
     ) -> Result<RemainingOperation<A, G>, String> {
         return Ok(RemainingOperation {
             rates: exchange_rate,
@@ -87,14 +94,14 @@ impl<A: QueriableAccount, G: Goal> RemainingOperation<A, G> {
             date: Local::now().date_naive(),
             periods_configuration: PeriodsConfiguration::default(), // TODO get from Vault, remove the "default" implementation
 
-            raw_accounts: vec![],
-            goals: vec![],
+            raw_accounts: vec![], // TODO get from Accounts
+            goals: vec![],        // TODO get from vault
 
-            predicted_income: Some(dec!(0)),
+            predicted_income,
         });
     }
 
-    pub fn execute(&self) -> Result<RemainingMoneyScreen, String> {
+    pub fn execute(self) -> Result<RemainingMoneyScreen, String> {
         let current_period = self
             .periods_configuration
             .period_for_date(&self.date)
@@ -200,7 +207,27 @@ impl<A: QueriableAccount, G: Goal> RemainingOperation<A, G> {
             },
         )?;
 
-        let remaining = overall_balance.current_balance + self.predicted_income.unwrap_or(dec!(0))
+        let predicted_income_in_target_currency = {
+            if let Some(predicted_income) = &self.predicted_income {
+                if predicted_income.currency != self.target_currency {
+                    Some(Amount {
+                        currency: self.target_currency.to_string(),
+                        figure: self
+                            .convert(&predicted_income.figure, &predicted_income.currency)?,
+                    })
+                } else {
+                    self.predicted_income.clone()
+                }
+            } else {
+                self.predicted_income.clone()
+            }
+        };
+
+        let remaining = overall_balance.current_balance
+            + match &predicted_income_in_target_currency {
+                None => dec!(0),
+                Some(i) => i.figure,
+            }
             - overall_goal.to_commit_this_period.unwrap_or(dec!(0));
 
         return Ok(RemainingMoneyScreen {
@@ -209,13 +236,13 @@ impl<A: QueriableAccount, G: Goal> RemainingOperation<A, G> {
             overall_balance,
             individual_balances: accounts,
 
-            predicted_income: self.predicted_income,
+            predicted_income: predicted_income_in_target_currency,
 
             overall_goal,
             goals,
 
             remaining,
-            currency: self.target_currency.clone(),
+            currency: self.target_currency,
         });
     }
 
@@ -286,9 +313,10 @@ impl DisplayAccount {
 #[cfg(test)]
 mod tests_remaining_operation {
     use super::{
-        Figure as RemainingFigure, Currency, DisplayAccount, DisplayGoal, RemainingOperation,
+        Amount, Currency, DisplayAccount, DisplayGoal, Figure as RemainingFigure,
+        RemainingOperation,
     };
-    use crate::accounts::{Figure as AccountAmount, FoundAmount, MockQueriableAccount};
+    use crate::accounts::{Figure as AccountFigure, FoundAmount, MockQueriableAccount};
     use crate::goals::{Figure as GoalFigure, MockGoal};
     use crate::period::{MockPeriodsConfiguration, Period};
     use chrono::NaiveDate;
@@ -335,8 +363,8 @@ mod tests_remaining_operation {
         name: String,
         currency: Currency,
 
-        today_figure: AccountAmount,
-        period_start_figure: AccountAmount,
+        today_figure: AccountFigure,
+        period_start_figure: AccountFigure,
     }
 
     impl MockQueriableAccountBuilder {
@@ -418,11 +446,16 @@ mod tests_remaining_operation {
             raw_accounts: vec![],
             goals: vec![],
 
-            predicted_income: Some(dec!(0)),
+            predicted_income: None,
         }
     }
 
-    /* TODO Make all tests use this table test */
+    /*
+    TODO Make all tests use this table test
+    Once this is done, I should be able to compare the result to a
+    full RemainingMoneyScreen, instead of doing partial comparison as
+    I do now
+     */
     pub struct TestRunner<AccountGen: Fn(MockQueriableAccountBuilder) -> Vec<MockQueriableAccount>> {
         target_currency: String,
 
@@ -434,16 +467,19 @@ mod tests_remaining_operation {
         today: NaiveDate,
 
         accounts: AccountGen,
-        predicted_income: Option<RemainingFigure>,
+        predicted_income: Option<Amount>,
 
         goals: Vec<MockGoal>,
         expected_commited: Vec<RemainingFigure>,
         expected_overall_goal: DisplayGoal,
+        expected_predicted_income: Option<Amount>,
 
         expected_remaining: RemainingFigure,
     }
 
-    impl<AccountGen: Fn(MockQueriableAccountBuilder) -> Vec<MockQueriableAccount>> TestRunner<AccountGen> {
+    impl<AccountGen: Fn(MockQueriableAccountBuilder) -> Vec<MockQueriableAccount>>
+        TestRunner<AccountGen>
+    {
         pub fn test(self) {
             let account_builder = MockQueriableAccountBuilder::default()
                 .period_start_date(self.period_start)
@@ -455,7 +491,10 @@ mod tests_remaining_operation {
                     ("EUR".to_string(), self.rate_eur),
                 ]),
                 periods_configuration: mkperiodsconfig(
-                    &self.period_start, &self.period_end, &self.today),
+                    &self.period_start,
+                    &self.period_end,
+                    &self.today,
+                ),
                 date: self.today,
 
                 raw_accounts: (self.accounts)(account_builder),
@@ -477,6 +516,8 @@ mod tests_remaining_operation {
             assert_eq!(result.overall_goal, self.expected_overall_goal);
 
             assert_eq!(result.remaining, self.expected_remaining);
+
+            assert_eq!(result.predicted_income, self.expected_predicted_income)
         }
     }
 
@@ -599,10 +640,7 @@ mod tests_remaining_operation {
             }
         );
 
-        assert_eq!(
-            result.remaining,
-            dec!(6)
-        )
+        assert_eq!(result.remaining, dec!(6))
     }
 
     #[test]
@@ -740,8 +778,9 @@ mod tests_remaining_operation {
             period_start: mkdate(1),
             period_end: mkdate(31),
             today: mkdate(3),
-            accounts: |_| {vec!()},
+            accounts: |_| vec![],
             predicted_income: None,
+            expected_predicted_income: None,
 
             goals: vec![MockGoalBuilder::default()
                 .commited(vec![(mkdate(1), 2), (mkdate(1), 3)])
@@ -758,7 +797,7 @@ mod tests_remaining_operation {
                 target: 36.into(),
                 currency: "EUR".into(),
             },
-            expected_remaining: dec!(-12)
+            expected_remaining: dec!(-12),
         }
         .test();
     }
@@ -773,8 +812,9 @@ mod tests_remaining_operation {
             period_start: mkdate(1),
             period_end: mkdate(31),
             today: mkdate(3),
-            accounts: |_| {vec!()},
+            accounts: |_| vec![],
             predicted_income: None,
+            expected_predicted_income: None,
 
             goals: vec![MockGoalBuilder::default()
                 .commited(vec![(mkdate(1), 2), (mkdate(1), 3)])
@@ -791,7 +831,7 @@ mod tests_remaining_operation {
                 target: 15.into(),
                 currency: "EUR".into(),
             },
-            expected_remaining: dec!(0)
+            expected_remaining: dec!(0),
         }
         .test();
     }
@@ -806,8 +846,9 @@ mod tests_remaining_operation {
             period_start: mkdate(1),
             period_end: mkdate(31),
             today: mkdate(3),
-            accounts: |_| {vec!()},
+            accounts: |_| vec![],
             predicted_income: None,
+            expected_predicted_income: None,
 
             goals: vec![MockGoalBuilder::default()
                 .commited(vec![])
@@ -824,7 +865,7 @@ mod tests_remaining_operation {
                 target: dec!(15),
                 currency: "EUR".to_string(),
             },
-            expected_remaining: dec!(-5)
+            expected_remaining: dec!(-5),
         }
         .test();
     }
@@ -839,8 +880,9 @@ mod tests_remaining_operation {
             period_start: mkdate(1),
             period_end: mkdate(31),
             today: mkdate(3),
-            accounts: |_| {vec!()},
+            accounts: |_| vec![],
             predicted_income: None,
+            expected_predicted_income: None,
 
             goals: vec![
                 MockGoalBuilder::default()
@@ -871,8 +913,8 @@ mod tests_remaining_operation {
     }
 
     #[test]
-    fn test__multiple_account__multiple_goal(){
-        TestRunner{
+    fn test__multiple_account__multiple_goal() {
+        TestRunner {
             target_currency: "EUR".into(),
 
             rate_credit: 1.into(),
@@ -882,22 +924,23 @@ mod tests_remaining_operation {
             period_end: mkdate(31),
             today: mkdate(3),
             predicted_income: None,
+            expected_predicted_income: None,
 
             accounts: |account_builder| {
                 return vec![
                     account_builder
                         .name("European bank")
                         .currency("EUR")
-                        .today_figure(1500 as AccountAmount)
-                        .period_start_figure(1630 as AccountAmount)
+                        .today_figure(1500 as AccountFigure)
+                        .period_start_figure(1630 as AccountFigure)
                         .build(),
                     account_builder
                         .name("Galactic bank")
                         .currency("CREDIT")
-                        .today_figure(1338 as AccountAmount)
-                        .period_start_figure(1400 as AccountAmount)
+                        .today_figure(1338 as AccountFigure)
+                        .period_start_figure(1400 as AccountFigure)
                         .build(),
-                ]
+                ];
             },
 
             goals: vec![
@@ -923,12 +966,13 @@ mod tests_remaining_operation {
                 currency: "EUR".to_string(),
             },
             expected_remaining: dec!(4682.2),
-        }.test()
+        }
+        .test()
     }
 
     #[test]
-    fn test__multiple_account__multiple_goal__predicted_income(){
-        TestRunner{
+    fn test__multiple_account__multiple_goal__predicted_income() {
+        TestRunner {
             target_currency: "EUR".into(),
 
             rate_credit: 1.into(),
@@ -937,23 +981,30 @@ mod tests_remaining_operation {
             period_start: mkdate(1),
             period_end: mkdate(31),
             today: mkdate(3),
-            predicted_income: Some(1200.into()),
+            predicted_income: Some(Amount {
+                currency: "CREDIT".into(),
+                figure: 1200.into(),
+            }),
+            expected_predicted_income: Some(Amount {
+                currency: "EUR".into(),
+                figure: 2880.into(),
+            }),
 
             accounts: |account_builder| {
                 return vec![
                     account_builder
                         .name("European bank")
                         .currency("EUR")
-                        .today_figure(1500 as AccountAmount)
-                        .period_start_figure(1630 as AccountAmount)
+                        .today_figure(1500 as AccountFigure)
+                        .period_start_figure(1630 as AccountFigure)
                         .build(),
                     account_builder
                         .name("Galactic bank")
                         .currency("CREDIT")
-                        .today_figure(1338 as AccountAmount)
-                        .period_start_figure(1400 as AccountAmount)
+                        .today_figure(1338 as AccountFigure)
+                        .period_start_figure(1400 as AccountFigure)
                         .build(),
-                ]
+                ];
             },
 
             goals: vec![
@@ -978,7 +1029,42 @@ mod tests_remaining_operation {
                 target: dec!(3615),
                 currency: "EUR".to_string(),
             },
-            expected_remaining: dec!(4682.2),
-        }.test()
+            expected_remaining: dec!(7562.2),
+        }
+        .test()
+    }
+
+    #[test]
+    fn test__predicted_amount__same_currency() {
+        TestRunner {
+            target_currency: "EUR".into(),
+            predicted_income: Some(Amount {
+                currency: "EUR".into(),
+                figure: 1200.into(),
+            }),
+
+            expected_predicted_income: Some(Amount {
+                currency: "EUR".into(),
+                figure: 1200.into(),
+            }),
+            expected_remaining: dec!(1200),
+
+            rate_credit: 1.into(),
+            rate_eur: dec!(2.4),
+            period_start: mkdate(1),
+            period_end: mkdate(31),
+            today: mkdate(3),
+            accounts: |_| {vec!()},
+            goals: vec![],
+            expected_commited: vec![],
+            expected_overall_goal: DisplayGoal {
+                name: "Overall Goal".into(),
+                commited: dec!(0),
+                to_commit_this_period: None,
+                target: dec!(0),
+                currency: "EUR".to_string(),
+            },
+        }
+        .test()
     }
 }
