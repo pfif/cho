@@ -200,14 +200,8 @@ impl<A: QueriableAccount, G: Goal> RemainingOperation<A, G> {
             },
         )?;
 
-        let remaining = match self.predicted_income {
-            Some(i) => i,
-            None => dec!(0),
-        } - overall_balance.difference
-            - match overall_goal.to_commit_this_period {
-                Some(i) => i,
-                None => dec!(0),
-            };
+        let remaining = overall_balance.current_balance + self.predicted_income.unwrap_or(dec!(0))
+            - overall_goal.to_commit_this_period.unwrap_or(dec!(0));
 
         return Ok(RemainingMoneyScreen {
             period_start: current_period.start_date,
@@ -429,25 +423,45 @@ mod tests_remaining_operation {
     }
 
     /* TODO Make all tests use this table test */
-    pub struct TestRunner {
+    pub struct TestRunner<AccountGen: Fn(MockQueriableAccountBuilder) -> Vec<MockQueriableAccount>> {
         target_currency: String,
-        rate_credit: Decimal,
-        rate_eur: Decimal,
+
+        rate_credit: RemainingAmount,
+        rate_eur: RemainingAmount,
+
+        period_start: NaiveDate,
+        period_end: NaiveDate,
+        today: NaiveDate,
+
+        accounts: AccountGen,
+        predicted_income: Option<RemainingAmount>,
+
         goals: Vec<MockGoal>,
-        expected_commited: Vec<Decimal>,
+        expected_commited: Vec<RemainingAmount>,
         expected_overall_goal: DisplayGoal,
+
+        expected_remaining: RemainingAmount,
     }
 
-    impl TestRunner {
+    impl<AccountGen: Fn(MockQueriableAccountBuilder) -> Vec<MockQueriableAccount>> TestRunner<AccountGen> {
         pub fn test(self) {
+            let account_builder = MockQueriableAccountBuilder::default()
+                .period_start_date(self.period_start)
+                .today_date(self.today);
             let instance = RemainingOperation {
                 target_currency: self.target_currency,
                 rates: HashMap::from([
                     ("CREDIT".to_string(), self.rate_credit),
                     ("EUR".to_string(), self.rate_eur),
                 ]),
+                periods_configuration: mkperiodsconfig(
+                    &self.period_start, &self.period_end, &self.today),
+                date: self.today,
+
+                raw_accounts: (self.accounts)(account_builder),
+                predicted_income: self.predicted_income,
+
                 goals: self.goals,
-                ..defaultinstance()
             };
 
             let result = instance.execute().unwrap();
@@ -457,11 +471,12 @@ mod tests_remaining_operation {
                     .goals
                     .iter()
                     .map(|goal| goal.commited)
-                    .collect::<Vec<Decimal>>(),
+                    .collect::<Vec<RemainingAmount>>(),
                 self.expected_commited
             );
-
             assert_eq!(result.overall_goal, self.expected_overall_goal);
+
+            assert_eq!(result.remaining, self.expected_remaining);
         }
     }
 
@@ -583,6 +598,11 @@ mod tests_remaining_operation {
                 currency: "CREDIT".to_string(),
             }
         );
+
+        assert_eq!(
+            result.remaining,
+            dec!(6)
+        )
     }
 
     #[test]
@@ -633,7 +653,9 @@ mod tests_remaining_operation {
                 difference: dec!(-9.60),
                 currency: "EUR".to_string(),
             }
-        )
+        );
+
+        assert_eq!(result.remaining, dec!(14.40))
     }
 
     #[test]
@@ -703,7 +725,9 @@ mod tests_remaining_operation {
                 current_balance: dec!(16.40),
                 difference: dec!(-28.6)
             }
-        )
+        );
+
+        assert_eq!(result.remaining, dec!(16.40))
     }
 
     #[test]
@@ -712,10 +736,17 @@ mod tests_remaining_operation {
             target_currency: "EUR".into(),
             rate_credit: dec!(1.0),
             rate_eur: dec!(2.4),
+
+            period_start: mkdate(1),
+            period_end: mkdate(31),
+            today: mkdate(3),
+            accounts: |_| {vec!()},
+            predicted_income: None,
+
             goals: vec![MockGoalBuilder::default()
                 .commited(vec![(mkdate(1), 2), (mkdate(1), 3)])
-                .to_pay_at(5 as u32)
-                .target(15 as u32)
+                .to_pay_at(5 as GoalAmount)
+                .target(15 as GoalAmount)
                 .currency("CREDIT")
                 .build()],
 
@@ -727,6 +758,7 @@ mod tests_remaining_operation {
                 target: 36.into(),
                 currency: "EUR".into(),
             },
+            expected_remaining: dec!(-12)
         }
         .test();
     }
@@ -737,10 +769,17 @@ mod tests_remaining_operation {
             target_currency: "EUR".into(),
             rate_credit: dec!(1.0),
             rate_eur: dec!(2.4),
+
+            period_start: mkdate(1),
+            period_end: mkdate(31),
+            today: mkdate(3),
+            accounts: |_| {vec!()},
+            predicted_income: None,
+
             goals: vec![MockGoalBuilder::default()
                 .commited(vec![(mkdate(1), 2), (mkdate(1), 3)])
-                .to_pay_at(0 as u32)
-                .target(15 as u32)
+                .to_pay_at(0 as GoalAmount)
+                .target(15 as GoalAmount)
                 .currency("EUR")
                 .build()],
 
@@ -752,6 +791,7 @@ mod tests_remaining_operation {
                 target: 15.into(),
                 currency: "EUR".into(),
             },
+            expected_remaining: dec!(0)
         }
         .test();
     }
@@ -762,10 +802,17 @@ mod tests_remaining_operation {
             target_currency: "EUR".into(),
             rate_credit: dec!(1.0),
             rate_eur: dec!(2.4),
+
+            period_start: mkdate(1),
+            period_end: mkdate(31),
+            today: mkdate(3),
+            accounts: |_| {vec!()},
+            predicted_income: None,
+
             goals: vec![MockGoalBuilder::default()
                 .commited(vec![])
-                .to_pay_at(5 as u32)
-                .target(15 as u32)
+                .to_pay_at(5 as GoalAmount)
+                .target(15 as GoalAmount)
                 .currency("EUR")
                 .build()],
 
@@ -777,6 +824,7 @@ mod tests_remaining_operation {
                 target: dec!(15),
                 currency: "EUR".to_string(),
             },
+            expected_remaining: dec!(-5)
         }
         .test();
     }
@@ -787,17 +835,24 @@ mod tests_remaining_operation {
             target_currency: "EUR".into(),
             rate_credit: dec!(1.0),
             rate_eur: dec!(2.4),
+
+            period_start: mkdate(1),
+            period_end: mkdate(31),
+            today: mkdate(3),
+            accounts: |_| {vec!()},
+            predicted_income: None,
+
             goals: vec![
                 MockGoalBuilder::default()
                     .commited(vec![(mkdate(1), 15), (mkdate(10), 20)])
-                    .to_pay_at(5 as u32)
-                    .target(15 as u32)
+                    .to_pay_at(5 as GoalAmount)
+                    .target(15 as GoalAmount)
                     .currency("EUR")
                     .build(),
                 MockGoalBuilder::default()
                     .commited(vec![(mkdate(3), 5), (mkdate(17), 5)])
-                    .to_pay_at(10 as u32)
-                    .target(1500 as u32)
+                    .to_pay_at(10 as GoalAmount)
+                    .target(1500 as GoalAmount)
                     .currency("CREDIT")
                     .build(),
             ],
@@ -810,7 +865,120 @@ mod tests_remaining_operation {
                 target: dec!(3615),
                 currency: "EUR".to_string(),
             },
+            expected_remaining: dec!(-29),
         }
         .test();
+    }
+
+    #[test]
+    fn test__multiple_account__multiple_goal(){
+        TestRunner{
+            target_currency: "EUR".into(),
+
+            rate_credit: 1.into(),
+            rate_eur: dec!(2.4),
+
+            period_start: mkdate(1),
+            period_end: mkdate(31),
+            today: mkdate(3),
+            predicted_income: None,
+
+            accounts: |account_builder| {
+                return vec![
+                    account_builder
+                        .name("European bank")
+                        .currency("EUR")
+                        .today_figure(1500 as AccountAmount)
+                        .period_start_figure(1630 as AccountAmount)
+                        .build(),
+                    account_builder
+                        .name("Galactic bank")
+                        .currency("CREDIT")
+                        .today_figure(1338 as AccountAmount)
+                        .period_start_figure(1400 as AccountAmount)
+                        .build(),
+                ]
+            },
+
+            goals: vec![
+                MockGoalBuilder::default()
+                    .commited(vec![(mkdate(1), 15), (mkdate(10), 20)])
+                    .to_pay_at(5 as GoalAmount)
+                    .target(15 as GoalAmount)
+                    .currency("EUR")
+                    .build(),
+                MockGoalBuilder::default()
+                    .commited(vec![(mkdate(3), 5), (mkdate(17), 5)])
+                    .to_pay_at(10 as GoalAmount)
+                    .target(1500 as GoalAmount)
+                    .currency("CREDIT")
+                    .build(),
+            ],
+            expected_commited: vec![dec!(35), dec!(10)],
+            expected_overall_goal: DisplayGoal {
+                name: "Overall Goal".into(),
+                commited: dec!(59),
+                to_commit_this_period: Some(dec!(29)),
+                target: dec!(3615),
+                currency: "EUR".to_string(),
+            },
+            expected_remaining: dec!(4682.2),
+        }.test()
+    }
+
+    #[test]
+    fn test__multiple_account__multiple_goal__predicted_income(){
+        TestRunner{
+            target_currency: "EUR".into(),
+
+            rate_credit: 1.into(),
+            rate_eur: dec!(2.4),
+
+            period_start: mkdate(1),
+            period_end: mkdate(31),
+            today: mkdate(3),
+            predicted_income: Some(1200.into()),
+
+            accounts: |account_builder| {
+                return vec![
+                    account_builder
+                        .name("European bank")
+                        .currency("EUR")
+                        .today_figure(1500 as AccountAmount)
+                        .period_start_figure(1630 as AccountAmount)
+                        .build(),
+                    account_builder
+                        .name("Galactic bank")
+                        .currency("CREDIT")
+                        .today_figure(1338 as AccountAmount)
+                        .period_start_figure(1400 as AccountAmount)
+                        .build(),
+                ]
+            },
+
+            goals: vec![
+                MockGoalBuilder::default()
+                    .commited(vec![(mkdate(1), 15), (mkdate(10), 20)])
+                    .to_pay_at(5 as GoalAmount)
+                    .target(15 as GoalAmount)
+                    .currency("EUR")
+                    .build(),
+                MockGoalBuilder::default()
+                    .commited(vec![(mkdate(3), 5), (mkdate(17), 5)])
+                    .to_pay_at(10 as GoalAmount)
+                    .target(1500 as GoalAmount)
+                    .currency("CREDIT")
+                    .build(),
+            ],
+            expected_commited: vec![dec!(35), dec!(10)],
+            expected_overall_goal: DisplayGoal {
+                name: "Overall Goal".into(),
+                commited: dec!(59),
+                to_commit_this_period: Some(dec!(29)),
+                target: dec!(3615),
+                currency: "EUR".to_string(),
+            },
+            expected_remaining: dec!(4682.2),
+        }.test()
     }
 }
