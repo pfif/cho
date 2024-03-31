@@ -79,16 +79,19 @@ impl Goal for GoalImplementation {
         let current_period = period_config.period_for_date(date)?;
 
         let mut commits_iter = self.commited.iter();
-        if let Some(mut current_commit) = commits_iter.next(){
-            loop{
+        if let Some(mut current_commit) = commits_iter.next() {
+            loop {
                 let Some(next_commit) = commits_iter.next() else {
-                    break
+                    break;
                 };
 
                 let current_commit_date = current_commit.0;
                 let next_commit_date = next_commit.0;
                 if current_commit_date > next_commit_date {
-                    return Err(format!("Goal '{}': Commits should be in chronological order", self.name));
+                    return Err(format!(
+                        "Goal '{}': Commits should be in chronological order",
+                        self.name
+                    ));
                 }
 
                 current_commit = next_commit;
@@ -109,7 +112,6 @@ impl Goal for GoalImplementation {
                 return Ok(0);
             }
         };
-
 
         let remaining = self.remaining()?;
 
