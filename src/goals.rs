@@ -78,30 +78,23 @@ impl Goal for GoalImplementation {
         }
         let current_period = period_config.period_for_date(date)?;
 
-        let last_commit_opt = {
-            let mut commits_iter = self.commited.iter();
-            let mut current_commit_opt = commits_iter.next();
-            if let Some(mut current_commit) = current_commit_opt{
-                loop{
-                    let next_commit_opt = commits_iter.next();
-                    let Some(next_commit) = next_commit_opt else {
-                        break
-                    };
+        let mut commits_iter = self.commited.iter();
+        if let Some(mut current_commit) = commits_iter.next(){
+            loop{
+                let Some(next_commit) = commits_iter.next() else {
+                    break
+                };
 
-                    let current_commit_date = current_commit.0;
-                    let next_commit_date = next_commit.0;
-                    if current_commit_date > next_commit_date {
-                        return Err(format!("Goal '{}': Commits should be in chronological order", self.name));
-                    }
-
-                    current_commit_opt = next_commit_opt;
-                    current_commit = next_commit;
+                let current_commit_date = current_commit.0;
+                let next_commit_date = next_commit.0;
+                if current_commit_date > next_commit_date {
+                    return Err(format!("Goal '{}': Commits should be in chronological order", self.name));
                 }
-            };
-            current_commit_opt
-        };
 
-        if let Some(last_commit) = last_commit_opt {
+                current_commit = next_commit;
+            }
+
+            let last_commit = current_commit;
             let last_commit_date = &last_commit.0;
             if last_commit_date > date {
                 return Err(format!(
@@ -115,7 +108,8 @@ impl Goal for GoalImplementation {
             {
                 return Ok(0);
             }
-        }
+        };
+
 
         let remaining = self.remaining()?;
 
