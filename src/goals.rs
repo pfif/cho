@@ -5,7 +5,7 @@ use chrono::NaiveDate;
 use mockall::automock;
 use mockall_double::double;
 
-pub type Amount = u32;
+pub type Figure = u32;
 
 pub trait GoalVaultValues {
     fn goals() -> Vec<GoalImplementation>;
@@ -15,23 +15,23 @@ pub trait GoalVaultValues {
 pub trait Goal {
     fn name(&self) -> &String;
     fn currency(&self) -> &String;
-    fn target(&self) -> &Amount;
-    fn commited(&self) -> &Vec<(NaiveDate, Amount)>;
+    fn target(&self) -> &Figure;
+    fn commited(&self) -> &Vec<(NaiveDate, Figure)>;
     fn target_date(&self) -> &NaiveDate;
 
-    fn remaining(&self) -> Result<Amount, String>;
+    fn remaining(&self) -> Result<Figure, String>;
     fn to_pay_at(
         &self,
         period_config: &PeriodsConfiguration,
         date: &NaiveDate,
-    ) -> Result<Amount, String>;
+    ) -> Result<Figure, String>;
 }
 
 pub struct GoalImplementation {
     name: String,
     currency: String,
-    target: Amount,
-    commited: Vec<(NaiveDate, Amount)>,
+    target: Figure,
+    commited: Vec<(NaiveDate, Figure)>,
     target_date: NaiveDate,
 }
 
@@ -44,11 +44,11 @@ impl Goal for GoalImplementation {
         return &self.currency;
     }
 
-    fn target(&self) -> &Amount {
+    fn target(&self) -> &Figure {
         return &self.target;
     }
 
-    fn commited(&self) -> &Vec<(NaiveDate, Amount)> {
+    fn commited(&self) -> &Vec<(NaiveDate, Figure)> {
         return &self.commited;
     }
 
@@ -56,7 +56,7 @@ impl Goal for GoalImplementation {
         return &self.target_date;
     }
 
-    fn remaining(&self) -> Result<Amount, String> {
+    fn remaining(&self) -> Result<Figure, String> {
         let total_commited = self
             .commited
             .iter()
@@ -72,7 +72,7 @@ impl Goal for GoalImplementation {
         &self,
         period_config: &PeriodsConfiguration,
         date: &NaiveDate,
-    ) -> Result<Amount, String> {
+    ) -> Result<Figure, String> {
         if date > &self.target_date {
             return self.remaining();
         }
@@ -122,10 +122,10 @@ impl Goal for GoalImplementation {
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod test_remaining {
-    use super::{Amount, Goal, GoalImplementation};
+    use super::{Figure, Goal, GoalImplementation};
     use chrono::NaiveDate;
 
-    fn make_goal(commited: Vec<(NaiveDate, Amount)>) -> GoalImplementation {
+    fn make_goal(commited: Vec<(NaiveDate, Figure)>) -> GoalImplementation {
         return GoalImplementation {
             name: "Test goal".to_string(),
             currency: "JPY".to_string(),
@@ -207,10 +207,10 @@ mod test_to_pay_at {
     use crate::period::{MockPeriodsConfiguration, Period};
     use mockall::predicate::eq;
 
-    use super::{Amount, Goal, GoalImplementation};
+    use super::{Figure, Goal, GoalImplementation};
     use chrono::{Datelike, Days, NaiveDate};
 
-    fn make_goal(commited: Vec<(NaiveDate, Amount)>) -> GoalImplementation {
+    fn make_goal(commited: Vec<(NaiveDate, Figure)>) -> GoalImplementation {
         return GoalImplementation {
             name: "Test goal".to_string(),
             currency: "JPY".to_string(),

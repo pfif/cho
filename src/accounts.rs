@@ -10,12 +10,12 @@ use serde::Deserialize;
 use serde_json::from_reader;
 
 // Public traits
-pub type Amount = u32;
+pub type Figure = u32;
 const ACCOUNT_DIR: &str = "accounts";
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct FoundAmount {
-    pub figure: Amount,
+    pub figure: Figure,
     pub estimated: bool,
 }
 
@@ -178,7 +178,7 @@ pub struct AccountJson {
 #[derive(Deserialize, Hash, Eq, PartialEq, Debug)]
 pub struct AmountListItem {
     date: NaiveDate,
-    amount: Amount,
+    amount: Figure,
 }
 
 impl QueriableAccount for AccountJson {
@@ -249,7 +249,7 @@ impl QueriableAccount for AccountJson {
 mod tests_accountjson_amount_at {
     use chrono::NaiveDate;
 
-    use super::{AccountJson, Amount, AmountListItem, FoundAmount, QueriableAccount};
+    use super::{AccountJson, Figure, AmountListItem, FoundAmount, QueriableAccount};
 
     fn date(day: u32) -> NaiveDate {
         return NaiveDate::from_ymd_opt(1995, 5, day).unwrap();
@@ -289,7 +289,7 @@ mod tests_accountjson_amount_at {
         };
     }
 
-    fn assert_correct(day: u32, amount: Amount, estimated: bool) {
+    fn assert_correct(day: u32, amount: Figure, estimated: bool) {
         assert_eq!(
             sample_account(list_in_order()).amount_at(&date(day)),
             Result::Ok(FoundAmount {

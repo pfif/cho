@@ -14,25 +14,25 @@ use rust_decimal_macros::dec;
 // Public types //
 //////////////////
 
-type Amount = Decimal;
+type Figure = Decimal;
 type Currency = String;
-type ExchangeRates = HashMap<Currency, Amount>;
+type ExchangeRates = HashMap<Currency, Figure>;
 
 #[cfg_attr(test, derive(Default, Debug, PartialEq, Eq, Hash))]
 pub struct DisplayAccount {
     name: String,
-    period_start_balance: Amount,
-    current_balance: Amount,
-    difference: Amount,
+    period_start_balance: Figure,
+    current_balance: Figure,
+    difference: Figure,
     currency: Currency,
 }
 
 #[cfg_attr(test, derive(Default, Debug, PartialEq, Eq))]
 pub struct DisplayGoal {
     name: String,
-    commited: Amount,
-    to_commit_this_period: Option<Amount>,
-    target: Amount,
+    commited: Figure,
+    to_commit_this_period: Option<Figure>,
+    target: Figure,
     currency: Currency,
 }
 
@@ -43,17 +43,17 @@ pub struct RemainingMoneyScreen {
     overall_balance: DisplayAccount,
     individual_balances: Vec<DisplayAccount>,
 
-    predicted_income: Option<Amount>,
+    predicted_income: Option<Figure>,
 
     overall_goal: DisplayGoal,
     goals: Vec<DisplayGoal>,
 
-    remaining: Amount,
+    remaining: Figure,
     currency: Currency,
 }
 
 pub struct PredictedIncome {
-    amount: Amount,
+    amount: Figure,
     currency: Currency,
 }
 
@@ -71,14 +71,14 @@ pub struct RemainingOperation<A: QueriableAccount, G: Goal> {
     raw_accounts: Vec<A>,
     goals: Vec<G>,
 
-    predicted_income: Option<Amount>,
+    predicted_income: Option<Figure>,
 }
 
 impl<A: QueriableAccount, G: Goal> RemainingOperation<A, G> {
     pub fn FromVaultValue(
         exchange_rate: ExchangeRates,
         target_currency: Currency,
-        predicted_income: Option<Amount>,
+        predicted_income: Option<Figure>,
     ) -> Result<RemainingOperation<A, G>, String> {
         return Ok(RemainingOperation {
             rates: exchange_rate,
@@ -114,10 +114,10 @@ impl<A: QueriableAccount, G: Goal> RemainingOperation<A, G> {
 
         let overall_balance = {
             let (period_start_balance, current_balance) = accounts.iter().try_fold(
-                (dec!(0) as Amount, dec!(0) as Amount),
+                (dec!(0) as Figure, dec!(0) as Figure),
                 |(acc_period_start_balance, acc_current_balance),
                  account|
-                 -> Result<(Amount, Amount), String> {
+                 -> Result<(Figure, Figure), String> {
                     let mut period_start_balance = account.period_start_balance;
                     let mut current_balance = account.current_balance;
 
@@ -219,7 +219,7 @@ impl<A: QueriableAccount, G: Goal> RemainingOperation<A, G> {
         });
     }
 
-    fn convert(&self, amount: &Amount, from: &Currency) -> Result<Amount, String> {
+    fn convert(&self, amount: &Figure, from: &Currency) -> Result<Figure, String> {
         if from == &self.target_currency {
             return Err(
                 "Attempt to convert from the target currency to the target currency".into(),
@@ -236,7 +236,7 @@ impl<A: QueriableAccount, G: Goal> RemainingOperation<A, G> {
             .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::MidpointNearestEven));
     }
 
-    fn rate_for_currency(&self, name: &Currency) -> Result<Amount, String> {
+    fn rate_for_currency(&self, name: &Currency) -> Result<Figure, String> {
         return self
             .rates
             .get(name)
@@ -270,8 +270,8 @@ impl DisplayAccount {
     fn FromValues(
         name: String,
         currency: Currency,
-        period_start_balance: Amount,
-        current_balance: Amount,
+        period_start_balance: Figure,
+        current_balance: Figure,
     ) -> Self {
         DisplayAccount {
             name,
@@ -286,10 +286,10 @@ impl DisplayAccount {
 #[cfg(test)]
 mod tests_remaining_operation {
     use super::{
-        Amount as RemainingAmount, Currency, DisplayAccount, DisplayGoal, RemainingOperation,
+        Figure as RemainingFigure, Currency, DisplayAccount, DisplayGoal, RemainingOperation,
     };
-    use crate::accounts::{Amount as AccountAmount, FoundAmount, MockQueriableAccount};
-    use crate::goals::{Amount as GoalAmount, MockGoal};
+    use crate::accounts::{Figure as AccountAmount, FoundAmount, MockQueriableAccount};
+    use crate::goals::{Figure as GoalFigure, MockGoal};
     use crate::period::{MockPeriodsConfiguration, Period};
     use chrono::NaiveDate;
     use derive_builder::Builder;
@@ -375,9 +375,9 @@ mod tests_remaining_operation {
         name = "MockGoalBuilder"
     )]
     struct MockGoalB {
-        commited: Vec<(NaiveDate, GoalAmount)>,
-        to_pay_at: GoalAmount,
-        target: GoalAmount,
+        commited: Vec<(NaiveDate, GoalFigure)>,
+        to_pay_at: GoalFigure,
+        target: GoalFigure,
         currency: String,
     }
 
@@ -426,21 +426,21 @@ mod tests_remaining_operation {
     pub struct TestRunner<AccountGen: Fn(MockQueriableAccountBuilder) -> Vec<MockQueriableAccount>> {
         target_currency: String,
 
-        rate_credit: RemainingAmount,
-        rate_eur: RemainingAmount,
+        rate_credit: RemainingFigure,
+        rate_eur: RemainingFigure,
 
         period_start: NaiveDate,
         period_end: NaiveDate,
         today: NaiveDate,
 
         accounts: AccountGen,
-        predicted_income: Option<RemainingAmount>,
+        predicted_income: Option<RemainingFigure>,
 
         goals: Vec<MockGoal>,
-        expected_commited: Vec<RemainingAmount>,
+        expected_commited: Vec<RemainingFigure>,
         expected_overall_goal: DisplayGoal,
 
-        expected_remaining: RemainingAmount,
+        expected_remaining: RemainingFigure,
     }
 
     impl<AccountGen: Fn(MockQueriableAccountBuilder) -> Vec<MockQueriableAccount>> TestRunner<AccountGen> {
@@ -471,7 +471,7 @@ mod tests_remaining_operation {
                     .goals
                     .iter()
                     .map(|goal| goal.commited)
-                    .collect::<Vec<RemainingAmount>>(),
+                    .collect::<Vec<RemainingFigure>>(),
                 self.expected_commited
             );
             assert_eq!(result.overall_goal, self.expected_overall_goal);
@@ -745,8 +745,8 @@ mod tests_remaining_operation {
 
             goals: vec![MockGoalBuilder::default()
                 .commited(vec![(mkdate(1), 2), (mkdate(1), 3)])
-                .to_pay_at(5 as GoalAmount)
-                .target(15 as GoalAmount)
+                .to_pay_at(5 as GoalFigure)
+                .target(15 as GoalFigure)
                 .currency("CREDIT")
                 .build()],
 
@@ -778,8 +778,8 @@ mod tests_remaining_operation {
 
             goals: vec![MockGoalBuilder::default()
                 .commited(vec![(mkdate(1), 2), (mkdate(1), 3)])
-                .to_pay_at(0 as GoalAmount)
-                .target(15 as GoalAmount)
+                .to_pay_at(0 as GoalFigure)
+                .target(15 as GoalFigure)
                 .currency("EUR")
                 .build()],
 
@@ -811,8 +811,8 @@ mod tests_remaining_operation {
 
             goals: vec![MockGoalBuilder::default()
                 .commited(vec![])
-                .to_pay_at(5 as GoalAmount)
-                .target(15 as GoalAmount)
+                .to_pay_at(5 as GoalFigure)
+                .target(15 as GoalFigure)
                 .currency("EUR")
                 .build()],
 
@@ -845,14 +845,14 @@ mod tests_remaining_operation {
             goals: vec![
                 MockGoalBuilder::default()
                     .commited(vec![(mkdate(1), 15), (mkdate(10), 20)])
-                    .to_pay_at(5 as GoalAmount)
-                    .target(15 as GoalAmount)
+                    .to_pay_at(5 as GoalFigure)
+                    .target(15 as GoalFigure)
                     .currency("EUR")
                     .build(),
                 MockGoalBuilder::default()
                     .commited(vec![(mkdate(3), 5), (mkdate(17), 5)])
-                    .to_pay_at(10 as GoalAmount)
-                    .target(1500 as GoalAmount)
+                    .to_pay_at(10 as GoalFigure)
+                    .target(1500 as GoalFigure)
                     .currency("CREDIT")
                     .build(),
             ],
@@ -903,14 +903,14 @@ mod tests_remaining_operation {
             goals: vec![
                 MockGoalBuilder::default()
                     .commited(vec![(mkdate(1), 15), (mkdate(10), 20)])
-                    .to_pay_at(5 as GoalAmount)
-                    .target(15 as GoalAmount)
+                    .to_pay_at(5 as GoalFigure)
+                    .target(15 as GoalFigure)
                     .currency("EUR")
                     .build(),
                 MockGoalBuilder::default()
                     .commited(vec![(mkdate(3), 5), (mkdate(17), 5)])
-                    .to_pay_at(10 as GoalAmount)
-                    .target(1500 as GoalAmount)
+                    .to_pay_at(10 as GoalFigure)
+                    .target(1500 as GoalFigure)
                     .currency("CREDIT")
                     .build(),
             ],
@@ -959,14 +959,14 @@ mod tests_remaining_operation {
             goals: vec![
                 MockGoalBuilder::default()
                     .commited(vec![(mkdate(1), 15), (mkdate(10), 20)])
-                    .to_pay_at(5 as GoalAmount)
-                    .target(15 as GoalAmount)
+                    .to_pay_at(5 as GoalFigure)
+                    .target(15 as GoalFigure)
                     .currency("EUR")
                     .build(),
                 MockGoalBuilder::default()
                     .commited(vec![(mkdate(3), 5), (mkdate(17), 5)])
-                    .to_pay_at(10 as GoalAmount)
-                    .target(1500 as GoalAmount)
+                    .to_pay_at(10 as GoalFigure)
+                    .target(1500 as GoalFigure)
                     .currency("CREDIT")
                     .build(),
             ],
