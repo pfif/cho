@@ -429,10 +429,10 @@ mod tests_remaining_operation {
     }
 
     /* TODO Make all tests use this table test */
-    pub struct TestRunner{
+    pub struct TestRunner {
         target_currency: String,
         rate_credit: Decimal,
-        eur_credit: Decimal,
+        rate_eur: Decimal,
         goals: Vec<MockGoal>,
         expected_commited: Vec<Decimal>,
         expected_overall_goal: DisplayGoal,
@@ -444,7 +444,7 @@ mod tests_remaining_operation {
                 target_currency: self.target_currency,
                 rates: HashMap::from([
                     ("CREDIT".to_string(), self.rate_credit),
-                    ("EUR".to_string(), self.eur_credit),
+                    ("EUR".to_string(), self.rate_eur),
                 ]),
                 goals: self.goals,
                 ..defaultinstance()
@@ -453,7 +453,11 @@ mod tests_remaining_operation {
             let result = instance.execute().unwrap();
 
             assert_eq!(
-                result.goals.iter().map(|goal| goal.commited).collect::<Vec<Decimal>>(),
+                result
+                    .goals
+                    .iter()
+                    .map(|goal| goal.commited)
+                    .collect::<Vec<Decimal>>(),
                 self.expected_commited
             );
 
@@ -703,11 +707,11 @@ mod tests_remaining_operation {
     }
 
     #[test]
-    fn test__goal_conversion__different_currency() {
-        TestRunner{
+    fn test__goal__different_currency() {
+        TestRunner {
             target_currency: "EUR".into(),
             rate_credit: dec!(1.0),
-            eur_credit: dec!(2.4),
+            rate_eur: dec!(2.4),
             goals: vec![MockGoalBuilder::default()
                 .commited(vec![(mkdate(1), 2), (mkdate(1), 3)])
                 .to_pay_at(5 as u32)
@@ -722,28 +726,91 @@ mod tests_remaining_operation {
                 to_commit_this_period: Some(12.into()),
                 target: 36.into(),
                 currency: "EUR".into(),
-            }
-        }.test();
+            },
+        }
+        .test();
     }
 
     #[test]
-    fn test__goal_conversion__nothing_to_pay() {
-        panic!(
-            "Next test to implement. Only test the overall DisplayGoal, the rest is just plumbing"
-        )
+    fn test__goal__nothing_to_pay() {
+        TestRunner {
+            target_currency: "EUR".into(),
+            rate_credit: dec!(1.0),
+            rate_eur: dec!(2.4),
+            goals: vec![MockGoalBuilder::default()
+                .commited(vec![(mkdate(1), 2), (mkdate(1), 3)])
+                .to_pay_at(0 as u32)
+                .target(15 as u32)
+                .currency("EUR")
+                .build()],
+
+            expected_commited: vec![5.into()],
+            expected_overall_goal: DisplayGoal {
+                name: "Overall Goal".into(),
+                commited: 5.into(),
+                to_commit_this_period: None,
+                target: 15.into(),
+                currency: "EUR".into(),
+            },
+        }
+        .test();
     }
 
     #[test]
-    fn test__goal_conversion__nothing_commited() {
-        panic!(
-            "Next test to implement. Only test the overall DisplayGoal, the rest is just plumbing"
-        )
+    fn test__goal__nothing_commited() {
+        TestRunner {
+            target_currency: "EUR".into(),
+            rate_credit: dec!(1.0),
+            rate_eur: dec!(2.4),
+            goals: vec![MockGoalBuilder::default()
+                .commited(vec![])
+                .to_pay_at(5 as u32)
+                .target(15 as u32)
+                .currency("EUR")
+                .build()],
+
+            expected_commited: vec![dec!(0)],
+            expected_overall_goal: DisplayGoal {
+                name: "Overall Goal".into(),
+                commited: dec!(0),
+                to_commit_this_period: Some(dec!(5)),
+                target: dec!(15),
+                currency: "EUR".to_string(),
+            },
+        }
+        .test();
     }
 
     #[test]
-    fn test__goal_conversion__multiple_goals() {
-        panic!(
-            "Next test to implement. Only test the overall DisplayGoal, the rest is just plumbing"
-        )
+    fn test__goal__multiple_goals__different_currencies() {
+        TestRunner {
+            target_currency: "EUR".into(),
+            rate_credit: dec!(1.0),
+            rate_eur: dec!(2.4),
+            goals: vec![
+                MockGoalBuilder::default()
+                    .commited(vec![(mkdate(1), 15), (mkdate(10), 20)])
+                    .to_pay_at(5 as u32)
+                    .target(15 as u32)
+                    .currency("EUR")
+                    .build(),
+                MockGoalBuilder::default()
+                    .commited(vec![(mkdate(3), 5), (mkdate(17), 5)])
+                    .to_pay_at(10 as u32)
+                    .target(1500 as u32)
+                    .currency("CREDIT")
+                    .build(),
+            ],
+
+            expected_commited: vec![dec!(35), dec!(10)],
+            expected_overall_goal: DisplayGoal {
+                name: "Overall Goal".into(),
+                commited: dec!(59),
+                to_commit_this_period: Some(dec!(29)),
+                target: dec!(3615),
+                currency: "EUR".to_string(),
+            },
+        }
+        .test();
     }
 }
