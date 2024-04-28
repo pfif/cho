@@ -35,11 +35,14 @@ impl Vault {
 #[cfg(test)]
 mod tests_read_vault_values {
     use std::fs::File;
+    use std::io::Write;
 
     use serde::Deserialize;
     use tempfile::tempdir;
 
-    #[derive(Deserialize)]
+    use super::Vault;
+
+    #[derive(Deserialize, Eq, PartialEq, Debug)]
     struct TestVaultConfigObject {
         prop_left: String,
         prop_right: u16,
@@ -47,20 +50,30 @@ mod tests_read_vault_values {
 
     #[test]
     fn nominal() {
+        // Write the config file
         let directory = tempdir().unwrap();
         let config_file_path = directory.path().join("config.json");
 
-        let raw_path = r#"{
+        let raw_file = r#"{
 "vault_config_object": {
     "prop_left": "bar",
     "prop_right": 15
-}
+},
 "other_vault_object": {
     "prop_up": true,
     "prop_down": "foo"
 }
 }"#;
         let mut config_file = File::create(config_file_path).unwrap();
-        config_file.write_all(raw_path.into());
+        config_file.write_all(raw_file.as_bytes()).unwrap();
+
+        // Read it
+        let vault = Vault{path: directory.path().into()};
+        let result: Result<TestVaultConfigObject, String> = vault.read_vault_values("vault_config_object".into());
+
+        assert_eq!(result, Ok(TestVaultConfigObject{
+            prop_left: "bar".into(),
+            prop_right: 15
+        }))
     }
 }
