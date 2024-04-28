@@ -1054,7 +1054,7 @@ mod tests_remaining_operation {
             period_start: mkdate(1),
             period_end: mkdate(31),
             today: mkdate(3),
-            accounts: |_| {vec!()},
+            accounts: |_| vec![],
             goals: vec![],
             expected_commited: vec![],
             expected_overall_goal: DisplayGoal {
