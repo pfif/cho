@@ -96,7 +96,7 @@ impl RemainingOperation<AccountJson, GoalImplementation, PeriodVaultValues>{
             periods_configuration: vault.read_periods_configuration()?,
 
             raw_accounts: vec![], // TODO get from Accounts
-            goals: vec![],        // TODO get from vault
+            goals: vault.read_goals()?.goals,
 
             predicted_income,
         });

@@ -1,14 +1,23 @@
-use crate::period::PeriodsConfiguration;
+use crate::{period::PeriodsConfiguration, vault::Vault};
 use chrono::NaiveDate;
 #[cfg(test)]
 use mockall::automock;
+use serde::Deserialize;
 
 pub type Figure = u32;
 
-pub trait GoalVaultValues {
-    fn goals() -> Vec<GoalImplementation>;
+#[derive(Deserialize)]
+pub struct GoalVaultValues {
+    pub goals: Vec<GoalImplementation>
 }
 
+impl Vault {
+    pub fn read_goals(&self) -> Result<GoalVaultValues, String> {
+        return self.read_vault_values("goals".into());
+    }
+}
+
+#[derive(Deserialize)]
 pub struct GoalImplementation {
     name: String,
     currency: String,

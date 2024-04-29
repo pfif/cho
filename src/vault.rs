@@ -49,6 +49,7 @@ mod tests_read_vault_values {
         prop_right: u16,
     }
 
+    // TODO Make a macro to generate this
     impl Vault {
         fn read_vault_config_object(&self) -> Result<TestVaultConfigObject, String> {
             return self.read_vault_values("vault_config_object".into());
