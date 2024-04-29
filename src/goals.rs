@@ -29,6 +29,20 @@ pub trait Goal<P: PeriodsConfiguration> {
     fn to_pay_at(&self, period_config: &P, date: &NaiveDate) -> Result<Figure, String>;
 }
 
+impl GoalImplementation{
+    fn remaining(&self) -> Result<Figure, String> {
+        let total_commited = self
+            .commited
+            .iter()
+            .fold(0, |acc, (_, amount)| acc + amount);
+        if total_commited > self.target {
+            return Err("Commited above Goal's target".to_string());
+        }
+
+        return Ok(self.target - total_commited);
+    }
+}
+
 impl<P: PeriodsConfiguration> Goal<P> for GoalImplementation {
     fn name(&self) -> &String {
         return &self.name;
@@ -51,15 +65,11 @@ impl<P: PeriodsConfiguration> Goal<P> for GoalImplementation {
     }
 
     fn remaining(&self) -> Result<Figure, String> {
-        let total_commited = self
-            .commited
-            .iter()
-            .fold(0, |acc, (_, amount)| acc + amount);
-        if total_commited > self.target {
-            return Err("Commited above Goal's target".to_string());
-        }
-
-        return Ok(self.target - total_commited);
+        /* Telling the compiler that, when looking for the
+         * implementation of Goal<P>.remaining() for
+         * GoalImplementation on any P, it should use GoalImplementation's
+         * function directly */
+        self.remaining()
     }
 
     fn to_pay_at(&self, period_config: &P, date: &NaiveDate) -> Result<Figure, String> {
