@@ -2,9 +2,9 @@ use chrono::{Local, NaiveDate};
 use rand::Error;
 use std::collections::HashMap;
 
-use crate::accounts::{get_accounts, QueriableAccount};
-use crate::goals::{Goal, GoalVaultValues};
-use crate::period::PeriodsConfiguration;
+use crate::accounts::{get_accounts, QueriableAccount, AccountJson};
+use crate::goals::{Goal, GoalVaultValues, GoalImplementation};
+use crate::period::{PeriodsConfiguration, PeriodVaultValues};
 use crate::vault::Vault;
 use mockall_double::double;
 use rust_decimal::Decimal;
@@ -81,13 +81,13 @@ pub struct RemainingOperation<A: QueriableAccount, G: Goal<P>, P: PeriodsConfigu
     predicted_income: Option<Amount>,
 }
 
-impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperation<A, G, P> {
+impl RemainingOperation<AccountJson, GoalImplementation, PeriodVaultValues>{
     pub fn FromVaultValue(
         exchange_rate: ExchangeRates,
         target_currency: Currency,
         predicted_income: Option<Amount>,
         vault: Vault,
-    ) -> Result<RemainingOperation<A, G, P>, String> {
+    ) -> Result<RemainingOperation<AccountJson, GoalImplementation, PeriodVaultValues>, String> {
         return Ok(RemainingOperation {
             rates: exchange_rate,
             target_currency,
@@ -101,7 +101,9 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
             predicted_income,
         });
     }
+}
 
+impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperation<A, G, P> {
     pub fn execute(self) -> Result<RemainingMoneyScreen, String> {
         let current_period = self
             .periods_configuration
