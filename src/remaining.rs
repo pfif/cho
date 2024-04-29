@@ -4,8 +4,8 @@ use std::collections::HashMap;
 
 use crate::accounts::{get_accounts, QueriableAccount};
 use crate::goals::{Goal, GoalVaultValues};
-#[double]
 use crate::period::PeriodsConfiguration;
+use crate::vault::Vault;
 use mockall_double::double;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -68,12 +68,12 @@ pub struct PredictedIncome {
 // Public methods //
 ////////////////////
 
-pub struct RemainingOperation<A: QueriableAccount, G: Goal> {
+pub struct RemainingOperation<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> {
     rates: ExchangeRates,
     target_currency: Currency,
 
     date: NaiveDate,
-    periods_configuration: PeriodsConfiguration,
+    periods_configuration: P,
 
     raw_accounts: Vec<A>,
     goals: Vec<G>,
@@ -81,18 +81,19 @@ pub struct RemainingOperation<A: QueriableAccount, G: Goal> {
     predicted_income: Option<Amount>,
 }
 
-impl<A: QueriableAccount, G: Goal> RemainingOperation<A, G> {
+impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperation<A, G, P> {
     pub fn FromVaultValue(
         exchange_rate: ExchangeRates,
         target_currency: Currency,
         predicted_income: Option<Amount>,
-    ) -> Result<RemainingOperation<A, G>, String> {
+        vault: Vault,
+    ) -> Result<RemainingOperation<A, G, P>, String> {
         return Ok(RemainingOperation {
             rates: exchange_rate,
             target_currency,
 
             date: Local::now().date_naive(),
-            periods_configuration: PeriodsConfiguration::default(), // TODO get from Vault, remove the "default" implementation
+            periods_configuration: vault.read_periods_configuration()?,
 
             raw_accounts: vec![], // TODO get from Accounts
             goals: vec![],        // TODO get from vault
@@ -322,7 +323,6 @@ mod tests_remaining_operation {
     use chrono::NaiveDate;
     use derive_builder::Builder;
     use mockall::predicate::eq;
-    use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
     use std::collections::HashMap;
     use std::collections::HashSet;
@@ -410,7 +410,7 @@ mod tests_remaining_operation {
     }
 
     impl MockGoalBuilder {
-        fn build(&self) -> MockGoal {
+        fn build(&self) -> MockGoal<MockPeriodsConfiguration> {
             let mut mock = MockGoal::new();
 
             mock.expect_name().return_const("Mocked goal".into());
@@ -425,7 +425,11 @@ mod tests_remaining_operation {
         }
     }
 
-    fn defaultinstance() -> RemainingOperation<MockQueriableAccount, MockGoal> {
+    fn defaultinstance() -> RemainingOperation<
+        MockQueriableAccount,
+        MockGoal<MockPeriodsConfiguration>,
+        MockPeriodsConfiguration,
+    > {
         let mut period_configuration = MockPeriodsConfiguration::new();
 
         let period = Period {
@@ -469,7 +473,7 @@ mod tests_remaining_operation {
         accounts: AccountGen,
         predicted_income: Option<Amount>,
 
-        goals: Vec<MockGoal>,
+        goals: Vec<MockGoal<MockPeriodsConfiguration>>,
         expected_commited: Vec<RemainingFigure>,
         expected_overall_goal: DisplayGoal,
         expected_predicted_income: Option<Amount>,

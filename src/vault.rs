@@ -14,7 +14,8 @@ impl Vault {
             .map_err(|e| e.to_string())
             .and_then(|file| from_reader(file).map_err(|e| e.to_string()))
             .and_then(|json: Value| {
-                json.get(&name).cloned()
+                json.get(&name)
+                    .cloned()
                     .ok_or(format!("Could not find key: {}", &name))
             })
             .and_then(|subconfig| -> Result<T, String> {
@@ -32,14 +33,6 @@ impl Vault {
     }
 }
 
-trait VaultReadable: DeserializeOwned{
-    const KEY: &'static str;
-
-    fn FromVault(vault: Vault) -> Result<Self, String>{
-        return vault.read_vault_values(Self::KEY.into())
-    }
-}
-
 #[cfg(test)]
 mod tests_read_vault_values {
     use std::fs::File;
@@ -48,7 +41,7 @@ mod tests_read_vault_values {
     use serde::Deserialize;
     use tempfile::tempdir;
 
-    use super::{Vault, VaultReadable};
+    use super::Vault;
 
     #[derive(Deserialize, Eq, PartialEq, Debug)]
     struct TestVaultConfigObject {
@@ -56,8 +49,10 @@ mod tests_read_vault_values {
         prop_right: u16,
     }
 
-    impl VaultReadable for TestVaultConfigObject{
-        const KEY: &'static str = "vault_config_object";
+    impl Vault {
+        fn read_vault_config_object(&self) -> Result<TestVaultConfigObject, String> {
+            return self.read_vault_values("vault_config_object".into());
+        }
     }
 
     #[test]
@@ -80,12 +75,17 @@ mod tests_read_vault_values {
         config_file.write_all(raw_file.as_bytes()).unwrap();
 
         // Read it
-        let vault = Vault{path: directory.path().into()};
-        let result: Result<TestVaultConfigObject, String> = TestVaultConfigObject::FromVault(vault);
+        let vault = Vault {
+            path: directory.path().into(),
+        };
+        let result: Result<TestVaultConfigObject, String> = vault.read_vault_config_object();
 
-        assert_eq!(result, Ok(TestVaultConfigObject{
-            prop_left: "bar".into(),
-            prop_right: 15
-        }))
+        assert_eq!(
+            result,
+            Ok(TestVaultConfigObject {
+                prop_left: "bar".into(),
+                prop_right: 15
+            })
+        )
     }
 }

@@ -1,9 +1,3 @@
-/* use crate::goals::get_goals;
-use crate::remaining::remaining_money;
-use crate::vault::get_vault_value;
-use chrono::NaiveDate;
-
-
 /*
 Period start: 2023/02/01
 ============
@@ -27,13 +21,18 @@ Total          | €15300   | … (€2500)            | €61000 |
 Remaining this period: €456
 */
 
-fn remaining() {
+/* use crate::goals::get_goals;
+use crate::remaining::remaining_money;
+use crate::vault::Vault;
+use chrono::NaiveDate;
+
+
+
+fn remaining(vault: Vault) {
     // TODO Parse arguments
     let exchange_rate: ((String, f64), (String, f64));
     let target_currency: String;
     let include_predicted_income: bool;
-
-    let vault_value = get_vault_value();
 
     let remaining_money = remaining_money(
         exchange_rate,
@@ -43,15 +42,5 @@ fn remaining() {
         include_predicted_income,
     );
     // TODO: Display remaining money
-}
-
-fn goals() {
-    // TODO Parse arguments
-    let date: NaiveDate;
-    let vault_value = get_vault_value();
-
-    get_goals(vault_value, date);
-
-    // TODO Display goals
 }
 */

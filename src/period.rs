@@ -1,20 +1,38 @@
 use chrono::{Days, NaiveDate};
 #[cfg(test)]
 use mockall::automock;
+use serde::Deserialize;
+
+use crate::vault::Vault;
 
 pub type PeriodNumber = u16;
 
-#[derive(Default)]
-pub struct PeriodsConfiguration {
+#[derive(Deserialize)]
+pub struct PeriodVaultValues {
     start_date: NaiveDate,
     period_in_days: u8,
+}
+
+impl Vault {
+    pub fn read_periods_configuration(&self) -> Result<PeriodVaultValues, String> {
+        return self.read_vault_values("periods".into());
+    }
 }
 
 pub struct ErrorStartBeforePeriodConfiguration;
 
 #[cfg_attr(test, automock)]
-impl PeriodsConfiguration {
-    pub fn period_number_for_date(
+pub trait PeriodsConfiguration {
+    fn period_number_for_date(
+        &self,
+        date: &NaiveDate,
+    ) -> Result<PeriodNumber, ErrorStartBeforePeriodConfiguration>;
+    fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String>;
+    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<PeriodNumber, String>;
+}
+
+impl PeriodsConfiguration for PeriodVaultValues {
+    fn period_number_for_date(
         &self,
         date: &NaiveDate,
     ) -> Result<PeriodNumber, ErrorStartBeforePeriodConfiguration> {
@@ -24,7 +42,7 @@ impl PeriodsConfiguration {
         let days_since_start = (*date - self.start_date).num_days() as u8;
         return Ok((days_since_start / self.period_in_days) as PeriodNumber);
     }
-    pub fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String> {
+    fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String> {
         let period_number_for_date = self.period_number_for_date(date).or_else(
             |_errortypecheck: ErrorStartBeforePeriodConfiguration| {
                 return Err("Date is before PeriodsConfiguration's start".to_string());
@@ -44,11 +62,7 @@ impl PeriodsConfiguration {
         });
     }
 
-    pub fn periods_between(
-        &self,
-        start: &NaiveDate,
-        end: &NaiveDate,
-    ) -> Result<PeriodNumber, String> {
+    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<PeriodNumber, String> {
         if start > end {
             return Err("Start date is after end date".to_string());
         }
@@ -87,15 +101,15 @@ pub struct Period {
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod tests {
-    use super::{Period, PeriodsConfiguration};
+    use super::{Period, PeriodVaultValues, PeriodsConfiguration};
     use chrono::NaiveDate;
 
     fn date(day_of_month: u32) -> NaiveDate {
         return NaiveDate::from_ymd_opt(2023, 04, day_of_month).unwrap();
     }
 
-    fn config() -> PeriodsConfiguration {
-        return PeriodsConfiguration {
+    fn config() -> PeriodVaultValues {
+        return PeriodVaultValues {
             start_date: date(11),
             period_in_days: 4,
         };

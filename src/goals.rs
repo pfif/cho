@@ -1,30 +1,12 @@
-#[double]
 use crate::period::PeriodsConfiguration;
 use chrono::NaiveDate;
 #[cfg(test)]
 use mockall::automock;
-use mockall_double::double;
 
 pub type Figure = u32;
 
 pub trait GoalVaultValues {
     fn goals() -> Vec<GoalImplementation>;
-}
-
-#[cfg_attr(test, automock)]
-pub trait Goal {
-    fn name(&self) -> &String;
-    fn currency(&self) -> &String;
-    fn target(&self) -> &Figure;
-    fn commited(&self) -> &Vec<(NaiveDate, Figure)>;
-    fn target_date(&self) -> &NaiveDate;
-
-    fn remaining(&self) -> Result<Figure, String>;
-    fn to_pay_at(
-        &self,
-        period_config: &PeriodsConfiguration,
-        date: &NaiveDate,
-    ) -> Result<Figure, String>;
 }
 
 pub struct GoalImplementation {
@@ -35,7 +17,19 @@ pub struct GoalImplementation {
     target_date: NaiveDate,
 }
 
-impl Goal for GoalImplementation {
+#[cfg_attr(test, automock)]
+pub trait Goal<P: PeriodsConfiguration> {
+    fn name(&self) -> &String;
+    fn currency(&self) -> &String;
+    fn target(&self) -> &Figure;
+    fn commited(&self) -> &Vec<(NaiveDate, Figure)>;
+    fn target_date(&self) -> &NaiveDate;
+
+    fn remaining(&self) -> Result<Figure, String>;
+    fn to_pay_at(&self, period_config: &P, date: &NaiveDate) -> Result<Figure, String>;
+}
+
+impl<P: PeriodsConfiguration> Goal<P> for GoalImplementation {
     fn name(&self) -> &String {
         return &self.name;
     }
@@ -68,11 +62,7 @@ impl Goal for GoalImplementation {
         return Ok(self.target - total_commited);
     }
 
-    fn to_pay_at(
-        &self,
-        period_config: &PeriodsConfiguration,
-        date: &NaiveDate,
-    ) -> Result<Figure, String> {
+    fn to_pay_at(&self, period_config: &P, date: &NaiveDate) -> Result<Figure, String> {
         if date > &self.target_date {
             return self.remaining();
         }
