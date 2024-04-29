@@ -32,6 +32,14 @@ impl Vault {
     }
 }
 
+trait VaultReadable: DeserializeOwned{
+    const KEY: &'static str;
+
+    fn FromVault(vault: Vault) -> Result<Self, String>{
+        return vault.read_vault_values(Self::KEY.into())
+    }
+}
+
 #[cfg(test)]
 mod tests_read_vault_values {
     use std::fs::File;
@@ -40,12 +48,16 @@ mod tests_read_vault_values {
     use serde::Deserialize;
     use tempfile::tempdir;
 
-    use super::Vault;
+    use super::{Vault, VaultReadable};
 
     #[derive(Deserialize, Eq, PartialEq, Debug)]
     struct TestVaultConfigObject {
         prop_left: String,
         prop_right: u16,
+    }
+
+    impl VaultReadable for TestVaultConfigObject{
+        const KEY: &'static str = "vault_config_object";
     }
 
     #[test]
@@ -69,7 +81,7 @@ mod tests_read_vault_values {
 
         // Read it
         let vault = Vault{path: directory.path().into()};
-        let result: Result<TestVaultConfigObject, String> = vault.read_vault_values("vault_config_object".into());
+        let result: Result<TestVaultConfigObject, String> = TestVaultConfigObject::FromVault(vault);
 
         assert_eq!(result, Ok(TestVaultConfigObject{
             prop_left: "bar".into(),
