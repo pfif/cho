@@ -3,12 +3,17 @@ use serde_json::{from_reader, from_value, Value};
 use std::fs::File;
 use std::path::PathBuf;
 
-pub struct Vault {
+pub struct VaultImpl {
     path: PathBuf,
 }
 
-impl Vault {
-    pub fn read_vault_values<T: DeserializeOwned>(&self, name: String) -> Result<T, String> {
+pub trait Vault{
+    fn read_vault_values<T: DeserializeOwned>(&self, name: String) -> Result<T, String>;
+    fn path(&self) -> &PathBuf;
+}
+
+impl Vault for VaultImpl {
+    fn read_vault_values<T: DeserializeOwned>(&self, name: String) -> Result<T, String> {
         let path = self.path.join("config.json");
         let vault_values = File::open(&path)
             .map_err(|e| e.to_string())
@@ -31,6 +36,18 @@ impl Vault {
             )
         })
     }
+
+    fn path(&self) -> &PathBuf{
+        return &self.path
+    }
+}
+
+pub trait VaultReadable: DeserializeOwned {
+    const KEY: &'static str;
+
+    fn FromVault<V:Vault>(vault: &V) -> Result<Self, String> where Self: Sized {
+        vault.read_vault_values(Self::KEY.into())
+    }
 }
 
 #[cfg(test)]
@@ -41,7 +58,9 @@ mod tests_read_vault_values {
     use serde::Deserialize;
     use tempfile::tempdir;
 
-    use super::Vault;
+    use crate::vault::VaultImpl;
+
+    use super::{Vault, VaultReadable};
 
     #[derive(Deserialize, Eq, PartialEq, Debug)]
     struct TestVaultConfigObject {
@@ -49,13 +68,10 @@ mod tests_read_vault_values {
         prop_right: u16,
     }
 
-    // TODO Make a macro to generate this
-    impl Vault {
-        fn read_vault_config_object(&self) -> Result<TestVaultConfigObject, String> {
-            return self.read_vault_values("vault_config_object".into());
-        }
+    impl VaultReadable for TestVaultConfigObject {
+        const KEY: &'static str = "vault_config_object";
     }
-
+    
     #[test]
     fn nominal() {
         // Write the config file
@@ -76,10 +92,10 @@ mod tests_read_vault_values {
         config_file.write_all(raw_file.as_bytes()).unwrap();
 
         // Read it
-        let vault = Vault {
+        let vault = VaultImpl {
             path: directory.path().into(),
         };
-        let result: Result<TestVaultConfigObject, String> = vault.read_vault_config_object();
+        let result: Result<TestVaultConfigObject, String> = TestVaultConfigObject::FromVault(&vault);
 
         assert_eq!(
             result,

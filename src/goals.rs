@@ -1,4 +1,4 @@
-use crate::{period::PeriodsConfiguration, vault::Vault};
+use crate::{period::PeriodsConfiguration, vault::VaultReadable};
 use chrono::NaiveDate;
 #[cfg(test)]
 use mockall::automock;
@@ -11,10 +11,8 @@ pub struct GoalVaultValues {
     pub goals: Vec<GoalImplementation>
 }
 
-impl Vault {
-    pub fn read_goals(&self) -> Result<GoalVaultValues, String> {
-        return self.read_vault_values("goals".into());
-    }
+impl VaultReadable for GoalVaultValues {
+    const KEY: &'static str = "goals";
 }
 
 #[derive(Deserialize)]

@@ -1,6 +1,6 @@
 use std::{
     fs::{read_dir, File},
-    path::Path,
+    path::PathBuf,
 };
 
 use chrono::NaiveDate;
@@ -8,6 +8,8 @@ use chrono::NaiveDate;
 use mockall::automock;
 use serde::Deserialize;
 use serde_json::from_reader;
+
+use crate::vault::Vault;
 
 // Public traits
 pub type Figure = u32;
@@ -27,8 +29,9 @@ pub trait QueriableAccount {
 }
 
 // Finder
-pub fn get_accounts(directory: &Path) -> Result<Vec<AccountJson>, String> {
-    let dir_reader = match read_dir(Path::join(directory, ACCOUNT_DIR)) {
+pub fn get_accounts<V: Vault>(vault: &V) -> Result<Vec<AccountJson>, String> {
+    let directory = vault.path();
+    let dir_reader = match read_dir(directory.join(ACCOUNT_DIR)) {
         Err(why) => {
             return Err(String::from("Could not read the Accounts directory: ") + &why.to_string())
         }
@@ -82,10 +85,25 @@ mod tests_get_accounts {
     use std::collections::HashSet;
     use std::fs::{create_dir, File};
     use std::io::prelude::*;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use tempfile::{tempdir, TempDir};
 
     use crate::accounts::{get_accounts, AccountJson, AmountListItem, ACCOUNT_DIR};
+    use crate::vault::Vault;
+
+    struct MockVault{
+        path: PathBuf
+    }
+
+    impl Vault for MockVault{
+        fn path(&self) -> &PathBuf {
+            return &self.path;
+        }
+        
+        fn read_vault_values<T: serde::de::DeserializeOwned>(&self, name: String) -> Result<T, String> {
+            todo!()
+        }
+    }
 
     fn create_account_file(directory: &TempDir, name: &str, content: &str) {
         let path = Path::join(&Path::join(directory.path(), ACCOUNT_DIR), name);
@@ -160,8 +178,10 @@ mod tests_get_accounts {
             },
         ]);
 
+        let vault = MockVault{path: directory.path().to_path_buf()};
+
         assert_eq!(
-            HashSet::from_iter(get_accounts(&directory.path()).unwrap()),
+            HashSet::from_iter(get_accounts(&vault).unwrap()),
             expected_accounts
         )
     }

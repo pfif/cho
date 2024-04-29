@@ -3,7 +3,7 @@ use chrono::{Days, NaiveDate};
 use mockall::automock;
 use serde::Deserialize;
 
-use crate::vault::Vault;
+use crate::vault::VaultReadable;
 
 pub type PeriodNumber = u16;
 
@@ -13,10 +13,9 @@ pub struct PeriodVaultValues {
     period_in_days: u8,
 }
 
-impl Vault {
-    pub fn read_periods_configuration(&self) -> Result<PeriodVaultValues, String> {
-        return self.read_vault_values("periods".into());
-    }
+// TODO Make a macro to generate this
+impl VaultReadable for PeriodVaultValues {
+    const KEY: &'static str = "periods_configuration";
 }
 
 pub struct ErrorStartBeforePeriodConfiguration;
