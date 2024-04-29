@@ -6,10 +6,7 @@ use serde::Deserialize;
 
 pub type Figure = u32;
 
-#[derive(Deserialize)]
-pub struct GoalVaultValues {
-    pub goals: Vec<GoalImplementation>
-}
+pub type GoalVaultValues = Vec<GoalImplementation>;
 
 impl VaultReadable for GoalVaultValues {
     const KEY: &'static str = "goals";
@@ -36,7 +33,7 @@ pub trait Goal<P: PeriodsConfiguration> {
     fn to_pay_at(&self, period_config: &P, date: &NaiveDate) -> Result<Figure, String>;
 }
 
-impl GoalImplementation{
+impl GoalImplementation {
     fn remaining(&self) -> Result<Figure, String> {
         let total_commited = self
             .commited

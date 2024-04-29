@@ -1,6 +1,5 @@
 use std::{
     fs::{read_dir, File},
-    path::PathBuf,
 };
 
 use chrono::NaiveDate;
@@ -33,7 +32,7 @@ pub fn get_accounts<V: Vault>(vault: &V) -> Result<Vec<AccountJson>, String> {
     let directory = vault.path();
     let dir_reader = match read_dir(directory.join(ACCOUNT_DIR)) {
         Err(why) => {
-            return Err(String::from("Could not read the Accounts directory: ") + &why.to_string())
+            return Err("Could not read the Accounts directory: ".to_string() + &why.to_string())
         }
         Ok(reader) => reader,
     };
@@ -91,16 +90,19 @@ mod tests_get_accounts {
     use crate::accounts::{get_accounts, AccountJson, AmountListItem, ACCOUNT_DIR};
     use crate::vault::Vault;
 
-    struct MockVault{
-        path: PathBuf
+    struct MockVault {
+        path: PathBuf,
     }
 
-    impl Vault for MockVault{
+    impl Vault for MockVault {
         fn path(&self) -> &PathBuf {
             return &self.path;
         }
-        
-        fn read_vault_values<T: serde::de::DeserializeOwned>(&self, name: String) -> Result<T, String> {
+
+        fn read_vault_values<T: serde::de::DeserializeOwned>(
+            &self,
+            name: String,
+        ) -> Result<T, String> {
             todo!()
         }
     }
@@ -178,7 +180,9 @@ mod tests_get_accounts {
             },
         ]);
 
-        let vault = MockVault{path: directory.path().to_path_buf()};
+        let vault = MockVault {
+            path: directory.path().to_path_buf(),
+        };
 
         assert_eq!(
             HashSet::from_iter(get_accounts(&vault).unwrap()),

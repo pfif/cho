@@ -1,12 +1,13 @@
 use chrono::{Local, NaiveDate};
 use std::collections::HashMap;
 
-use crate::accounts::{get_accounts, QueriableAccount, AccountJson};
-use crate::goals::{Goal, GoalVaultValues, GoalImplementation};
-use crate::period::{PeriodsConfiguration, PeriodVaultValues};
+use crate::accounts::{get_accounts, AccountJson, QueriableAccount};
+use crate::goals::{Goal, GoalImplementation, GoalVaultValues};
+use crate::period::{PeriodVaultValues, PeriodsConfiguration};
 use crate::vault::{Vault, VaultReadable};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
+use serde::Deserialize;
 
 //////////////////
 // Public types //
@@ -14,13 +15,13 @@ use rust_decimal_macros::dec;
 
 type Figure = Decimal;
 type Currency = String;
-type ExchangeRates = HashMap<Currency, Figure>;
+pub type ExchangeRates = HashMap<Currency, Figure>;
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 #[cfg_attr(test, derive(Debug, Eq, PartialEq))]
 pub struct Amount {
-    currency: Currency,
-    figure: Figure,
+    pub currency: Currency,
+    pub figure: Figure,
 }
 
 #[cfg_attr(test, derive(Default, Debug, PartialEq, Eq, Hash))]
@@ -79,22 +80,23 @@ pub struct RemainingOperation<A: QueriableAccount, G: Goal<P>, P: PeriodsConfigu
     predicted_income: Option<Amount>,
 }
 
-impl RemainingOperation<AccountJson, GoalImplementation, PeriodVaultValues>{
+impl RemainingOperation<AccountJson, GoalImplementation, PeriodVaultValues> {
     pub fn FromVaultValue<V: Vault>(
         exchange_rate: ExchangeRates,
         target_currency: Currency,
         predicted_income: Option<Amount>,
-        vault: V,
-    ) -> Result<RemainingOperation<AccountJson, GoalImplementation, PeriodVaultValues>, String> {
+        vault: &V,
+    ) -> Result<RemainingOperation<AccountJson, GoalImplementation, PeriodVaultValues>, String>
+    {
         return Ok(RemainingOperation {
             rates: exchange_rate,
             target_currency,
 
             date: Local::now().date_naive(),
-            periods_configuration: PeriodVaultValues::FromVault(&vault)?,
+            periods_configuration: PeriodVaultValues::FromVault(vault)?,
 
-            raw_accounts: get_accounts(&vault)?,
-            goals: GoalVaultValues::FromVault(&vault)?.goals,
+            raw_accounts: get_accounts(vault)?,
+            goals: GoalVaultValues::FromVault(vault)?,
 
             predicted_income,
         });

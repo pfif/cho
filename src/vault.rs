@@ -4,10 +4,10 @@ use std::fs::File;
 use std::path::PathBuf;
 
 pub struct VaultImpl {
-    path: PathBuf,
+    pub(crate) path: PathBuf,
 }
 
-pub trait Vault{
+pub trait Vault {
     fn read_vault_values<T: DeserializeOwned>(&self, name: String) -> Result<T, String>;
     fn path(&self) -> &PathBuf;
 }
@@ -37,15 +37,15 @@ impl Vault for VaultImpl {
         })
     }
 
-    fn path(&self) -> &PathBuf{
-        return &self.path
+    fn path(&self) -> &PathBuf {
+        return &self.path;
     }
 }
 
 pub trait VaultReadable: DeserializeOwned {
     const KEY: &'static str;
 
-    fn FromVault<V:Vault>(vault: &V) -> Result<Self, String> where Self: Sized {
+    fn FromVault<V: Vault>(vault: &V) -> Result<Self, String> {
         vault.read_vault_values(Self::KEY.into())
     }
 }
@@ -71,7 +71,7 @@ mod tests_read_vault_values {
     impl VaultReadable for TestVaultConfigObject {
         const KEY: &'static str = "vault_config_object";
     }
-    
+
     #[test]
     fn nominal() {
         // Write the config file
@@ -95,7 +95,8 @@ mod tests_read_vault_values {
         let vault = VaultImpl {
             path: directory.path().into(),
         };
-        let result: Result<TestVaultConfigObject, String> = TestVaultConfigObject::FromVault(&vault);
+        let result: Result<TestVaultConfigObject, String> =
+            TestVaultConfigObject::FromVault(&vault);
 
         assert_eq!(
             result,

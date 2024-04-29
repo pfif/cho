@@ -13,7 +13,6 @@ pub struct PeriodVaultValues {
     period_in_days: u8,
 }
 
-// TODO Make a macro to generate this
 impl VaultReadable for PeriodVaultValues {
     const KEY: &'static str = "periods_configuration";
 }

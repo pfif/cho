@@ -5,6 +5,7 @@ mod period;
 mod remaining;
 mod vault;
 
+use crate::cli::remaining;
 fn main() {
-    println!("Hello, world!");
+    remaining()
 }
