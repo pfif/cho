@@ -67,6 +67,8 @@ pub fn remaining_operation() {
     println!("{}", screen.unwrap())
 }
 
+// TYPES AND ADAPTERS
+
 type Figure = Decimal;
 type Currency = String;
 type ExchangeRate = (String, Decimal);
@@ -187,6 +189,8 @@ impl<'a> DisplayGoal<'a> {
     }
 }
 
+// CLI ARGUMENTS PARSING
+
 fn parse_exchange_rate(s: &str) -> Result<ExchangeRate, String> {
     let rate: Option<ExchangeRate> = (|| {
         let splitted_string = s.split(":").collect::<Vec<&str>>();
@@ -223,6 +227,8 @@ struct RemainingOptions {
     #[arg(short = 'V', long)]
     vault: Option<PathBuf>,
 }
+
+// OUTPUT FORMATTING
 
 struct RemainingMoneyScreen {
     screen: remaining::RemainingMoneyScreen,
@@ -313,7 +319,7 @@ impl RemainingMoneyScreen {
     }
 
     fn formatted_remaining(&self) -> String {
-        RemainingMoneyScreen::title(&format!("Remaining this period: {}", Amount::from(self.screen.remaining.clone())))
+        RemainingMoneyScreen::title(&format!("(=) Remaining this period: {}", Amount::from(self.screen.remaining.clone())))
     }
 }
 
