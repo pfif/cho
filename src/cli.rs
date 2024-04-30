@@ -331,7 +331,7 @@ impl Display for RemainingMoneyScreen {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}",
+            "{}\n",
             [
                 self.formatted_period_start(),
                 self.formatted_account_table(),
