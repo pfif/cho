@@ -5,7 +5,7 @@ mod period;
 mod remaining;
 mod vault;
 
-use crate::cli::remaining;
+use crate::cli::remaining_operation;
 fn main() {
-    remaining()
+    remaining_operation()
 }

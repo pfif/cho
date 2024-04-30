@@ -54,13 +54,7 @@ pub struct RemainingMoneyScreen {
     pub overall_goal: DisplayGoal,
     pub goals: Vec<DisplayGoal>,
 
-    pub remaining: Figure,
-    pub currency: Currency,
-}
-
-pub struct PredictedIncome {
-    pub amount: Figure,
-    pub currency: Currency,
+    pub remaining: Amount,
 }
 
 ////////////////////
@@ -244,8 +238,10 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
             overall_goal,
             goals,
 
-            remaining,
-            currency: self.target_currency,
+            remaining: Amount{
+                figure: remaining,
+                currency: self.target_currency
+            },
         });
     }
 
@@ -480,7 +476,7 @@ mod tests_remaining_operation {
         expected_overall_goal: DisplayGoal,
         expected_predicted_income: Option<Amount>,
 
-        expected_remaining: RemainingFigure,
+        expected_remaining: Amount,
     }
 
     impl<AccountGen: Fn(MockQueriableAccountBuilder) -> Vec<MockQueriableAccount>>
@@ -646,7 +642,10 @@ mod tests_remaining_operation {
             }
         );
 
-        assert_eq!(result.remaining, dec!(6))
+        assert_eq!(result.remaining, Amount{
+            figure: dec!(6),
+            currency: "CREDIT".to_string()
+        })
     }
 
     #[test]
@@ -699,7 +698,7 @@ mod tests_remaining_operation {
             }
         );
 
-        assert_eq!(result.remaining, dec!(14.40))
+        assert_eq!(result.remaining, Amount{figure: dec!(14.40), currency: "EUR".to_string()})
     }
 
     #[test]
@@ -771,7 +770,7 @@ mod tests_remaining_operation {
             }
         );
 
-        assert_eq!(result.remaining, dec!(16.40))
+        assert_eq!(result.remaining, Amount{figure: dec!(16.40), currency: "EUR".to_string()})
     }
 
     #[test]
@@ -803,7 +802,7 @@ mod tests_remaining_operation {
                 target: 36.into(),
                 currency: "EUR".into(),
             },
-            expected_remaining: dec!(-12),
+            expected_remaining: Amount{figure: dec!(-12), currency: "EUR".to_string()},
         }
         .test();
     }
@@ -837,7 +836,7 @@ mod tests_remaining_operation {
                 target: 15.into(),
                 currency: "EUR".into(),
             },
-            expected_remaining: dec!(0),
+            expected_remaining: Amount{figure: dec!(0), currency: "EUR".to_string()},
         }
         .test();
     }
@@ -871,7 +870,7 @@ mod tests_remaining_operation {
                 target: dec!(15),
                 currency: "EUR".to_string(),
             },
-            expected_remaining: dec!(-5),
+            expected_remaining: Amount{figure: dec!(-5), currency: "EUR".to_string()},
         }
         .test();
     }
@@ -913,7 +912,7 @@ mod tests_remaining_operation {
                 target: dec!(3615),
                 currency: "EUR".to_string(),
             },
-            expected_remaining: dec!(-29),
+            expected_remaining: Amount{figure: dec!(-29), currency: "EUR".to_string()},
         }
         .test();
     }
@@ -971,7 +970,7 @@ mod tests_remaining_operation {
                 target: dec!(3615),
                 currency: "EUR".to_string(),
             },
-            expected_remaining: dec!(4682.2),
+            expected_remaining: Amount{figure: dec!(4682.2), currency: "EUR".to_string()},
         }
         .test()
     }
@@ -1035,7 +1034,7 @@ mod tests_remaining_operation {
                 target: dec!(3615),
                 currency: "EUR".to_string(),
             },
-            expected_remaining: dec!(7562.2),
+            expected_remaining: Amount{figure: dec!(7562.2), currency: "EUR".to_string()},
         }
         .test()
     }
@@ -1053,7 +1052,7 @@ mod tests_remaining_operation {
                 currency: "EUR".into(),
                 figure: 1200.into(),
             }),
-            expected_remaining: dec!(1200),
+            expected_remaining: Amount{figure: dec!(1200), currency: "EUR".to_string()},
 
             rate_credit: 1.into(),
             rate_eur: dec!(2.4),
