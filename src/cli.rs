@@ -147,7 +147,7 @@ struct RemainingOptions {
     #[arg(short = 'p', long = "include-predicted")]
     include_predicted_income: bool,
 
-    #[arg(short, long)]
+    #[arg(short = 'V', long)]
     vault: Option<PathBuf>,
 }
 
