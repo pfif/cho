@@ -1,6 +1,4 @@
-use std::{
-    fs::{read_dir, File},
-};
+use std::fs::{read_dir, File};
 
 use chrono::NaiveDate;
 #[cfg(test)]

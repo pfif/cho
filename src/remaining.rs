@@ -13,8 +13,8 @@ use serde::Deserialize;
 // Public types //
 //////////////////
 
-type Figure = Decimal;
-type Currency = String;
+pub type Figure = Decimal;
+pub type Currency = String;
 pub type ExchangeRates = HashMap<Currency, Figure>;
 
 #[derive(Clone, Deserialize)]
@@ -26,41 +26,41 @@ pub struct Amount {
 
 #[cfg_attr(test, derive(Default, Debug, PartialEq, Eq, Hash))]
 pub struct DisplayAccount {
-    name: String,
-    period_start_balance: Figure,
-    current_balance: Figure,
-    difference: Figure,
-    currency: Currency,
+    pub name: String,
+    pub period_start_balance: Figure,
+    pub current_balance: Figure,
+    pub difference: Figure,
+    pub currency: Currency,
 }
 
 #[cfg_attr(test, derive(Default, Debug, PartialEq, Eq))]
 pub struct DisplayGoal {
-    name: String,
-    commited: Figure,
-    to_commit_this_period: Option<Figure>,
-    target: Figure,
-    currency: Currency,
+    pub name: String,
+    pub commited: Figure,
+    pub to_commit_this_period: Option<Figure>,
+    pub target: Figure,
+    pub currency: Currency,
 }
 
 #[cfg_attr(test, derive(Debug))]
 pub struct RemainingMoneyScreen {
-    period_start: NaiveDate,
+    pub period_start: NaiveDate,
 
-    overall_balance: DisplayAccount,
-    individual_balances: Vec<DisplayAccount>,
+    pub overall_balance: DisplayAccount,
+    pub individual_balances: Vec<DisplayAccount>,
 
-    predicted_income: Option<Amount>,
+    pub predicted_income: Option<Amount>,
 
-    overall_goal: DisplayGoal,
-    goals: Vec<DisplayGoal>,
+    pub overall_goal: DisplayGoal,
+    pub goals: Vec<DisplayGoal>,
 
-    remaining: Figure,
-    currency: Currency,
+    pub remaining: Figure,
+    pub currency: Currency,
 }
 
 pub struct PredictedIncome {
-    amount: Figure,
-    currency: Currency,
+    pub amount: Figure,
+    pub currency: Currency,
 }
 
 ////////////////////
