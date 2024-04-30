@@ -36,7 +36,7 @@ use std::iter::once;
 use std::path::PathBuf;
 
 pub fn remaining_operation() {
-    let screen: Result<RemainingMoneyScreen, String> = (|| {
+    let result: Result<RemainingMoneyScreen, String> = (|| {
         let arguments = RemainingOptions::parse();
         let vault_path = match &arguments.vault {
             Some(a) => a.clone(),
@@ -64,7 +64,11 @@ pub fn remaining_operation() {
         Ok(screen.into())
     })();
 
-    println!("{}", screen.unwrap())
+    if let Ok(screen) = result {
+        print!("{}", screen)
+    } else if let Err(error) = result {
+        println!("Could not compute remaining amount: {}", error)
+    }
 }
 
 // TYPES AND ADAPTERS
