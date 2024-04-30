@@ -325,6 +325,11 @@ impl RemainingMoneyScreen {
     fn formatted_remaining(&self) -> String {
         RemainingMoneyScreen::title(&format!("(=) Remaining this period: {}", Amount::from(self.screen.remaining.clone())))
     }
+    
+    // TODO Move this to a more appropriate place once we have a better CLI
+    fn format_release(&self) -> String {
+        format!("Release: {}", env!("RELEASE"))
+    }
 }
 
 impl Display for RemainingMoneyScreen {
@@ -337,7 +342,8 @@ impl Display for RemainingMoneyScreen {
                 self.formatted_account_table(),
                 self.formatted_predicted_income(),
                 self.formatted_goal_table(),
-                self.formatted_remaining()
+                self.formatted_remaining(),
+                self.format_release()
             ]
             .join("\n\n")
             .as_str()
