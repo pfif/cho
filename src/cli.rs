@@ -73,28 +73,38 @@ impl Display for Amount {
     }
 }
 
-impl RemainingDisplayAccount{
+struct DisplayAccount<'a>{
+    account: &'a RemainingDisplayAccount
+}
+
+impl<'a> DisplayAccount<'a>{
+    fn from(value: &'a RemainingDisplayAccount) -> DisplayAccount<'a> {
+        DisplayAccount{
+            account: value
+        }
+    }
+
     fn make_amount(&self, figure: &RemainingFigure) -> Amount {
         return Amount{
-            currency: self.currency.clone(),
+            currency: self.account.currency.clone(),
             figure: figure.clone()
         }
     }
 
     fn name(&self) -> String {
-        self.name.clone()
+        self.account.name.clone()
     }
 
     fn period_start_balance(&self) -> Amount{
-        self.make_amount(&self.period_start_balance)
+        self.make_amount(&self.account.period_start_balance)
     }
 
     fn current_balance(&self) -> Amount {
-        self.make_amount(&self.current_balance)
+        self.make_amount(&self.account.current_balance)
     }
 
     fn difference(&self) -> Amount {
-        self.make_amount(&self.difference)
+        self.make_amount(&self.account.difference)
     }
 }
 
@@ -167,7 +177,7 @@ pub fn remaining() {
 
         let screen = remaining_money.execute()?;
 
-        let accounts = once(&screen.overall_balance).chain(screen.individual_balances.iter());
+        let accounts = once(&screen.overall_balance).chain(screen.individual_balances.iter()).map(|account| DisplayAccount::from(account));
         let mut account_table = Table::new();
         account_table
             .set_header(once("".to_string()).chain(accounts.clone().map(|account| account.name())));
