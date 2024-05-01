@@ -37,8 +37,8 @@ impl PeriodsConfiguration for PeriodVaultValues {
         if date < &self.start_date {
             return Err(ErrorStartBeforePeriodConfiguration {});
         }
-        let days_since_start = (*date - self.start_date).num_days() as u8;
-        return Ok((days_since_start / self.period_in_days) as PeriodNumber);
+        let days_since_start = (*date - self.start_date).num_days() as u16; // u16: Up to 179 years
+        return Ok((days_since_start / self.period_in_days as u16) as PeriodNumber);
     }
     fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String> {
         let period_number_for_date = self.period_number_for_date(date).or_else(
@@ -86,6 +86,7 @@ impl PeriodsConfiguration for PeriodVaultValues {
             }
         };
 
+        // +1 because we return 1 if both dates are in the same period, 2 is they are in two contiguous period
         return Ok((end_period_number + 1) - start_period_number);
     }
 }
@@ -171,6 +172,18 @@ mod tests {
     #[test]
     fn period_between__several_periods__middle_to_same_period_middle__not_first_period() {
         assert_eq!(config().periods_between(&date(20), &date(21)).unwrap(), 1)
+    }
+    
+    #[test]
+    fn period_between__regression_test__long_period() {
+        let period_config = PeriodVaultValues{
+            start_date: NaiveDate::from_ymd_opt(2024,4,27).unwrap(),
+            period_in_days: 28
+        };
+        assert_eq!(period_config.periods_between(
+            &NaiveDate::from_ymd_opt(2024,5,1).unwrap(),
+            &NaiveDate::from_ymd_opt(2067,8,27).unwrap(),
+        ).unwrap(), 566)
     }
 
     #[test]
