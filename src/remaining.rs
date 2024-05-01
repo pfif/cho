@@ -225,6 +225,7 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
                 None => dec!(0),
                 Some(i) => i.figure,
             }
+            - overall_goal.commited
             - overall_goal.to_commit_this_period.unwrap_or(dec!(0));
 
         return Ok(RemainingMoneyScreen {
@@ -802,7 +803,7 @@ mod tests_remaining_operation {
                 target: 36.into(),
                 currency: "EUR".into(),
             },
-            expected_remaining: Amount{figure: dec!(-12), currency: "EUR".to_string()},
+            expected_remaining: Amount{figure: dec!(-24), currency: "EUR".to_string()},
         }
         .test();
     }
@@ -836,7 +837,7 @@ mod tests_remaining_operation {
                 target: 15.into(),
                 currency: "EUR".into(),
             },
-            expected_remaining: Amount{figure: dec!(0), currency: "EUR".to_string()},
+            expected_remaining: Amount{figure: dec!(-5), currency: "EUR".to_string()},
         }
         .test();
     }
@@ -912,7 +913,7 @@ mod tests_remaining_operation {
                 target: dec!(3615),
                 currency: "EUR".to_string(),
             },
-            expected_remaining: Amount{figure: dec!(-29), currency: "EUR".to_string()},
+            expected_remaining: Amount{figure: dec!(-88), currency: "EUR".to_string()},
         }
         .test();
     }
@@ -970,7 +971,7 @@ mod tests_remaining_operation {
                 target: dec!(3615),
                 currency: "EUR".to_string(),
             },
-            expected_remaining: Amount{figure: dec!(4682.2), currency: "EUR".to_string()},
+            expected_remaining: Amount{figure: dec!(4623.2), currency: "EUR".to_string()},
         }
         .test()
     }
@@ -1034,7 +1035,7 @@ mod tests_remaining_operation {
                 target: dec!(3615),
                 currency: "EUR".to_string(),
             },
-            expected_remaining: Amount{figure: dec!(7562.2), currency: "EUR".to_string()},
+            expected_remaining: Amount{figure: dec!(7503.2), currency: "EUR".to_string()},
         }
         .test()
     }
