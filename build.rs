@@ -1,5 +1,4 @@
 use std::process::Command;
-use std::env;
 
 fn main() {
     let opt_level = env::var("OPT_LEVEL").unwrap_or_else(|_| "0".to_string());

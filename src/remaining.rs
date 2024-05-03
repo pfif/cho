@@ -53,6 +53,8 @@ pub struct RemainingMoneyScreen {
 
     pub overall_goal: DisplayGoal,
     pub goals: Vec<DisplayGoal>,
+    pub uncommitted: Amount,
+    pub overcommitted: bool,
 
     pub remaining: Amount,
 }
@@ -220,14 +222,18 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
             }
         };
 
-        let remaining = overall_balance.current_balance
-            + match &predicted_income_in_target_currency {
-                None => dec!(0),
-                Some(i) => i.figure,
-            }
-            - overall_goal.commited
-            - overall_goal.to_commit_this_period.unwrap_or(dec!(0));
+        let remaining = match &predicted_income_in_target_currency {
+            None => dec!(0),
+            Some(i) => i.figure,
+        } + overall_balance.difference
+          - overall_goal.to_commit_this_period.unwrap_or(dec!(0));
 
+        let uncommitted = Amount {
+            figure: overall_balance.current_balance - overall_goal.commited,
+            currency: self.target_currency.clone(),
+        };
+        let overcommitted = &uncommitted.figure < &(0.into());
+       
         return Ok(RemainingMoneyScreen {
             period_start: current_period.start_date,
 
@@ -238,10 +244,12 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
 
             overall_goal,
             goals,
+            uncommitted,
+            overcommitted,
 
-            remaining: Amount{
+            remaining: Amount {
                 figure: remaining,
-                currency: self.target_currency
+                currency: self.target_currency,
             },
         });
     }
@@ -476,6 +484,8 @@ mod tests_remaining_operation {
         expected_commited: Vec<RemainingFigure>,
         expected_overall_goal: DisplayGoal,
         expected_predicted_income: Option<Amount>,
+        expected_uncommitted: Amount,
+        expected_overcommitted: bool,
 
         expected_remaining: Amount,
     }
@@ -520,7 +530,11 @@ mod tests_remaining_operation {
 
             assert_eq!(result.remaining, self.expected_remaining);
 
-            assert_eq!(result.predicted_income, self.expected_predicted_income)
+            assert_eq!(result.predicted_income, self.expected_predicted_income);
+
+            assert_eq!(result.uncommitted, self.expected_uncommitted);
+
+            assert_eq!(result.overcommitted, self.expected_overcommitted);
         }
     }
 
@@ -643,10 +657,13 @@ mod tests_remaining_operation {
             }
         );
 
-        assert_eq!(result.remaining, Amount{
-            figure: dec!(6),
-            currency: "CREDIT".to_string()
-        })
+        assert_eq!(
+            result.remaining,
+            Amount {
+                figure: dec!(-4),
+                currency: "CREDIT".to_string(),
+            }
+        )
     }
 
     #[test]
@@ -699,7 +716,13 @@ mod tests_remaining_operation {
             }
         );
 
-        assert_eq!(result.remaining, Amount{figure: dec!(14.40), currency: "EUR".to_string()})
+        assert_eq!(
+            result.remaining,
+            Amount {
+                figure: dec!(-9.60),
+                currency: "EUR".to_string()
+            }
+        )
     }
 
     #[test]
@@ -771,7 +794,13 @@ mod tests_remaining_operation {
             }
         );
 
-        assert_eq!(result.remaining, Amount{figure: dec!(16.40), currency: "EUR".to_string()})
+        assert_eq!(
+            result.remaining,
+            Amount {
+                figure: dec!(-28.6),
+                currency: "EUR".to_string()
+            }
+        )
     }
 
     #[test]
@@ -803,7 +832,15 @@ mod tests_remaining_operation {
                 target: 36.into(),
                 currency: "EUR".into(),
             },
-            expected_remaining: Amount{figure: dec!(-24), currency: "EUR".to_string()},
+            expected_uncommitted: Amount {
+                figure: (-12).into(),
+                currency: "EUR".into(),
+            },
+            expected_overcommitted: true,
+            expected_remaining: Amount {
+                figure: dec!(-12),
+                currency: "EUR".to_string(),
+            },
         }
         .test();
     }
@@ -837,7 +874,15 @@ mod tests_remaining_operation {
                 target: 15.into(),
                 currency: "EUR".into(),
             },
-            expected_remaining: Amount{figure: dec!(-5), currency: "EUR".to_string()},
+            expected_uncommitted: Amount {
+                figure: dec!(-5),
+                currency: "EUR".to_string(),
+            },
+            expected_overcommitted: true,
+            expected_remaining: Amount {
+                figure: dec!(0),
+                currency: "EUR".to_string(),
+            },
         }
         .test();
     }
@@ -871,7 +916,15 @@ mod tests_remaining_operation {
                 target: dec!(15),
                 currency: "EUR".to_string(),
             },
-            expected_remaining: Amount{figure: dec!(-5), currency: "EUR".to_string()},
+            expected_uncommitted: Amount {
+                figure: dec!(0),
+                currency: "EUR".to_string(),
+            },
+            expected_overcommitted: false,
+            expected_remaining: Amount {
+                figure: dec!(-5),
+                currency: "EUR".to_string(),
+            },
         }
         .test();
     }
@@ -913,7 +966,15 @@ mod tests_remaining_operation {
                 target: dec!(3615),
                 currency: "EUR".to_string(),
             },
-            expected_remaining: Amount{figure: dec!(-88), currency: "EUR".to_string()},
+            expected_uncommitted: Amount {
+                figure: dec!(-59),
+                currency: "EUR".to_string(),
+            },
+            expected_overcommitted: true,
+            expected_remaining: Amount {
+                figure: dec!(-29),
+                currency: "EUR".to_string(),
+            },
         }
         .test();
     }
@@ -971,7 +1032,15 @@ mod tests_remaining_operation {
                 target: dec!(3615),
                 currency: "EUR".to_string(),
             },
-            expected_remaining: Amount{figure: dec!(4623.2), currency: "EUR".to_string()},
+            expected_uncommitted: Amount {
+                figure: dec!(4652.2),
+                currency: "EUR".to_string(),
+            },
+            expected_overcommitted: false,
+            expected_remaining: Amount {
+                figure: dec!(-307.8),
+                currency: "EUR".to_string(),
+            },
         }
         .test()
     }
@@ -1035,7 +1104,15 @@ mod tests_remaining_operation {
                 target: dec!(3615),
                 currency: "EUR".to_string(),
             },
-            expected_remaining: Amount{figure: dec!(7503.2), currency: "EUR".to_string()},
+            expected_uncommitted: Amount {
+                figure: dec!(4652.2),
+                currency: "EUR".to_string(),
+            },
+            expected_overcommitted: false,
+            expected_remaining: Amount {
+                figure: dec!(2572.2),
+                currency: "EUR".to_string(),
+            },
         }
         .test()
     }
@@ -1053,7 +1130,10 @@ mod tests_remaining_operation {
                 currency: "EUR".into(),
                 figure: 1200.into(),
             }),
-            expected_remaining: Amount{figure: dec!(1200), currency: "EUR".to_string()},
+            expected_remaining: Amount {
+                figure: dec!(1200),
+                currency: "EUR".to_string(),
+            },
 
             rate_credit: 1.into(),
             rate_eur: dec!(2.4),
@@ -1069,6 +1149,11 @@ mod tests_remaining_operation {
                 to_commit_this_period: None,
                 target: dec!(0),
                 currency: "EUR".to_string(),
+            },
+            expected_overcommitted: false,
+            expected_uncommitted: Amount {
+                figure: 0.into(),
+                currency: "EUR".into(),
             },
         }
         .test()

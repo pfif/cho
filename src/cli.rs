@@ -158,6 +158,7 @@ impl<'a> DisplayAccount<'a> {
     fn difference(&self) -> Amount {
         self.make_amount(&self.account.difference)
     }
+    
 }
 
 struct DisplayGoal<'a> {
@@ -314,18 +315,32 @@ impl RemainingMoneyScreen {
                 goal.target().to_string(),
             ]);
         }
+        
+        let mut formatted_uncommited = "(".to_string();
+        formatted_uncommited.extend("Uncommitted:".chars());
+        formatted_uncommited.extend(" ".chars());
+        formatted_uncommited.extend(Amount::from(self.screen.uncommitted.clone()).to_string().chars());
+        if self.screen.overcommitted {
+            formatted_uncommited.extend(" ".chars());
+            formatted_uncommited.extend("More money is committed to goals than is available in your accounts. Consider taking money out of one or more goals.".chars());
+        }
+        formatted_uncommited.extend(")".chars());
 
         format!(
-            "{}\n{}",
+            "{}\n{}\n{}",
             RemainingMoneyScreen::title("(-) Goals".into()),
-            table
+            table,
+            formatted_uncommited
         )
     }
 
     fn formatted_remaining(&self) -> String {
-        RemainingMoneyScreen::title(&format!("(=) Remaining this period: {}", Amount::from(self.screen.remaining.clone())))
+        RemainingMoneyScreen::title(&format!(
+            "(=) Remaining this period: {}",
+            Amount::from(self.screen.remaining.clone())
+        ))
     }
-    
+
     // TODO Move this to a more appropriate place once we have a better CLI
     fn format_release(&self) -> String {
         format!("Release: {}", env!("RELEASE"))
@@ -340,8 +355,8 @@ impl Display for RemainingMoneyScreen {
             [
                 self.formatted_period_start(),
                 self.formatted_account_table(),
-                self.formatted_predicted_income(),
                 self.formatted_goal_table(),
+                self.formatted_predicted_income(),
                 self.formatted_remaining(),
                 self.format_release()
             ]
