@@ -23,7 +23,7 @@ Remaining this period: €456
 */
 
 use crate::remaining;
-use crate::remaining::RemainingOperation;
+use crate::remaining::{RemainingOperation, Period};
 use crate::vault::{VaultImpl, VaultReadable};
 use clap::Parser;
 use comfy_table::Table;
@@ -195,6 +195,24 @@ impl<'a> DisplayGoal<'a> {
     }
 }
 
+struct DisplayPeriod<'a>{
+    period: &'a Period
+}
+
+impl<'a> DisplayPeriod<'a>{
+    fn from(period: &'a Period) -> Self{
+        DisplayPeriod{
+            period
+        }
+    }
+}
+
+impl<'a> Display for DisplayPeriod<'a>{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} to {}", self.period.start_date, self.period.end_date)
+    }
+}
+
 // CLI ARGUMENTS PARSING
 
 fn parse_exchange_rate(s: &str) -> Result<ExchangeRate, String> {
@@ -253,7 +271,7 @@ impl RemainingMoneyScreen {
     }
 
     fn formatted_period_start(&self) -> String {
-        return Self::title(&format!("Period start: {}", self.screen.period_start));
+        return Self::title(&format!("Current period : {}", DisplayPeriod::from(&self.screen.current_period)));
     }
 
     fn formatted_account_table(&self) -> String {

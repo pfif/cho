@@ -8,6 +8,7 @@ use crate::vault::{Vault, VaultReadable};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::Deserialize;
+use crate::period;
 
 //////////////////
 // Public types //
@@ -22,6 +23,21 @@ pub type ExchangeRates = HashMap<Currency, Figure>;
 pub struct Amount {
     pub currency: Currency,
     pub figure: Figure,
+}
+
+#[cfg_attr(test, derive(Debug, Eq, PartialEq))]
+pub struct Period {
+    pub start_date: NaiveDate,
+    pub end_date: NaiveDate,
+}
+
+impl From<period::Period> for Period{
+    fn from(value: period::Period) -> Self {
+        Period{
+            start_date: value.start_date,
+            end_date: value.end_date
+        }
+    }
 }
 
 #[cfg_attr(test, derive(Default, Debug, PartialEq, Eq, Hash))]
@@ -44,7 +60,7 @@ pub struct DisplayGoal {
 
 #[cfg_attr(test, derive(Debug))]
 pub struct RemainingMoneyScreen {
-    pub period_start: NaiveDate,
+    pub current_period: Period,
 
     pub overall_balance: DisplayAccount,
     pub individual_balances: Vec<DisplayAccount>,
@@ -101,10 +117,11 @@ impl RemainingOperation<AccountJson, GoalImplementation, PeriodVaultValues> {
 
 impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperation<A, G, P> {
     pub fn execute(self) -> Result<RemainingMoneyScreen, String> {
-        let current_period = self
+        let current_period: Period = self
             .periods_configuration
             .period_for_date(&self.date)
-            .map_err(|error| "Failed to fetch Periods Configuration: ".to_string() + &error)?;
+            .map_err(|error| "Failed to fetch Periods Configuration: ".to_string() + &error)?
+            .into();
 
         let accounts = self
             .raw_accounts
@@ -235,7 +252,7 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
         let overcommitted = &uncommitted.figure < &(0.into());
        
         return Ok(RemainingMoneyScreen {
-            period_start: current_period.start_date,
+            current_period,
 
             overall_balance,
             individual_balances: accounts,
@@ -322,11 +339,12 @@ impl DisplayAccount {
 mod tests_remaining_operation {
     use super::{
         Amount, Currency, DisplayAccount, DisplayGoal, Figure as RemainingFigure,
-        RemainingOperation,
+        RemainingOperation, Period
     };
     use crate::accounts::{Figure as AccountFigure, FoundAmount, MockQueriableAccount};
     use crate::goals::{Figure as GoalFigure, MockGoal};
-    use crate::period::{MockPeriodsConfiguration, Period};
+    use crate::period;
+    use crate::period::{MockPeriodsConfiguration};
     use chrono::NaiveDate;
     use derive_builder::Builder;
     use mockall::predicate::eq;
@@ -348,7 +366,7 @@ mod tests_remaining_operation {
         periods_configuration
             .expect_period_for_date()
             .with(eq(today.clone()))
-            .return_const(Ok(Period {
+            .return_const(Ok(period::Period {
                 start_date: start_date.clone(),
                 end_date: end_date.clone(),
             }));
@@ -439,7 +457,7 @@ mod tests_remaining_operation {
     > {
         let mut period_configuration = MockPeriodsConfiguration::new();
 
-        let period = Period {
+        let period = period::Period {
             start_date: mkdate(1),
             end_date: mkdate(4),
         };
@@ -539,7 +557,7 @@ mod tests_remaining_operation {
     }
 
     #[test]
-    fn test_period_start() {
+    fn test_period() {
         let today = mkdate(3);
         let mut periods_configuration = mkperiodsconfig(&mkdate(1), &mkdate(4), &today);
 
@@ -550,7 +568,10 @@ mod tests_remaining_operation {
         };
         let result = instance.execute();
 
-        assert_eq!(result.unwrap().period_start, mkdate(1))
+        assert_eq!(result.unwrap().current_period, Period{
+            start_date: mkdate(1),
+            end_date: mkdate(4)
+        })
     }
 
     #[test]
