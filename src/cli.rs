@@ -299,7 +299,7 @@ impl RemainingMoneyScreen {
 
     fn formatted_goal_table(&self) -> String {
         let mut table = Table::new();
-        table.set_header(["", "Commited", "Commited this period", "Target"]);
+        table.set_header(["", "Commited", "To commit this period", "Target"]);
 
         let goals = once(&self.screen.overall_goal)
             .chain(self.screen.goals.iter())
