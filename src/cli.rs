@@ -34,6 +34,7 @@ use std::env::current_dir;
 use std::fmt::{Display, Formatter};
 use std::iter::once;
 use std::path::PathBuf;
+use serde_json::value::Index;
 
 pub fn remaining_operation() {
     let result: Result<RemainingMoneyScreen, String> = (|| {

@@ -778,7 +778,7 @@ mod tests_remaining_operation {
                     currency: "EUR".to_string(),
                     period_start_balance: dec!(21),
                     current_balance: dec!(2),
-                    difference: dec!(-19)
+                    difference: dec!(-19),
                 }
             ])
         );
@@ -790,7 +790,7 @@ mod tests_remaining_operation {
                 currency: "EUR".to_string(),
                 period_start_balance: dec!(45),
                 current_balance: dec!(16.40),
-                difference: dec!(-28.6)
+                difference: dec!(-28.6),
             }
         );
 

@@ -173,17 +173,22 @@ mod tests {
     fn period_between__several_periods__middle_to_same_period_middle__not_first_period() {
         assert_eq!(config().periods_between(&date(20), &date(21)).unwrap(), 1)
     }
-    
+
     #[test]
     fn period_between__regression_test__long_period() {
-        let period_config = PeriodVaultValues{
-            start_date: NaiveDate::from_ymd_opt(2024,4,27).unwrap(),
-            period_in_days: 28
+        let period_config = PeriodVaultValues {
+            start_date: NaiveDate::from_ymd_opt(2024, 4, 27).unwrap(),
+            period_in_days: 28,
         };
-        assert_eq!(period_config.periods_between(
-            &NaiveDate::from_ymd_opt(2024,5,1).unwrap(),
-            &NaiveDate::from_ymd_opt(2067,8,27).unwrap(),
-        ).unwrap(), 566)
+        assert_eq!(
+            period_config
+                .periods_between(
+                    &NaiveDate::from_ymd_opt(2024, 5, 1).unwrap(),
+                    &NaiveDate::from_ymd_opt(2067, 8, 27).unwrap(),
+                )
+                .unwrap(),
+            566
+        )
     }
 
     #[test]
