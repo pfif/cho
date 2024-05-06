@@ -53,6 +53,7 @@ pub struct DisplayAccount {
 pub struct DisplayGoal {
     pub name: String,
     pub committed: Figure,
+    pub committed_this_period: Figure,
     pub to_commit_this_period: Option<Figure>,
     pub target: Figure,
     pub currency: Currency,
@@ -175,6 +176,16 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
                         .committed()
                         .iter()
                         .fold(0.into(), |acc, (_, amount)| acc + amount),
+                    committed_this_period: goal.
+                        committed().
+                        iter().
+                        fold(0.into(), |acc, (date, amount)| {
+                            if date >= &current_period.start_date && date <= &current_period.end_date {
+                                acc + amount
+                            } else {
+                                acc
+                            }
+                        }),
                     to_commit_this_period: {
                         let to_commit = goal.to_pay_at(&self.periods_configuration, &self.date)?;
                         if to_commit == 0.into() {
@@ -194,16 +205,19 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
                 currency: self.target_currency.clone(),
                 target: dec!(0),
                 committed: dec!(0),
+                committed_this_period: dec!(0),
                 to_commit_this_period: None,
             },
             |acc, goal| -> Result<DisplayGoal, String> {
                 let mut target = goal.target;
                 let mut commited = goal.committed;
+                let mut committed_this_period = goal.committed_this_period;
                 let mut to_commit_this_period = goal.to_commit_this_period;
 
                 if goal.currency != self.target_currency {
                     target = self.convert(&target, &goal.currency)?;
                     commited = self.convert(&commited, &goal.currency)?;
+                    committed_this_period = self.convert(&committed_this_period, &goal.currency)?;
                     to_commit_this_period = match to_commit_this_period {
                         None => None,
                         Some(i) => Some(self.convert(&i, &goal.currency)?),
@@ -219,6 +233,7 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
                             Some(acc.to_commit_this_period.unwrap_or(0.into()) + amount)
                         }
                     },
+                    committed_this_period: acc.committed_this_period + committed_this_period,
                     ..acc
                 })
             },
@@ -244,6 +259,7 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
             None => dec!(0),
             Some(i) => i.figure,
         } + overall_balance.difference
+            - overall_goal.committed_this_period
             - overall_goal.to_commit_this_period.unwrap_or(dec!(0));
 
         let uncommitted = Amount {
@@ -839,15 +855,61 @@ mod tests_remaining_operation {
     }
 
     #[test]
-    fn test__goal__different_currency() {
+    fn test__goal__different_currencies__committed_this_period() {
         TestRunner {
             target_currency: "EUR".into(),
             rate_credit: dec!(1.0),
             rate_eur: dec!(2.4),
 
-            period_start: mkdate(1),
+            period_start: mkdate(16),
             period_end: mkdate(31),
-            today: mkdate(3),
+            today: mkdate(17),
+            accounts: |_| vec![],
+            predicted_income: None,
+            expected_predicted_income: None,
+
+            goals: vec![MockGoalBuilder::default()
+                .commited(vec![
+                    (mkdate(1), 2), // Outside of period
+                    (mkdate(16), 3)] // In Period
+                               )
+                .to_pay_at(0)
+                .target(15)
+                .currency("CREDIT")
+                .build()],
+
+            expected_commited: vec![5.into()],
+            expected_overall_goal: DisplayGoal {
+                name: "Overall Goal".into(),
+                committed: 12.into(),
+                committed_this_period: dec!(7.20),
+                to_commit_this_period: None,
+                target: 36.into(),
+                currency: "EUR".into(),
+            },
+            expected_uncommitted: Amount {
+                figure: (-12).into(),
+                currency: "EUR".into(),
+            },
+            expected_overcommitted: true,
+            expected_remaining: Amount {
+                figure: dec!(-7.2),
+                currency: "EUR".to_string(),
+            },
+        }
+        .test();
+    }
+    
+    #[test]
+    fn test__goal__different_currencies__not_committed_this_period() {
+        TestRunner {
+            target_currency: "EUR".into(),
+            rate_credit: dec!(1.0),
+            rate_eur: dec!(2.4),
+
+            period_start: mkdate(16),
+            period_end: mkdate(31),
+            today: mkdate(17),
             accounts: |_| vec![],
             predicted_income: None,
             expected_predicted_income: None,
@@ -863,6 +925,7 @@ mod tests_remaining_operation {
             expected_overall_goal: DisplayGoal {
                 name: "Overall Goal".into(),
                 committed: 12.into(),
+                committed_this_period: 0.into(),
                 to_commit_this_period: Some(12.into()),
                 target: 36.into(),
                 currency: "EUR".into(),
@@ -877,19 +940,105 @@ mod tests_remaining_operation {
                 currency: "EUR".to_string(),
             },
         }
-        .test();
+            .test();
     }
 
     #[test]
-    fn test__goal__nothing_to_pay() {
+    fn test__goal__nothing_to_pay__committed_this_period() {
         TestRunner {
             target_currency: "EUR".into(),
             rate_credit: dec!(1.0),
             rate_eur: dec!(2.4),
 
-            period_start: mkdate(1),
+            period_start: mkdate(16),
             period_end: mkdate(31),
-            today: mkdate(3),
+            today: mkdate(17),
+            accounts: |_| vec![],
+            predicted_income: None,
+            expected_predicted_income: None,
+
+            goals: vec![MockGoalBuilder::default()
+                .commited(vec![(mkdate(1), 2), (mkdate(16), 3)])
+                .to_pay_at(0)
+                .target(15)
+                .currency("EUR")
+                .build()],
+
+            expected_commited: vec![5.into()],
+            expected_overall_goal: DisplayGoal {
+                name: "Overall Goal".into(),
+                committed: 5.into(),
+                committed_this_period: 3.into(),
+                to_commit_this_period: None,
+                target: 15.into(),
+                currency: "EUR".into(),
+            },
+            expected_uncommitted: Amount {
+                figure: dec!(-5),
+                currency: "EUR".to_string(),
+            },
+            expected_overcommitted: true,
+            expected_remaining: Amount {
+                figure: dec!(-3),
+                currency: "EUR".to_string(),
+            },
+        }
+        .test();
+    }
+    
+    #[test]
+    fn test__goal__committed_this_period__have_to_pay_more() {
+        TestRunner {
+            target_currency: "EUR".into(),
+            rate_credit: dec!(1.0),
+            rate_eur: dec!(2.4),
+
+            period_start: mkdate(16),
+            period_end: mkdate(31),
+            today: mkdate(17),
+            accounts: |_| vec![],
+            predicted_income: None,
+            expected_predicted_income: None,
+
+            goals: vec![MockGoalBuilder::default()
+                .commited(vec![(mkdate(1), 2), (mkdate(16), 3)])
+                .to_pay_at(5)
+                .target(15)
+                .currency("EUR")
+                .build()],
+
+            expected_commited: vec![5.into()],
+            expected_overall_goal: DisplayGoal {
+                name: "Overall Goal".into(),
+                committed: 5.into(),
+                committed_this_period: 3.into(),
+                to_commit_this_period: Some(5.into()),
+                target: 15.into(),
+                currency: "EUR".into(),
+            },
+            expected_uncommitted: Amount {
+                figure: dec!(-5),
+                currency: "EUR".to_string(),
+            },
+            expected_overcommitted: true,
+            expected_remaining: Amount {
+                figure: dec!(-8),
+                currency: "EUR".to_string(),
+            },
+        }
+            .test();
+    }
+    
+    #[test]
+    fn test__goal__nothing_to_pay__not_committed_this_period() {
+        TestRunner {
+            target_currency: "EUR".into(),
+            rate_credit: dec!(1.0),
+            rate_eur: dec!(2.4),
+
+            period_start: mkdate(16),
+            period_end: mkdate(31),
+            today: mkdate(17),
             accounts: |_| vec![],
             predicted_income: None,
             expected_predicted_income: None,
@@ -905,6 +1054,7 @@ mod tests_remaining_operation {
             expected_overall_goal: DisplayGoal {
                 name: "Overall Goal".into(),
                 committed: 5.into(),
+                committed_this_period: 0.into(),
                 to_commit_this_period: None,
                 target: 15.into(),
                 currency: "EUR".into(),
@@ -919,7 +1069,7 @@ mod tests_remaining_operation {
                 currency: "EUR".to_string(),
             },
         }
-        .test();
+            .test();
     }
 
     #[test]
@@ -947,6 +1097,7 @@ mod tests_remaining_operation {
             expected_overall_goal: DisplayGoal {
                 name: "Overall Goal".into(),
                 committed: dec!(0),
+                committed_this_period: 0.into(),
                 to_commit_this_period: Some(dec!(5)),
                 target: dec!(15),
                 currency: "EUR".to_string(),
@@ -965,15 +1116,66 @@ mod tests_remaining_operation {
     }
 
     #[test]
-    fn test__goal__multiple_goals__different_currencies() {
+    fn test__goal__multiple_goals__different_currencies__committed_this_period() {
         TestRunner {
             target_currency: "EUR".into(),
             rate_credit: dec!(1.0),
             rate_eur: dec!(2.4),
 
-            period_start: mkdate(1),
+            period_start: mkdate(16),
             period_end: mkdate(31),
-            today: mkdate(3),
+            today: mkdate(17),
+            accounts: |_| vec![],
+            predicted_income: None,
+            expected_predicted_income: None,
+
+            goals: vec![
+                MockGoalBuilder::default()
+                    .commited(vec![(mkdate(1), 15), (mkdate(16), 20)])
+                    .to_pay_at(0)
+                    .target(15)
+                    .currency("EUR")
+                    .build(),
+                MockGoalBuilder::default()
+                    .commited(vec![(mkdate(3), 5), (mkdate(17), 5)])
+                    .to_pay_at(0)
+                    .target(1500)
+                    .currency("CREDIT")
+                    .build(),
+            ],
+
+            expected_commited: vec![dec!(35), dec!(10)],
+            expected_overall_goal: DisplayGoal {
+                name: "Overall Goal".into(),
+                committed: dec!(59),
+                committed_this_period: 32.into(),
+                to_commit_this_period: None,
+                target: dec!(3615),
+                currency: "EUR".to_string(),
+            },
+            expected_uncommitted: Amount {
+                figure: dec!(-59),
+                currency: "EUR".to_string(),
+            },
+            expected_overcommitted: true,
+            expected_remaining: Amount {
+                figure: dec!(-32),
+                currency: "EUR".to_string(),
+            },
+        }
+        .test();
+    }
+    
+    #[test]
+    fn test__goal__multiple_goals__different_currencies__not_committed_this_period() {
+        TestRunner {
+            target_currency: "EUR".into(),
+            rate_credit: dec!(1.0),
+            rate_eur: dec!(2.4),
+
+            period_start: mkdate(16),
+            period_end: mkdate(31),
+            today: mkdate(17),
             accounts: |_| vec![],
             predicted_income: None,
             expected_predicted_income: None,
@@ -986,7 +1188,7 @@ mod tests_remaining_operation {
                     .currency("EUR")
                     .build(),
                 MockGoalBuilder::default()
-                    .commited(vec![(mkdate(3), 5), (mkdate(17), 5)])
+                    .commited(vec![(mkdate(3), 5), (mkdate(13), 5)])
                     .to_pay_at(10)
                     .target(1500)
                     .currency("CREDIT")
@@ -997,6 +1199,7 @@ mod tests_remaining_operation {
             expected_overall_goal: DisplayGoal {
                 name: "Overall Goal".into(),
                 committed: dec!(59),
+                committed_this_period: 0.into(),
                 to_commit_this_period: Some(dec!(29)),
                 target: dec!(3615),
                 currency: "EUR".to_string(),
@@ -1011,7 +1214,7 @@ mod tests_remaining_operation {
                 currency: "EUR".to_string(),
             },
         }
-        .test();
+            .test();
     }
 
     #[test]
@@ -1022,9 +1225,9 @@ mod tests_remaining_operation {
             rate_credit: 1.into(),
             rate_eur: dec!(2.4),
 
-            period_start: mkdate(1),
+            period_start: mkdate(16),
             period_end: mkdate(31),
-            today: mkdate(3),
+            today: mkdate(17),
             predicted_income: None,
             expected_predicted_income: None,
 
@@ -1054,7 +1257,7 @@ mod tests_remaining_operation {
                     .build(),
                 MockGoalBuilder::default()
                     .commited(vec![(mkdate(3), 5), (mkdate(17), 5)])
-                    .to_pay_at(10)
+                    .to_pay_at(0)
                     .target(1500)
                     .currency("CREDIT")
                     .build(),
@@ -1063,7 +1266,8 @@ mod tests_remaining_operation {
             expected_overall_goal: DisplayGoal {
                 name: "Overall Goal".into(),
                 committed: dec!(59),
-                to_commit_this_period: Some(dec!(29)),
+                committed_this_period: 12.into(),
+                to_commit_this_period: Some(dec!(5)),
                 target: dec!(3615),
                 currency: "EUR".to_string(),
             },
@@ -1073,7 +1277,7 @@ mod tests_remaining_operation {
             },
             expected_overcommitted: false,
             expected_remaining: Amount {
-                figure: dec!(-307.8),
+                figure: dec!(-295.8),
                 currency: "EUR".to_string(),
             },
         }
@@ -1088,9 +1292,9 @@ mod tests_remaining_operation {
             rate_credit: 1.into(),
             rate_eur: dec!(2.4),
 
-            period_start: mkdate(1),
+            period_start: mkdate(16),
             period_end: mkdate(31),
-            today: mkdate(3),
+            today: mkdate(17),
             predicted_income: Some(Amount {
                 currency: "CREDIT".into(),
                 figure: 1200.into(),
@@ -1126,7 +1330,7 @@ mod tests_remaining_operation {
                     .build(),
                 MockGoalBuilder::default()
                     .commited(vec![(mkdate(3), 5), (mkdate(17), 5)])
-                    .to_pay_at(10)
+                    .to_pay_at(0)
                     .target(1500)
                     .currency("CREDIT")
                     .build(),
@@ -1135,7 +1339,8 @@ mod tests_remaining_operation {
             expected_overall_goal: DisplayGoal {
                 name: "Overall Goal".into(),
                 committed: dec!(59),
-                to_commit_this_period: Some(dec!(29)),
+                committed_this_period: 12.into(),
+                to_commit_this_period: Some(dec!(5)),
                 target: dec!(3615),
                 currency: "EUR".to_string(),
             },
@@ -1145,7 +1350,7 @@ mod tests_remaining_operation {
             },
             expected_overcommitted: false,
             expected_remaining: Amount {
-                figure: dec!(2572.2),
+                figure: dec!(2584.2),
                 currency: "EUR".to_string(),
             },
         }
@@ -1181,6 +1386,7 @@ mod tests_remaining_operation {
             expected_overall_goal: DisplayGoal {
                 name: "Overall Goal".into(),
                 committed: dec!(0),
+                committed_this_period: 0.into(),
                 to_commit_this_period: None,
                 target: dec!(0),
                 currency: "EUR".to_string(),

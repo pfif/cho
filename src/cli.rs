@@ -180,6 +180,10 @@ impl<'a> DisplayGoal<'a> {
     fn committed(&self) -> Amount {
         self.make_amount(&self.goal.committed)
     }
+    
+    fn committed_this_period(&self) -> Amount {
+        self.make_amount(&self.goal.committed_this_period)
+    }
 
     fn to_commit_this_period(&self) -> Option<Amount> {
         self.goal
@@ -315,7 +319,7 @@ impl RemainingMoneyScreen {
 
     fn formatted_goal_table(&self) -> String {
         let mut table = Table::new();
-        table.set_header(["", "Commited", "To commit this period", "Target"]);
+        table.set_header(["", "Committed", "Committed this period", "To commit this period", "Target"]);
 
         let goals = once(&self.screen.overall_goal)
             .chain(self.screen.goals.iter())
@@ -325,6 +329,7 @@ impl RemainingMoneyScreen {
             table.add_row(vec![
                 goal.name(),
                 goal.committed().to_string(),
+                goal.committed_this_period().to_string(),
                 match goal.to_commit_this_period() {
                     Some(amount) => amount.to_string(),
                     None => "✅".to_string(),
