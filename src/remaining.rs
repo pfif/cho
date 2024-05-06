@@ -93,7 +93,7 @@ pub struct RemainingOperation<A: QueriableAccount, G: Goal<P>, P: PeriodsConfigu
 }
 
 impl RemainingOperation<AccountJson, GoalImplementation, PeriodVaultValues> {
-    pub fn FromVaultValue<V: Vault>(
+    pub fn from_vault_value<V: Vault>(
         exchange_rate: ExchangeRates,
         target_currency: Currency,
         predicted_income: Option<Amount>,
@@ -382,6 +382,7 @@ mod tests_remaining_operation {
         setter(into),
         name = "MockQueriableAccountBuilder"
     )]
+    #[allow(unused)] // Builder is used, not class used to create Builder
     struct MockQueriableAccountB {
         today_date: NaiveDate,
         period_start_date: NaiveDate,
@@ -428,6 +429,7 @@ mod tests_remaining_operation {
         setter(into),
         name = "MockGoalBuilder"
     )]
+    #[allow(unused)] // MockGoalBuilder is used, not MockGoalB
     struct MockGoalB {
         commited: Vec<(NaiveDate, i32)>,
         to_pay_at: i32,
@@ -494,7 +496,7 @@ mod tests_remaining_operation {
     full RemainingMoneyScreen, instead of doing partial comparison as
     I do now
      */
-    pub struct TestRunner<AccountGen: Fn(MockQueriableAccountBuilder) -> Vec<MockQueriableAccount>> {
+    struct TestRunner<AccountGen: Fn(MockQueriableAccountBuilder) -> Vec<MockQueriableAccount>> {
         target_currency: String,
 
         rate_credit: RemainingFigure,
@@ -568,7 +570,7 @@ mod tests_remaining_operation {
     #[test]
     fn test_period() {
         let today = mkdate(3);
-        let mut periods_configuration = mkperiodsconfig(&mkdate(1), &mkdate(4), &today);
+        let periods_configuration = mkperiodsconfig(&mkdate(1), &mkdate(4), &today);
 
         let instance = RemainingOperation {
             date: today,

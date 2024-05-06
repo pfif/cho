@@ -99,7 +99,7 @@ mod tests_get_accounts {
 
         fn read_vault_values<T: serde::de::DeserializeOwned>(
             &self,
-            name: String,
+            _name: String,
         ) -> Result<T, String> {
             todo!()
         }

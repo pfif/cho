@@ -130,7 +130,7 @@ impl<P: PeriodsConfiguration> Goal<P> for GoalImplementation {
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod test_remaining {
-    use super::{Figure, Goal, GoalImplementation};
+    use super::{Figure, GoalImplementation};
     use chrono::NaiveDate;
 
     fn make_goal(commited: Vec<(NaiveDate, Figure)>) -> GoalImplementation {

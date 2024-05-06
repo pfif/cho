@@ -52,7 +52,7 @@ pub fn remaining_operation() {
             false => None,
         };
 
-        let remaining_money = RemainingOperation::FromVaultValue(
+        let remaining_money = RemainingOperation::from_vault_value(
             HashMap::from_iter(arguments.exchange_rates),
             arguments.target_currency,
             predicted_income,
