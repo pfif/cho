@@ -2,9 +2,11 @@ use crate::{period::PeriodsConfiguration, vault::VaultReadable};
 use chrono::NaiveDate;
 #[cfg(test)]
 use mockall::automock;
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use serde::Deserialize;
 
-pub type Figure = u32;
+pub type Figure = Decimal;
 
 pub type GoalVaultValues = Vec<GoalImplementation>;
 
@@ -38,7 +40,7 @@ impl GoalImplementation {
         let total_commited = self
             .commited
             .iter()
-            .fold(0, |acc, (_, amount)| acc + amount);
+            .fold(dec!(0), |acc, (_, amount)| acc + amount);
         if total_commited > self.target {
             return Err("Commited above Goal's target".to_string());
         }
@@ -113,13 +115,15 @@ impl<P: PeriodsConfiguration> Goal<P> for GoalImplementation {
             if last_commit_date >= &current_period.start_date
                 && last_commit_date <= &current_period.end_date
             {
-                return Ok(0);
+                return Ok(0.into());
             }
         };
 
         let remaining = self.remaining()?;
 
-        return Ok(remaining / period_config.periods_between(date, &self.target_date)? as u32);
+        return Ok(
+            remaining / Decimal::from(period_config.periods_between(date, &self.target_date)?)
+        );
     }
 }
 
@@ -133,7 +137,7 @@ mod test_remaining {
         return GoalImplementation {
             name: "Test goal".to_string(),
             currency: "JPY".to_string(),
-            target: 100,
+            target: 100.into(),
             target_date: NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
             commited,
         };
@@ -141,44 +145,53 @@ mod test_remaining {
     #[test]
     fn remaining__nothing_commited() {
         let goal = make_goal(vec![]);
-        assert_eq!(goal.remaining().unwrap(), 100);
+        assert_eq!(goal.remaining().unwrap(), 100.into());
     }
 
     #[test]
     fn remaining__below_target__commited_once() {
-        let goal = make_goal(vec![(NaiveDate::from_ymd_opt(2019, 1, 1).unwrap(), 10)]);
-        assert_eq!(goal.remaining().unwrap(), 90);
+        let goal = make_goal(vec![(
+            NaiveDate::from_ymd_opt(2019, 1, 1).unwrap(),
+            10.into(),
+        )]);
+        assert_eq!(goal.remaining().unwrap(), 90.into());
     }
 
     #[test]
     fn remaining__below_target__commited_many() {
         let goal = make_goal(vec![
-            (NaiveDate::from_ymd_opt(2019, 1, 1).unwrap(), 10),
-            (NaiveDate::from_ymd_opt(2019, 2, 1).unwrap(), 10),
-            (NaiveDate::from_ymd_opt(2019, 3, 1).unwrap(), 10),
+            (NaiveDate::from_ymd_opt(2019, 1, 1).unwrap(), 10.into()),
+            (NaiveDate::from_ymd_opt(2019, 2, 1).unwrap(), 10.into()),
+            (NaiveDate::from_ymd_opt(2019, 3, 1).unwrap(), 10.into()),
         ]);
-        assert_eq!(goal.remaining().unwrap(), 70);
+        assert_eq!(goal.remaining().unwrap(), 70.into());
     }
 
     #[test]
     fn remaining__at_target__commited_once() {
-        let goal = make_goal(vec![(NaiveDate::from_ymd_opt(2019, 1, 1).unwrap(), 100)]);
-        assert_eq!(goal.remaining().unwrap(), 0);
+        let goal = make_goal(vec![(
+            NaiveDate::from_ymd_opt(2019, 1, 1).unwrap(),
+            100.into(),
+        )]);
+        assert_eq!(goal.remaining().unwrap(), 0.into());
     }
 
     #[test]
     fn remaining__at_target__commited_many() {
         let goal = make_goal(vec![
-            (NaiveDate::from_ymd_opt(2019, 1, 1).unwrap(), 30),
-            (NaiveDate::from_ymd_opt(2019, 2, 1).unwrap(), 30),
-            (NaiveDate::from_ymd_opt(2019, 3, 1).unwrap(), 40),
+            (NaiveDate::from_ymd_opt(2019, 1, 1).unwrap(), 30.into()),
+            (NaiveDate::from_ymd_opt(2019, 2, 1).unwrap(), 30.into()),
+            (NaiveDate::from_ymd_opt(2019, 3, 1).unwrap(), 40.into()),
         ]);
-        assert_eq!(goal.remaining().unwrap(), 0);
+        assert_eq!(goal.remaining().unwrap(), 0.into());
     }
 
     #[test]
     fn remaining__above_target__commited_once() {
-        let goal = make_goal(vec![(NaiveDate::from_ymd_opt(2019, 1, 1).unwrap(), 110)]);
+        let goal = make_goal(vec![(
+            NaiveDate::from_ymd_opt(2019, 1, 1).unwrap(),
+            110.into(),
+        )]);
         assert_eq!(
             goal.remaining().unwrap_err(),
             "Commited above Goal's target"
@@ -188,8 +201,8 @@ mod test_remaining {
     #[test]
     fn remaining__above_target__commited_many() {
         let goal = make_goal(vec![
-            (NaiveDate::from_ymd_opt(2019, 1, 1).unwrap(), 60),
-            (NaiveDate::from_ymd_opt(2019, 1, 1).unwrap(), 50),
+            (NaiveDate::from_ymd_opt(2019, 1, 1).unwrap(), 60.into()),
+            (NaiveDate::from_ymd_opt(2019, 1, 1).unwrap(), 50.into()),
         ]);
         assert_eq!(
             goal.remaining().unwrap_err(),
@@ -218,7 +231,7 @@ mod test_to_pay_at {
         return GoalImplementation {
             name: "Test goal".to_string(),
             currency: "JPY".to_string(),
-            target: 100,
+            target: 100.into(),
             target_date: date(1, 7),
             commited,
         };
@@ -287,17 +300,17 @@ mod test_to_pay_at {
     #[test]
     fn payed_this_period__nothing_else_commited() {
         let today = date(1, 2);
-        let goal = make_goal(vec![(today, 10)]);
+        let goal = make_goal(vec![(today, 10.into())]);
         let period_config = make_period_config(today, date(1, 1));
-        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 0);
+        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 0.into());
     }
 
     #[test]
     fn payed_this_period__something_else_commited() {
         let today = date(1, 2);
-        let goal = make_goal(vec![(date(12, 29), 10), (today, 10)]);
+        let goal = make_goal(vec![(date(12, 29), 10.into()), (today, 10.into())]);
         let period_config = make_period_config(today, date(1, 1));
-        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 0);
+        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 0.into());
     }
 
     #[test]
@@ -305,31 +318,31 @@ mod test_to_pay_at {
         let today = date(1, 2);
         let goal = make_goal(vec![]);
         let period_config = make_period_config(today, date(1, 1));
-        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 50);
+        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 50.into());
     }
 
     #[test]
     fn all_commited__last_period() {
         let today = date(1, 6);
-        let goal = make_goal(vec![(date(12, 29), 50), (date(1, 2), 50)]);
+        let goal = make_goal(vec![(date(12, 29), 50.into()), (date(1, 2), 50.into())]);
         let period_config = make_period_config(today, date(1, 5));
-        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 0);
+        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 0.into());
     }
 
     #[test]
     fn all_commited__after_last_period() {
         let today = date(1, 10);
-        let goal = make_goal(vec![(date(12, 29), 50), (date(1, 2), 50)]);
+        let goal = make_goal(vec![(date(12, 29), 50.into()), (date(1, 2), 50.into())]);
         let period_config = make_period_config(today, date(1, 9));
-        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 0);
+        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 0.into());
     }
 
     #[test]
     fn all_commited__several_periods_left() {
         let today = date(1, 2);
-        let goal = make_goal(vec![(date(12, 29), 100)]);
+        let goal = make_goal(vec![(date(12, 29), 100.into())]);
         let period_config = make_period_config(today, date(1, 1));
-        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 0);
+        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 0.into());
     }
 
     #[test]
@@ -337,7 +350,7 @@ mod test_to_pay_at {
         let today = date(1, 6);
         let goal = make_goal(vec![]);
         let period_config = make_period_config(today, date(1, 5));
-        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 100);
+        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 100.into());
     }
 
     #[test]
@@ -345,7 +358,7 @@ mod test_to_pay_at {
         let today = date(1, 10);
         let goal = make_goal(vec![]);
         let period_config = make_period_config(today, date(1, 9));
-        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 100);
+        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 100.into());
     }
 
     #[test]
@@ -353,37 +366,37 @@ mod test_to_pay_at {
         let today = date(1, 2);
         let goal = make_goal(vec![]);
         let period_config = make_period_config(today, date(1, 1));
-        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 50);
+        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 50.into());
     }
 
     #[test]
     fn some_amount_commited__last_period() {
         let today = date(1, 6);
-        let goal = make_goal(vec![(date(12, 29), 30), (date(1, 3), 20)]);
+        let goal = make_goal(vec![(date(12, 29), 30.into()), (date(1, 3), 20.into())]);
         let period_config = make_period_config(today, date(1, 5));
-        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 50);
+        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 50.into());
     }
 
     #[test]
     fn some_amount_commited__after_last_period() {
         let today = date(1, 10);
-        let goal = make_goal(vec![(date(12, 29), 30), (date(1, 3), 20)]);
+        let goal = make_goal(vec![(date(12, 29), 30.into()), (date(1, 3), 20.into())]);
         let period_config = make_period_config(today, date(1, 9));
-        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 50);
+        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 50.into());
     }
 
     #[test]
     fn some_amount_commited__several_periods_left() {
         let today = date(1, 2);
-        let goal = make_goal(vec![(date(12, 29), 30)]);
+        let goal = make_goal(vec![(date(12, 29), 30.into())]);
         let period_config = make_period_config(today, date(1, 1));
-        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 35);
+        assert_eq!(goal.to_pay_at(&period_config, &today).unwrap(), 35.into());
     }
 
     #[test]
     fn commited_after_date() {
         let today = date(1, 2);
-        let goal = make_goal(vec![(date(12, 30), 30), (date(1, 3), 30)]);
+        let goal = make_goal(vec![(date(12, 30), 30.into()), (date(1, 3), 30.into())]);
         let period_config = make_period_config(today, date(1, 1));
         assert_eq!(
             goal.to_pay_at(&period_config, &today).unwrap_err(),
@@ -394,7 +407,7 @@ mod test_to_pay_at {
     #[test]
     fn commited_not_in_chronological_order() {
         let today = date(1, 2);
-        let goal = make_goal(vec![(date(12, 30), 30), (date(12, 29), 30)]);
+        let goal = make_goal(vec![(date(12, 30), 30.into()), (date(12, 29), 30.into())]);
         let period_config = make_period_config(today, date(1, 1));
         assert_eq!(
             goal.to_pay_at(&period_config, &today).unwrap_err(),

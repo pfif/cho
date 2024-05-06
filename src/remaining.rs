@@ -429,24 +429,32 @@ mod tests_remaining_operation {
         name = "MockGoalBuilder"
     )]
     struct MockGoalB {
-        commited: Vec<(NaiveDate, GoalFigure)>,
-        to_pay_at: GoalFigure,
-        target: GoalFigure,
+        commited: Vec<(NaiveDate, i32)>,
+        to_pay_at: i32,
+        target: i32,
         currency: String,
     }
 
     impl MockGoalBuilder {
         fn build(&self) -> MockGoal<MockPeriodsConfiguration> {
             let mut mock = MockGoal::new();
-
+            
+            
+            
             mock.expect_name().return_const("Mocked goal".into());
             mock.expect_currency()
                 .return_const(self.currency.clone().unwrap());
-            mock.expect_target().return_const(self.target.unwrap());
-            mock.expect_commited()
-                .return_const(self.commited.clone().unwrap());
+            mock.expect_target()
+                .return_const(self.target.unwrap().into());
+            mock.expect_commited().return_const(
+                self.commited
+                    .clone()
+                    .unwrap()
+                    .into_iter()
+                    .map(|(date, figure)| (date, GoalFigure::from(figure))).collect()
+            );
             mock.expect_to_pay_at()
-                .return_const(Ok(self.to_pay_at.unwrap()));
+                .return_const(Ok(self.to_pay_at.unwrap().into()));
             return mock;
         }
     }
@@ -844,8 +852,8 @@ mod tests_remaining_operation {
 
             goals: vec![MockGoalBuilder::default()
                 .commited(vec![(mkdate(1), 2), (mkdate(1), 3)])
-                .to_pay_at(5 as GoalFigure)
-                .target(15 as GoalFigure)
+                .to_pay_at(5)
+                .target(15)
                 .currency("CREDIT")
                 .build()],
 
@@ -886,8 +894,8 @@ mod tests_remaining_operation {
 
             goals: vec![MockGoalBuilder::default()
                 .commited(vec![(mkdate(1), 2), (mkdate(1), 3)])
-                .to_pay_at(0 as GoalFigure)
-                .target(15 as GoalFigure)
+                .to_pay_at(0)
+                .target(15)
                 .currency("EUR")
                 .build()],
 
@@ -928,8 +936,8 @@ mod tests_remaining_operation {
 
             goals: vec![MockGoalBuilder::default()
                 .commited(vec![])
-                .to_pay_at(5 as GoalFigure)
-                .target(15 as GoalFigure)
+                .to_pay_at(5)
+                .target(15)
                 .currency("EUR")
                 .build()],
 
@@ -971,14 +979,14 @@ mod tests_remaining_operation {
             goals: vec![
                 MockGoalBuilder::default()
                     .commited(vec![(mkdate(1), 15), (mkdate(10), 20)])
-                    .to_pay_at(5 as GoalFigure)
-                    .target(15 as GoalFigure)
+                    .to_pay_at(5)
+                    .target(15)
                     .currency("EUR")
                     .build(),
                 MockGoalBuilder::default()
                     .commited(vec![(mkdate(3), 5), (mkdate(17), 5)])
-                    .to_pay_at(10 as GoalFigure)
-                    .target(1500 as GoalFigure)
+                    .to_pay_at(10)
+                    .target(1500)
                     .currency("CREDIT")
                     .build(),
             ],
@@ -1038,14 +1046,14 @@ mod tests_remaining_operation {
             goals: vec![
                 MockGoalBuilder::default()
                     .commited(vec![(mkdate(1), 15), (mkdate(10), 20)])
-                    .to_pay_at(5 as GoalFigure)
-                    .target(15 as GoalFigure)
+                    .to_pay_at(5)
+                    .target(15)
                     .currency("EUR")
                     .build(),
                 MockGoalBuilder::default()
                     .commited(vec![(mkdate(3), 5), (mkdate(17), 5)])
-                    .to_pay_at(10 as GoalFigure)
-                    .target(1500 as GoalFigure)
+                    .to_pay_at(10)
+                    .target(1500)
                     .currency("CREDIT")
                     .build(),
             ],
@@ -1110,14 +1118,14 @@ mod tests_remaining_operation {
             goals: vec![
                 MockGoalBuilder::default()
                     .commited(vec![(mkdate(1), 15), (mkdate(10), 20)])
-                    .to_pay_at(5 as GoalFigure)
-                    .target(15 as GoalFigure)
+                    .to_pay_at(5)
+                    .target(15)
                     .currency("EUR")
                     .build(),
                 MockGoalBuilder::default()
                     .commited(vec![(mkdate(3), 5), (mkdate(17), 5)])
-                    .to_pay_at(10 as GoalFigure)
-                    .target(1500 as GoalFigure)
+                    .to_pay_at(10)
+                    .target(1500)
                     .currency("CREDIT")
                     .build(),
             ],
