@@ -45,7 +45,7 @@ impl Vault for VaultImpl {
 pub trait VaultReadable: DeserializeOwned {
     const KEY: &'static str;
 
-    fn FromVault<V: Vault>(vault: &V) -> Result<Self, String> {
+    fn from_vault<V: Vault>(vault: &V) -> Result<Self, String> {
         vault.read_vault_values(Self::KEY.into())
     }
 }
@@ -96,7 +96,7 @@ mod tests_read_vault_values {
             path: directory.path().into(),
         };
         let result: Result<TestVaultConfigObject, String> =
-            TestVaultConfigObject::FromVault(&vault);
+            TestVaultConfigObject::from_vault(&vault);
 
         assert_eq!(
             result,

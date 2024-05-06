@@ -46,7 +46,7 @@ pub fn remaining_operation() {
 
         let predicted_income = match arguments.include_predicted_income {
             true => {
-                let raw_amount = PredictedIncome::FromVault(&vault)?;
+                let raw_amount = PredictedIncome::from_vault(&vault)?;
                 Some(raw_amount.into())
             }
             false => None,

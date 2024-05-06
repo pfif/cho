@@ -106,10 +106,10 @@ impl RemainingOperation<AccountJson, GoalImplementation, PeriodVaultValues> {
             target_currency,
 
             date: Local::now().date_naive(),
-            periods_configuration: PeriodVaultValues::FromVault(vault)?,
+            periods_configuration: PeriodVaultValues::from_vault(vault)?,
 
             raw_accounts: get_accounts(vault)?,
-            goals: GoalVaultValues::FromVault(vault)?,
+            goals: GoalVaultValues::from_vault(vault)?,
 
             predicted_income,
         });
@@ -128,7 +128,7 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
             .raw_accounts
             .iter()
             .map(|a| {
-                return DisplayAccount::FromQueriableAccount(
+                return DisplayAccount::from_queriable_account(
                     a,
                     &current_period.start_date,
                     &self.date,
@@ -158,7 +158,7 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
                 },
             )?;
 
-            DisplayAccount::FromValues(
+            DisplayAccount::from_values(
                 "Overall Balance".into(),
                 self.target_currency.clone(),
                 period_start_balance,
@@ -315,7 +315,7 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
 }
 
 impl DisplayAccount {
-    fn FromQueriableAccount<A: QueriableAccount>(
+    fn from_queriable_account<A: QueriableAccount>(
         raw_account: &A,
         period_start_date: &NaiveDate,
         current_date: &NaiveDate,
@@ -324,7 +324,7 @@ impl DisplayAccount {
         let instance = (|| {
             let period_start_found_amount = raw_account.amount_at(period_start_date)?;
             let current_found_amount = raw_account.amount_at(current_date)?;
-            Ok(DisplayAccount::FromValues(
+            Ok(DisplayAccount::from_values(
                 name.clone(),
                 raw_account.currency().clone(),
                 period_start_found_amount.figure.into(),
@@ -336,7 +336,7 @@ impl DisplayAccount {
         instance
     }
 
-    fn FromValues(
+    fn from_values(
         name: String,
         currency: Currency,
         period_start_balance: Figure,
