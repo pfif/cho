@@ -76,7 +76,6 @@ pub fn remaining_operation() {
 type Figure = Decimal;
 type Currency = String;
 type ExchangeRate = (String, Decimal);
-pub type ExchangeRates = HashMap<Currency, Figure>;
 
 type PredictedIncome = Amount;
 impl VaultReadable for PredictedIncome {
