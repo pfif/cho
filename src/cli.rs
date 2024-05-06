@@ -193,8 +193,6 @@ impl<'a> DisplayGoal<'a> {
     }
 }
 
-struct DisplayPeriod<'a>{
-    period: &'a Period
 struct DisplayPeriod<'a> {
     period: &'a Period,
 }
