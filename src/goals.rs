@@ -19,7 +19,7 @@ pub struct GoalImplementation {
     name: String,
     currency: String,
     target: Figure,
-    commited: Vec<(NaiveDate, Figure)>,
+    committed: Vec<(NaiveDate, Figure)>,
     target_date: NaiveDate,
 }
 
@@ -28,7 +28,7 @@ pub trait Goal<P: PeriodsConfiguration> {
     fn name(&self) -> &String;
     fn currency(&self) -> &String;
     fn target(&self) -> &Figure;
-    fn commited(&self) -> &Vec<(NaiveDate, Figure)>;
+    fn committed(&self) -> &Vec<(NaiveDate, Figure)>;
     fn target_date(&self) -> &NaiveDate;
 
     fn remaining(&self) -> Result<Figure, String>;
@@ -38,7 +38,7 @@ pub trait Goal<P: PeriodsConfiguration> {
 impl GoalImplementation {
     fn remaining(&self) -> Result<Figure, String> {
         let total_commited = self
-            .commited
+            .committed
             .iter()
             .fold(dec!(0), |acc, (_, amount)| acc + amount);
         if total_commited > self.target {
@@ -62,8 +62,8 @@ impl<P: PeriodsConfiguration> Goal<P> for GoalImplementation {
         return &self.target;
     }
 
-    fn commited(&self) -> &Vec<(NaiveDate, Figure)> {
-        return &self.commited;
+    fn committed(&self) -> &Vec<(NaiveDate, Figure)> {
+        return &self.committed;
     }
 
     fn target_date(&self) -> &NaiveDate {
@@ -84,7 +84,7 @@ impl<P: PeriodsConfiguration> Goal<P> for GoalImplementation {
         }
         let current_period = period_config.period_for_date(date)?;
 
-        let mut commits_iter = self.commited.iter();
+        let mut commits_iter = self.committed.iter();
         if let Some(mut current_commit) = commits_iter.next() {
             loop {
                 let Some(next_commit) = commits_iter.next() else {
@@ -139,7 +139,7 @@ mod test_remaining {
             currency: "JPY".to_string(),
             target: 100.into(),
             target_date: NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
-            commited,
+            committed: commited,
         };
     }
     #[test]
@@ -233,7 +233,7 @@ mod test_to_pay_at {
             currency: "JPY".to_string(),
             target: 100.into(),
             target_date: date(1, 7),
-            commited,
+            committed: commited,
         };
     }
 
