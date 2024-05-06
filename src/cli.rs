@@ -178,7 +178,7 @@ impl<'a> DisplayGoal<'a> {
         self.goal.name.clone()
     }
     fn committed(&self) -> Amount {
-        self.make_amount(&self.goal.commited)
+        self.make_amount(&self.goal.committed)
     }
 
     fn to_commit_this_period(&self) -> Option<Amount> {

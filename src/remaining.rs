@@ -52,7 +52,7 @@ pub struct DisplayAccount {
 #[cfg_attr(test, derive(Default, Debug, PartialEq, Eq))]
 pub struct DisplayGoal {
     pub name: String,
-    pub commited: Figure,
+    pub committed: Figure,
     pub to_commit_this_period: Option<Figure>,
     pub target: Figure,
     pub currency: Currency,
@@ -171,8 +171,8 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
             .map(|goal| {
                 Ok(DisplayGoal {
                     name: goal.name().clone(),
-                    commited: goal
-                        .commited()
+                    committed: goal
+                        .committed()
                         .iter()
                         .fold(0.into(), |acc, (_, amount)| acc + amount),
                     to_commit_this_period: {
@@ -193,12 +193,12 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
                 name: "Overall Goal".into(),
                 currency: self.target_currency.clone(),
                 target: dec!(0),
-                commited: dec!(0),
+                committed: dec!(0),
                 to_commit_this_period: None,
             },
             |acc, goal| -> Result<DisplayGoal, String> {
                 let mut target = goal.target;
-                let mut commited = goal.commited;
+                let mut commited = goal.committed;
                 let mut to_commit_this_period = goal.to_commit_this_period;
 
                 if goal.currency != self.target_currency {
@@ -212,7 +212,7 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
 
                 Ok(DisplayGoal {
                     target: acc.target + target,
-                    commited: acc.commited + commited,
+                    committed: acc.committed + commited,
                     to_commit_this_period: match to_commit_this_period {
                         None => acc.to_commit_this_period,
                         Some(amount) => {
@@ -247,7 +247,7 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
             - overall_goal.to_commit_this_period.unwrap_or(dec!(0));
 
         let uncommitted = Amount {
-            figure: overall_balance.current_balance - overall_goal.commited,
+            figure: overall_balance.current_balance - overall_goal.committed,
             currency: self.target_currency.clone(),
         };
         let overcommitted = &uncommitted.figure < &(0.into());
@@ -448,7 +448,7 @@ mod tests_remaining_operation {
                 .return_const(self.currency.clone().unwrap());
             mock.expect_target()
                 .return_const(self.target.unwrap().into());
-            mock.expect_commited().return_const(
+            mock.expect_committed().return_const(
                 self.commited
                     .clone()
                     .unwrap()
@@ -551,7 +551,7 @@ mod tests_remaining_operation {
                 result
                     .goals
                     .iter()
-                    .map(|goal| goal.commited)
+                    .map(|goal| goal.committed)
                     .collect::<Vec<RemainingFigure>>(),
                 self.expected_commited
             );
@@ -862,7 +862,7 @@ mod tests_remaining_operation {
             expected_commited: vec![5.into()],
             expected_overall_goal: DisplayGoal {
                 name: "Overall Goal".into(),
-                commited: 12.into(),
+                committed: 12.into(),
                 to_commit_this_period: Some(12.into()),
                 target: 36.into(),
                 currency: "EUR".into(),
@@ -904,7 +904,7 @@ mod tests_remaining_operation {
             expected_commited: vec![5.into()],
             expected_overall_goal: DisplayGoal {
                 name: "Overall Goal".into(),
-                commited: 5.into(),
+                committed: 5.into(),
                 to_commit_this_period: None,
                 target: 15.into(),
                 currency: "EUR".into(),
@@ -946,7 +946,7 @@ mod tests_remaining_operation {
             expected_commited: vec![dec!(0)],
             expected_overall_goal: DisplayGoal {
                 name: "Overall Goal".into(),
-                commited: dec!(0),
+                committed: dec!(0),
                 to_commit_this_period: Some(dec!(5)),
                 target: dec!(15),
                 currency: "EUR".to_string(),
@@ -996,7 +996,7 @@ mod tests_remaining_operation {
             expected_commited: vec![dec!(35), dec!(10)],
             expected_overall_goal: DisplayGoal {
                 name: "Overall Goal".into(),
-                commited: dec!(59),
+                committed: dec!(59),
                 to_commit_this_period: Some(dec!(29)),
                 target: dec!(3615),
                 currency: "EUR".to_string(),
@@ -1062,7 +1062,7 @@ mod tests_remaining_operation {
             expected_commited: vec![dec!(35), dec!(10)],
             expected_overall_goal: DisplayGoal {
                 name: "Overall Goal".into(),
-                commited: dec!(59),
+                committed: dec!(59),
                 to_commit_this_period: Some(dec!(29)),
                 target: dec!(3615),
                 currency: "EUR".to_string(),
@@ -1134,7 +1134,7 @@ mod tests_remaining_operation {
             expected_commited: vec![dec!(35), dec!(10)],
             expected_overall_goal: DisplayGoal {
                 name: "Overall Goal".into(),
-                commited: dec!(59),
+                committed: dec!(59),
                 to_commit_this_period: Some(dec!(29)),
                 target: dec!(3615),
                 currency: "EUR".to_string(),
@@ -1180,7 +1180,7 @@ mod tests_remaining_operation {
             expected_commited: vec![],
             expected_overall_goal: DisplayGoal {
                 name: "Overall Goal".into(),
-                commited: dec!(0),
+                committed: dec!(0),
                 to_commit_this_period: None,
                 target: dec!(0),
                 currency: "EUR".to_string(),
