@@ -3,12 +3,12 @@ use std::collections::HashMap;
 
 use crate::accounts::{get_accounts, AccountJson, QueriableAccount};
 use crate::goals::{Goal, GoalImplementation, GoalVaultValues};
+use crate::period;
 use crate::period::{PeriodVaultValues, PeriodsConfiguration};
 use crate::vault::{Vault, VaultReadable};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::Deserialize;
-use crate::period;
 
 //////////////////
 // Public types //
@@ -31,11 +31,11 @@ pub struct Period {
     pub end_date: NaiveDate,
 }
 
-impl From<period::Period> for Period{
+impl From<period::Period> for Period {
     fn from(value: period::Period) -> Self {
-        Period{
+        Period {
             start_date: value.start_date,
-            end_date: value.end_date
+            end_date: value.end_date,
         }
     }
 }
@@ -174,13 +174,14 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
                     commited: goal
                         .commited()
                         .iter()
-                        .fold(0, |acc, (_, amount)| acc + amount)
-                        .into(),
-                    to_commit_this_period: match goal
-                        .to_pay_at(&self.periods_configuration, &self.date)?
-                    {
-                        0 => None,
-                        i => Some(i.into()),
+                        .fold(0.into(), |acc, (_, amount)| acc + amount),
+                    to_commit_this_period: {
+                        let to_commit = goal.to_pay_at(&self.periods_configuration, &self.date)?;
+                        if to_commit == 0.into() {
+                            None
+                        } else {
+                            Some(to_commit)
+                        }
                     },
                     currency: goal.currency().clone(),
                     target: Decimal::from(*goal.target()),
@@ -243,14 +244,14 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
             None => dec!(0),
             Some(i) => i.figure,
         } + overall_balance.difference
-          - overall_goal.to_commit_this_period.unwrap_or(dec!(0));
+            - overall_goal.to_commit_this_period.unwrap_or(dec!(0));
 
         let uncommitted = Amount {
             figure: overall_balance.current_balance - overall_goal.commited,
             currency: self.target_currency.clone(),
         };
         let overcommitted = &uncommitted.figure < &(0.into());
-       
+
         return Ok(RemainingMoneyScreen {
             current_period,
 
@@ -338,13 +339,13 @@ impl DisplayAccount {
 #[cfg(test)]
 mod tests_remaining_operation {
     use super::{
-        Amount, Currency, DisplayAccount, DisplayGoal, Figure as RemainingFigure,
-        RemainingOperation, Period
+        Amount, Currency, DisplayAccount, DisplayGoal, Figure as RemainingFigure, Period,
+        RemainingOperation,
     };
     use crate::accounts::{Figure as AccountFigure, FoundAmount, MockQueriableAccount};
     use crate::goals::{Figure as GoalFigure, MockGoal};
     use crate::period;
-    use crate::period::{MockPeriodsConfiguration};
+    use crate::period::MockPeriodsConfiguration;
     use chrono::NaiveDate;
     use derive_builder::Builder;
     use mockall::predicate::eq;
@@ -568,10 +569,13 @@ mod tests_remaining_operation {
         };
         let result = instance.execute();
 
-        assert_eq!(result.unwrap().current_period, Period{
-            start_date: mkdate(1),
-            end_date: mkdate(4)
-        })
+        assert_eq!(
+            result.unwrap().current_period,
+            Period {
+                start_date: mkdate(1),
+                end_date: mkdate(4)
+            }
+        )
     }
 
     #[test]

@@ -23,7 +23,7 @@ Remaining this period: €456
 */
 
 use crate::remaining;
-use crate::remaining::{RemainingOperation, Period};
+use crate::remaining::{Period, RemainingOperation};
 use crate::vault::{VaultImpl, VaultReadable};
 use clap::Parser;
 use comfy_table::Table;
@@ -34,7 +34,6 @@ use std::env::current_dir;
 use std::fmt::{Display, Formatter};
 use std::iter::once;
 use std::path::PathBuf;
-use serde_json::value::Index;
 
 pub fn remaining_operation() {
     let result: Result<RemainingMoneyScreen, String> = (|| {
@@ -159,7 +158,6 @@ impl<'a> DisplayAccount<'a> {
     fn difference(&self) -> Amount {
         self.make_amount(&self.account.difference)
     }
-    
 }
 
 struct DisplayGoal<'a> {
@@ -197,17 +195,17 @@ impl<'a> DisplayGoal<'a> {
 
 struct DisplayPeriod<'a>{
     period: &'a Period
+struct DisplayPeriod<'a> {
+    period: &'a Period,
 }
 
-impl<'a> DisplayPeriod<'a>{
-    fn from(period: &'a Period) -> Self{
-        DisplayPeriod{
-            period
-        }
+impl<'a> DisplayPeriod<'a> {
+    fn from(period: &'a Period) -> Self {
+        DisplayPeriod { period }
     }
 }
 
-impl<'a> Display for DisplayPeriod<'a>{
+impl<'a> Display for DisplayPeriod<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} to {}", self.period.start_date, self.period.end_date)
     }
@@ -271,7 +269,10 @@ impl RemainingMoneyScreen {
     }
 
     fn formatted_period_start(&self) -> String {
-        return Self::title(&format!("Current period : {}", DisplayPeriod::from(&self.screen.current_period)));
+        return Self::title(&format!(
+            "Current period : {}",
+            DisplayPeriod::from(&self.screen.current_period)
+        ));
     }
 
     fn formatted_account_table(&self) -> String {
@@ -334,11 +335,15 @@ impl RemainingMoneyScreen {
                 goal.target().to_string(),
             ]);
         }
-        
+
         let mut formatted_uncommited = "(".to_string();
         formatted_uncommited.extend("Uncommitted:".chars());
         formatted_uncommited.extend(" ".chars());
-        formatted_uncommited.extend(Amount::from(self.screen.uncommitted.clone()).to_string().chars());
+        formatted_uncommited.extend(
+            Amount::from(self.screen.uncommitted.clone())
+                .to_string()
+                .chars(),
+        );
         if self.screen.overcommitted {
             formatted_uncommited.extend(" ".chars());
             formatted_uncommited.extend("More money is committed to goals than is available in your accounts. Consider taking money out of one or more goals.".chars());
