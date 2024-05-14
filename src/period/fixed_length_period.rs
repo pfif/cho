@@ -1,19 +1,19 @@
 use chrono::{Days, NaiveDate};
 use serde::Deserialize;
-use crate::period::interface::{PeriodsConfiguration, PeriodNumber, Period};
+use crate::period::interface::{PeriodsConfiguration, Period};
 
 use crate::vault::VaultReadable;
 
-
+pub type PeriodNumber = u16;
 #[derive(Deserialize)]
-pub struct PeriodVaultValues {
+pub struct FixedLengthPeriodConfiguration {
     start_date: NaiveDate,
     period_in_days: u8,
 }
 
 pub struct ErrorStartBeforePeriodConfiguration;
 
-impl PeriodsConfiguration for PeriodVaultValues {
+impl FixedLengthPeriodConfiguration{
     fn period_number_for_date(
         &self,
         date: &NaiveDate,
@@ -24,6 +24,9 @@ impl PeriodsConfiguration for PeriodVaultValues {
         let days_since_start = (*date - self.start_date).num_days() as u16; // u16: Up to 179 years
         return Ok((days_since_start / self.period_in_days as u16) as PeriodNumber);
     }
+}
+
+impl PeriodsConfiguration for FixedLengthPeriodConfiguration {
     fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String> {
         let period_number_for_date = self.period_number_for_date(date).or_else(
             |_errortypecheck: ErrorStartBeforePeriodConfiguration| {
@@ -78,7 +81,7 @@ impl PeriodsConfiguration for PeriodVaultValues {
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod tests {
-    use super::{PeriodVaultValues, PeriodsConfiguration};
+    use super::{FixedLengthPeriodConfiguration, PeriodsConfiguration};
     use crate::period::Period;
     use chrono::NaiveDate;
 
@@ -86,8 +89,8 @@ mod tests {
         return NaiveDate::from_ymd_opt(2023, 04, day_of_month).unwrap();
     }
 
-    fn config() -> PeriodVaultValues {
-        return PeriodVaultValues {
+    fn config() -> FixedLengthPeriodConfiguration {
+        return FixedLengthPeriodConfiguration {
             start_date: date(11),
             period_in_days: 4,
         };
@@ -155,7 +158,7 @@ mod tests {
 
     #[test]
     fn period_between__regression_test__long_period() {
-        let period_config = PeriodVaultValues {
+        let period_config = FixedLengthPeriodConfiguration {
             start_date: NaiveDate::from_ymd_opt(2024, 4, 27).unwrap(),
             period_in_days: 28,
         };

@@ -1,8 +1,7 @@
 mod interface;
 mod fixed_length_period;
 
-pub use interface::{PeriodsConfiguration, Period};
+pub use interface::{PeriodsConfiguration, Period, PeriodVaultValues};
 
 #[cfg(test)]
 pub use interface::{MockPeriodsConfiguration};
-pub use fixed_length_period::{PeriodVaultValues};

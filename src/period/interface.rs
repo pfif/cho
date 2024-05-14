@@ -1,23 +1,43 @@
 use chrono::NaiveDate;
 #[cfg(test)]
 use mockall::automock;
-use crate::period::fixed_length_period::{ErrorStartBeforePeriodConfiguration, PeriodVaultValues};
+use serde::Deserialize;
+use crate::period::fixed_length_period::{FixedLengthPeriodConfiguration};
 use crate::vault::VaultReadable;
 
-pub type PeriodNumber = u16;
+
+#[derive(Deserialize)]
+#[serde(tag = "type")]
+pub enum PeriodVaultValues {
+    FixedLengthPeriod(FixedLengthPeriodConfiguration),
+}
 
 impl VaultReadable for PeriodVaultValues {
     const KEY: &'static str = "periods_configuration";
 }
 
+impl PeriodVaultValues{
+    fn unpack(&self) -> &dyn PeriodsConfiguration{
+        match self {
+           PeriodVaultValues::FixedLengthPeriod(p) => p
+        }
+    }
+}
+
+impl PeriodsConfiguration for PeriodVaultValues{
+    fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String> {
+        return self.unpack().period_for_date(date);
+    }
+
+    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, String> {
+        return self.unpack().periods_between(start, end);
+    }
+}
+
 #[cfg_attr(test, automock)]
 pub trait PeriodsConfiguration {
-    fn period_number_for_date(
-        &self,
-        date: &NaiveDate,
-    ) -> Result<PeriodNumber, ErrorStartBeforePeriodConfiguration>;
     fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String>;
-    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<PeriodNumber, String>;
+    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, String>;
 }
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Period {
