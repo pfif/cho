@@ -1,11 +1,9 @@
 use chrono::{Days, NaiveDate};
-#[cfg(test)]
-use mockall::automock;
 use serde::Deserialize;
+use crate::period::interface::{PeriodsConfiguration, PeriodNumber, Period};
 
 use crate::vault::VaultReadable;
 
-pub type PeriodNumber = u16;
 
 #[derive(Deserialize)]
 pub struct PeriodVaultValues {
@@ -13,21 +11,7 @@ pub struct PeriodVaultValues {
     period_in_days: u8,
 }
 
-impl VaultReadable for PeriodVaultValues {
-    const KEY: &'static str = "periods_configuration";
-}
-
 pub struct ErrorStartBeforePeriodConfiguration;
-
-#[cfg_attr(test, automock)]
-pub trait PeriodsConfiguration {
-    fn period_number_for_date(
-        &self,
-        date: &NaiveDate,
-    ) -> Result<PeriodNumber, ErrorStartBeforePeriodConfiguration>;
-    fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String>;
-    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<PeriodNumber, String>;
-}
 
 impl PeriodsConfiguration for PeriodVaultValues {
     fn period_number_for_date(
@@ -91,16 +75,11 @@ impl PeriodsConfiguration for PeriodVaultValues {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Period {
-    pub start_date: NaiveDate,
-    pub end_date: NaiveDate,
-}
-
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod tests {
-    use super::{Period, PeriodVaultValues, PeriodsConfiguration};
+    use super::{PeriodVaultValues, PeriodsConfiguration};
+    use crate::period::Period;
     use chrono::NaiveDate;
 
     fn date(day_of_month: u32) -> NaiveDate {
