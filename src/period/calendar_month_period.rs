@@ -18,11 +18,15 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration{
     }
 
     fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, String> {
-        todo!()
+        // The number of years between the two dates, including start and end
+        let full_years = (end.year() - start.year() + 1) as u16;
+        
+        let month_to_start = (start.month() - 1) as u16;
+        let end_year_end = (12 - end.month()) as u16;
+        
+        Ok(full_years * 12 - month_to_start - end_year_end)
     }
 }
-
-// TODO: Test 31st
 
 #[cfg(test)]
 mod period_for_date_tests{
@@ -164,5 +168,117 @@ mod period_for_date_tests{
     #[test]
     fn february_29__beginning_of_month(){
         february_29().input(date_bisextile(2, 1)).execute();
+    }
+}
+
+#[cfg(test)]
+mod test_periods_between {
+    use chrono::NaiveDate;
+    use crate::period::calendar_month_period::CalendarMonthPeriodConfiguration;
+    use crate::period::PeriodsConfiguration;
+
+    fn date(month: u32, day: u32) -> NaiveDate {
+        return NaiveDate::from_ymd_opt(2023, month, day).unwrap();
+    }
+
+    fn date_next_year(month: u32, day: u32) -> NaiveDate {
+        return NaiveDate::from_ymd_opt(2024, month, day).unwrap();
+    }
+    
+    fn date_several_years(month: u32, day: u32) -> NaiveDate {
+        return NaiveDate::from_ymd_opt(2026, month, day).unwrap();
+    }
+    
+    struct Test{
+        start: NaiveDate,
+        end: NaiveDate,
+        
+        expected_output: u16
+    }
+    
+    impl Test {
+        fn execute(&self){
+            let config = CalendarMonthPeriodConfiguration{};
+            let result = config.periods_between(&self.start, &self.end).unwrap();
+            assert_eq!(result, self.expected_output)
+        }
+    }
+    
+    #[test]
+    fn same_month__ends(){
+        Test{start: date(4, 1), end: date(4, 30), expected_output: 1}.execute();
+    }
+
+    #[test]
+    fn same_month__mid(){
+        Test{start: date(4, 4), end: date(4, 15), expected_output: 1}.execute();
+    }
+    
+    #[test]
+    fn adjacent_months_ends(){
+        Test{start: date(4, 1), end: date(5, 31), expected_output: 2}.execute();
+    }
+
+    #[test]
+    fn adjacent_months_mid(){
+        Test{start: date(4, 4), end: date(5, 15), expected_output: 2}.execute();
+    }
+
+    #[test]
+    fn adjacent_months__inner_ends(){
+        Test{start: date(4, 30), end: date(5, 1), expected_output: 2}.execute();
+    }
+    
+   #[test] 
+   fn several_months__ends(){
+       Test{start: date(2, 1), end: date(6, 30), expected_output: 5}.execute();
+   }
+
+   #[test]
+   fn several_months__mid(){
+       Test{start: date(2, 26), end: date(6, 15), expected_output: 5}.execute();
+   }
+
+   #[test]
+   fn several_months__inner_ends(){
+       Test{start: date(2, 28), end: date(6, 1), expected_output: 5}.execute();
+   }
+
+    #[test]
+    fn adjacent_years__ends(){
+        Test{start: date(1, 1), end: date_next_year(12, 31), expected_output: 24}.execute();
+    }
+    
+    #[test]
+    fn adjacent_years__mid(){
+        Test{start: date(10, 17), end: date_next_year(2, 14), expected_output: 5}.execute();
+    }
+    
+    #[test]
+    fn adjacent_years__inner_ends(){
+        Test{start: date(12, 31), end: date_next_year(1, 1), expected_output: 2}.execute();
+    }
+    
+    #[test]
+    fn several_years__ends(){
+        Test{start: date(1, 1), end: date_several_years(12, 31), expected_output: 48}.execute();
+    }
+
+    #[test]
+    fn several_years__mid(){
+        // Full years: 2024, 2025 -> 24 months
+        // Start year (2023): 3 months
+        // End year (2026): 2 months
+        // Total: 29 months
+        Test{start: date(10, 17), end: date_several_years(2, 15), expected_output: 29}.execute();
+    }
+
+    #[test]
+    fn several_years__inner_ends(){
+        // Full years: 2024, 2025 -> 24 months
+        // Start year (2023): 1 month
+        // End year (2026): 1 months
+        // Total: 26 months
+        Test{start: date(12, 31), end: date_several_years(1, 1), expected_output: 26}.execute();
     }
 }
