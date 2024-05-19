@@ -3,6 +3,7 @@ use chrono::NaiveDate;
 use mockall::automock;
 use serde::Deserialize;
 use crate::period::fixed_length_period::{FixedLengthPeriodConfiguration};
+use crate::period::calendar_month_period::{CalendarMonthPeriodConfiguration};
 use crate::vault::VaultReadable;
 
 
@@ -11,6 +12,8 @@ use crate::vault::VaultReadable;
 pub enum PeriodVaultValues {
     #[serde(rename = "fixed_length")]
     FixedLength(FixedLengthPeriodConfiguration),
+    #[serde(rename = "monthly")]
+    CalendarMonth(CalendarMonthPeriodConfiguration)
 }
 
 impl VaultReadable for PeriodVaultValues {
@@ -20,7 +23,8 @@ impl VaultReadable for PeriodVaultValues {
 impl PeriodVaultValues{
     fn unpack(&self) -> &dyn PeriodsConfiguration{
         match self {
-           PeriodVaultValues::FixedLength(p) => p
+           PeriodVaultValues::FixedLength(p) => p,
+           PeriodVaultValues::CalendarMonth(p) => p
         }
     }
 }
