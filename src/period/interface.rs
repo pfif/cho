@@ -9,7 +9,8 @@ use crate::vault::VaultReadable;
 #[derive(Deserialize)]
 #[serde(tag = "type")]
 pub enum PeriodVaultValues {
-    FixedLengthPeriod(FixedLengthPeriodConfiguration),
+    #[serde(rename = "fixed_length")]
+    FixedLength(FixedLengthPeriodConfiguration),
 }
 
 impl VaultReadable for PeriodVaultValues {
@@ -19,7 +20,7 @@ impl VaultReadable for PeriodVaultValues {
 impl PeriodVaultValues{
     fn unpack(&self) -> &dyn PeriodsConfiguration{
         match self {
-           PeriodVaultValues::FixedLengthPeriod(p) => p
+           PeriodVaultValues::FixedLength(p) => p
         }
     }
 }
