@@ -1,4 +1,4 @@
-/*use std::collections::HashSet;
+use std::collections::HashSet;
 use serde::Deserialize;
 use crate::period::PeriodsConfiguration;
 use transactions::Transaction;
@@ -25,4 +25,3 @@ impl<T: PeriodsConfiguration> RecurringTransactionsConfiguration<T> {
         }
     }
 }
-*/

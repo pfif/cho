@@ -1,4 +1,4 @@
-/*use chrono::NaiveDate;
+use chrono::NaiveDate;
 use crate::period::Period;
 use crate::amounts::{Currency, Figure};
 
@@ -12,4 +12,4 @@ pub struct Transaction<'a> {
 pub struct Occurrence<'a>{
     period: &'a Period,
     paid: bool
-}*/
+}
