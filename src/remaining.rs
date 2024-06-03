@@ -1,10 +1,10 @@
 use chrono::{Local, NaiveDate};
 use std::collections::HashMap;
 
-use crate::accounts::{get_accounts, AccountJson, QueriableAccount};
+use crate::accounts::{AccountJson, get_accounts, QueriableAccount};
 use crate::goals::{Goal, GoalImplementation, GoalVaultValues};
 use crate::period;
-use crate::period::{PeriodVaultValues, PeriodsConfiguration};
+use crate::period::{PeriodsConfiguration, AnyPeriodsConfiguration};
 use crate::vault::{Vault, VaultReadable};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -30,6 +30,16 @@ pub struct Period {
     pub start_date: NaiveDate,
     pub end_date: NaiveDate,
 }
+
+#[derive(Deserialize)]
+struct RemainingVaultValues{
+    periods_configuration: AnyPeriodsConfiguration
+}
+
+impl VaultReadable for RemainingVaultValues {
+    const KEY: &'static str = "remaining";
+}
+
 
 impl From<period::Period> for Period {
     fn from(value: period::Period) -> Self {
@@ -93,20 +103,20 @@ pub struct RemainingOperation<A: QueriableAccount, G: Goal<P>, P: PeriodsConfigu
     predicted_income: Option<Amount>,
 }
 
-impl RemainingOperation<AccountJson, GoalImplementation, PeriodVaultValues> {
+impl RemainingOperation<AccountJson, GoalImplementation, AnyPeriodsConfiguration> {
     pub fn from_vault_value<V: Vault>(
         exchange_rate: ExchangeRates,
         target_currency: Currency,
         predicted_income: Option<Amount>,
         vault: &V,
-    ) -> Result<RemainingOperation<AccountJson, GoalImplementation, PeriodVaultValues>, String>
+    ) -> Result<RemainingOperation<AccountJson, GoalImplementation, AnyPeriodsConfiguration>, String>
     {
         return Ok(RemainingOperation {
             rates: exchange_rate,
             target_currency,
 
             date: Local::now().date_naive(),
-            periods_configuration: PeriodVaultValues::from_vault(vault)?,
+            periods_configuration: AnyPeriodsConfiguration::from_vault(vault)?,
 
             raw_accounts: get_accounts(vault)?,
             goals: GoalVaultValues::from_vault(vault)?,
@@ -1400,3 +1410,4 @@ mod tests_remaining_operation {
         .test()
     }
 }
+
