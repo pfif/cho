@@ -4,6 +4,7 @@ use mockall::automock;
 use serde::Deserialize;
 use crate::period::fixed_length_period::FixedLengthPeriodConfiguration;
 use crate::period::calendar_month_period::CalendarMonthPeriodConfiguration;
+use crate::period::periods::Period;
 
 
 #[derive(Deserialize)]
@@ -43,9 +44,3 @@ pub trait PeriodsConfiguration {
     fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String>;
     fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, String>;
 }
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Period {
-    pub start_date: NaiveDate,
-    pub end_date: NaiveDate,
-}
-

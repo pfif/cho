@@ -221,11 +221,12 @@ the function works with those.*/
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod test_to_pay_at {
-    use crate::period::{MockPeriodsConfiguration, Period};
+    use crate::period::MockPeriodsConfiguration;
     use mockall::predicate::eq;
 
     use super::{Figure, Goal, GoalImplementation};
     use chrono::{Datelike, Days, NaiveDate};
+    use crate::period::Period;
 
     fn make_goal(commited: Vec<(NaiveDate, Figure)>) -> GoalImplementation {
         return GoalImplementation {
@@ -290,7 +291,7 @@ mod test_to_pay_at {
             _ => panic!("Unexpected date passed to make_period_config"),
         };
 
-        mock.expect_periods_between()
+        mock.expect_number_of_periods_between()
             .with(eq(passed_current_date), eq(date(1, 7)))
             .return_const(returned_number_of_period);
 

@@ -1,6 +1,7 @@
 use chrono::{Days, NaiveDate};
 use serde::Deserialize;
-use crate::period::interface::{PeriodsConfiguration, Period};
+use crate::period::periods_configuration::PeriodsConfiguration;
+use crate::period::periods::Period;
 
 pub type PeriodNumber = u16;
 #[derive(Deserialize)]

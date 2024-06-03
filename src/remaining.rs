@@ -3,11 +3,12 @@ use std::collections::HashMap;
 
 use crate::accounts::{AccountJson, get_accounts, QueriableAccount};
 use crate::goals::{Goal, GoalImplementation, GoalVaultValues};
-use crate::period::{PeriodsConfiguration, AnyPeriodsConfiguration, Period};
+use crate::period::{AnyPeriodsConfiguration, PeriodsConfiguration};
 use crate::vault::{Vault, VaultReadable};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::Deserialize;
+use crate::period::Period;
 
 //////////////////
 // Public types //
@@ -349,7 +350,7 @@ impl DisplayAccount {
 #[cfg(test)]
 mod tests_remaining_operation {
     use super::{
-        Amount, Currency, DisplayAccount, DisplayGoal, Figure as RemainingFigure, Period,
+        Amount, Currency, DisplayAccount, DisplayGoal, Figure as RemainingFigure,
         RemainingOperation,
     };
     use crate::accounts::{Figure as AccountFigure, FoundAmount, MockQueriableAccount};
@@ -362,6 +363,7 @@ mod tests_remaining_operation {
     use rust_decimal_macros::dec;
     use std::collections::HashMap;
     use std::collections::HashSet;
+    use crate::period::Period;
 
     fn mkdate(day: u32) -> NaiveDate {
         return NaiveDate::from_ymd_opt(2023, 12, day).unwrap();
