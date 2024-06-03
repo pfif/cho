@@ -66,7 +66,7 @@ impl<'de> Deserialize<'de> for Period {
                         .ok_or(DeError::custom("Could not construct month"))?;
                     (start_date, end_date)
                 } else {
-                    return Err(DeError::custom("Invalid date"));
+                    return Err(DeError::invalid_length(v.len(), &"a either 7 or 21 characters long string"));
                 };
                 Ok(Period {
                     start_date,
@@ -110,7 +110,7 @@ mod test_deserialize {
             &[Token::Str(&"2021-01-01/2021-01-28")],
         );
     }
-    
+
     #[test]
     fn test_deserialize_month() {
         assert_tokens(
