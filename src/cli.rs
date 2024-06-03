@@ -24,7 +24,7 @@ Remaining this period: €456
 
 use crate::period::Period;
 use crate::remaining;
-use crate::remaining::{RemainingOperation};
+use crate::remaining::RemainingOperation;
 use crate::vault::{VaultImpl, VaultReadable};
 use clap::Parser;
 use comfy_table::Table;
@@ -181,7 +181,7 @@ impl<'a> DisplayGoal<'a> {
     fn committed(&self) -> Amount {
         self.make_amount(&self.goal.committed)
     }
-    
+
     fn committed_this_period(&self) -> Amount {
         self.make_amount(&self.goal.committed_this_period)
     }
@@ -320,7 +320,13 @@ impl RemainingMoneyScreen {
 
     fn formatted_goal_table(&self) -> String {
         let mut table = Table::new();
-        table.set_header(["", "Committed", "Committed this period", "To commit this period", "Target"]);
+        table.set_header([
+            "",
+            "Committed",
+            "Committed this period",
+            "To commit this period",
+            "Target",
+        ]);
 
         let goals = once(&self.screen.overall_goal)
             .chain(self.screen.goals.iter())

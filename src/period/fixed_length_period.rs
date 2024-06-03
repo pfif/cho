@@ -1,7 +1,7 @@
+use crate::period::periods::Period;
+use crate::period::periods_configuration::PeriodsConfiguration;
 use chrono::{Days, NaiveDate};
 use serde::Deserialize;
-use crate::period::periods_configuration::PeriodsConfiguration;
-use crate::period::periods::Period;
 
 pub type PeriodNumber = u16;
 #[derive(Deserialize)]
@@ -12,7 +12,7 @@ pub struct FixedLengthPeriodConfiguration {
 
 pub struct ErrorStartBeforePeriodConfiguration;
 
-impl FixedLengthPeriodConfiguration{
+impl FixedLengthPeriodConfiguration {
     fn period_number_for_date(
         &self,
         date: &NaiveDate,
@@ -46,7 +46,11 @@ impl PeriodsConfiguration for FixedLengthPeriodConfiguration {
         });
     }
 
-    fn number_of_periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<PeriodNumber, String> {
+    fn number_of_periods_between(
+        &self,
+        start: &NaiveDate,
+        end: &NaiveDate,
+    ) -> Result<PeriodNumber, String> {
         if start > end {
             return Err("Start date is after end date".to_string());
         }
@@ -101,62 +105,122 @@ mod tests {
 
     #[test]
     fn period_between__length_of_period__first_period() {
-        assert_eq!(config().number_of_periods_between(&date(11), &date(14)).unwrap(), 1)
+        assert_eq!(
+            config()
+                .number_of_periods_between(&date(11), &date(14))
+                .unwrap(),
+            1
+        )
     }
 
     #[test]
     fn period_between__length_of_period__not_first_period() {
-        assert_eq!(config().number_of_periods_between(&date(15), &date(18)).unwrap(), 1)
+        assert_eq!(
+            config()
+                .number_of_periods_between(&date(15), &date(18))
+                .unwrap(),
+            1
+        )
     }
 
     #[test]
     fn period_between__several_periods__start_finish__first_period() {
-        assert_eq!(config().number_of_periods_between(&date(11), &date(22)).unwrap(), 3)
+        assert_eq!(
+            config()
+                .number_of_periods_between(&date(11), &date(22))
+                .unwrap(),
+            3
+        )
     }
 
     #[test]
     fn period_between__several_periods__start_finish__not_first_period() {
-        assert_eq!(config().number_of_periods_between(&date(15), &date(22)).unwrap(), 2)
+        assert_eq!(
+            config()
+                .number_of_periods_between(&date(15), &date(22))
+                .unwrap(),
+            2
+        )
     }
 
     #[test]
     fn period_between__several_periods__start_start__first_period() {
-        assert_eq!(config().number_of_periods_between(&date(11), &date(23)).unwrap(), 4)
+        assert_eq!(
+            config()
+                .number_of_periods_between(&date(11), &date(23))
+                .unwrap(),
+            4
+        )
     }
 
     #[test]
     fn period_between__several_periods__start_start__not_first_period() {
-        assert_eq!(config().number_of_periods_between(&date(15), &date(23)).unwrap(), 3)
+        assert_eq!(
+            config()
+                .number_of_periods_between(&date(15), &date(23))
+                .unwrap(),
+            3
+        )
     }
 
     #[test]
     fn period_between__several_periods__finish_finish__first_period() {
-        assert_eq!(config().number_of_periods_between(&date(14), &date(22)).unwrap(), 3)
+        assert_eq!(
+            config()
+                .number_of_periods_between(&date(14), &date(22))
+                .unwrap(),
+            3
+        )
     }
 
     #[test]
     fn period_between__several_periods__finish_finish__not_first_period() {
-        assert_eq!(config().number_of_periods_between(&date(18), &date(22)).unwrap(), 2)
+        assert_eq!(
+            config()
+                .number_of_periods_between(&date(18), &date(22))
+                .unwrap(),
+            2
+        )
     }
 
     #[test]
     fn period_between__several_periods__middle_to_other_period_middle__first_period() {
-        assert_eq!(config().number_of_periods_between(&date(13), &date(20)).unwrap(), 3)
+        assert_eq!(
+            config()
+                .number_of_periods_between(&date(13), &date(20))
+                .unwrap(),
+            3
+        )
     }
 
     #[test]
     fn period_between__several_periods__middle_to_other_period_middle__not_first_period() {
-        assert_eq!(config().number_of_periods_between(&date(16), &date(22)).unwrap(), 2)
+        assert_eq!(
+            config()
+                .number_of_periods_between(&date(16), &date(22))
+                .unwrap(),
+            2
+        )
     }
 
     #[test]
     fn period_between__several_periods__middle_to_same_period_middle__first_period() {
-        assert_eq!(config().number_of_periods_between(&date(12), &date(13)).unwrap(), 1)
+        assert_eq!(
+            config()
+                .number_of_periods_between(&date(12), &date(13))
+                .unwrap(),
+            1
+        )
     }
 
     #[test]
     fn period_between__several_periods__middle_to_same_period_middle__not_first_period() {
-        assert_eq!(config().number_of_periods_between(&date(20), &date(21)).unwrap(), 1)
+        assert_eq!(
+            config()
+                .number_of_periods_between(&date(20), &date(21))
+                .unwrap(),
+            1
+        )
     }
 
     #[test]
@@ -179,7 +243,9 @@ mod tests {
     #[test]
     fn period_between__before_period_config_start__start_date() {
         assert_eq!(
-            config().number_of_periods_between(&date(9), &date(21)).unwrap_err(),
+            config()
+                .number_of_periods_between(&date(9), &date(21))
+                .unwrap_err(),
             "Start date is before PeriodsConfiguration's start"
         )
     }
@@ -187,7 +253,9 @@ mod tests {
     #[test]
     fn period_between__before_period_config_start__both_date() {
         assert_eq!(
-            config().number_of_periods_between(&date(7), &date(9)).unwrap_err(),
+            config()
+                .number_of_periods_between(&date(7), &date(9))
+                .unwrap_err(),
             "Dates before PeriodsConfiguration's start"
         )
     }
@@ -195,7 +263,9 @@ mod tests {
     #[test]
     fn period_between__start_date_after_end_date() {
         assert_eq!(
-            config().number_of_periods_between(&date(21), &date(20)).unwrap_err(),
+            config()
+                .number_of_periods_between(&date(21), &date(20))
+                .unwrap_err(),
             "Start date is after end date"
         )
     }

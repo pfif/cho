@@ -60,7 +60,7 @@ mod tests_read_vault_values {
 
     use crate::vault::VaultImpl;
 
-    use super::{VaultReadable};
+    use super::VaultReadable;
 
     #[derive(Deserialize, Eq, PartialEq, Debug)]
     struct TestVaultConfigObject {
