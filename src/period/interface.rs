@@ -29,7 +29,11 @@ impl PeriodsConfiguration for AnyPeriodsConfiguration {
         return self.unpack().period_for_date(date);
     }
 
-    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, String> {
+    fn number_of_periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, String> {
+        return self.unpack().number_of_periods_between(start, end);
+    }
+
+    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<Vec<Period>, String> {
         return self.unpack().periods_between(start, end);
     }
 }

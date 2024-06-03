@@ -17,7 +17,7 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration{
         })
     }
 
-    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, String> {
+    fn number_of_periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, String> {
         // The number of years between the two dates, including start and end
         let full_years = (end.year() - start.year() + 1) as u16;
 
@@ -25,6 +25,10 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration{
         let end_year_end = (12 - end.month()) as u16;
 
         Ok(full_years * 12 - month_to_start - end_year_end)
+    }
+
+    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<Vec<Period>, String> {
+        todo!()
     }
 }
 
@@ -199,7 +203,7 @@ mod test_periods_between {
     impl Test {
         fn execute(&self){
             let config = CalendarMonthPeriodConfiguration{};
-            let result = config.periods_between(&self.start, &self.end).unwrap();
+            let result = config.number_of_periods_between(&self.start, &self.end).unwrap();
             assert_eq!(result, self.expected_output)
         }
     }

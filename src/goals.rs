@@ -122,7 +122,7 @@ impl<P: PeriodsConfiguration> Goal<P> for GoalImplementation {
         let remaining = self.remaining()?;
 
         return Ok(
-            remaining / Decimal::from(period_config.periods_between(date, &self.target_date)?)
+            remaining / Decimal::from(period_config.number_of_periods_between(date, &self.target_date)?)
         );
     }
 }
