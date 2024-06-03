@@ -2,8 +2,6 @@ use chrono::{Days, NaiveDate};
 use serde::Deserialize;
 use crate::period::interface::{PeriodsConfiguration, Period};
 
-use crate::vault::VaultReadable;
-
 pub type PeriodNumber = u16;
 #[derive(Deserialize)]
 pub struct FixedLengthPeriodConfiguration {

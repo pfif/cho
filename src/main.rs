@@ -4,6 +4,7 @@ mod goals;
 mod period;
 mod remaining;
 mod vault;
+mod transaction;
 
 use crate::cli::remaining_operation;
 fn main() {

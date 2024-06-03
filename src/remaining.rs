@@ -3,8 +3,7 @@ use std::collections::HashMap;
 
 use crate::accounts::{AccountJson, get_accounts, QueriableAccount};
 use crate::goals::{Goal, GoalImplementation, GoalVaultValues};
-use crate::period;
-use crate::period::{PeriodsConfiguration, AnyPeriodsConfiguration};
+use crate::period::{PeriodsConfiguration, AnyPeriodsConfiguration, Period};
 use crate::vault::{Vault, VaultReadable};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -25,12 +24,6 @@ pub struct Amount {
     pub figure: Figure,
 }
 
-#[cfg_attr(test, derive(Debug, Eq, PartialEq))]
-pub struct Period {
-    pub start_date: NaiveDate,
-    pub end_date: NaiveDate,
-}
-
 #[derive(Deserialize)]
 struct RemainingVaultValues{
     periods_configuration: AnyPeriodsConfiguration
@@ -40,15 +33,6 @@ impl VaultReadable for RemainingVaultValues {
     const KEY: &'static str = "remaining";
 }
 
-
-impl From<period::Period> for Period {
-    fn from(value: period::Period) -> Self {
-        Period {
-            start_date: value.start_date,
-            end_date: value.end_date,
-        }
-    }
-}
 
 #[cfg_attr(test, derive(Default, Debug, PartialEq, Eq, Hash))]
 pub struct DisplayAccount {
@@ -116,7 +100,7 @@ impl RemainingOperation<AccountJson, GoalImplementation, AnyPeriodsConfiguration
             target_currency,
 
             date: Local::now().date_naive(),
-            periods_configuration: AnyPeriodsConfiguration::from_vault(vault)?,
+            periods_configuration: RemainingVaultValues::from_vault(vault)?.periods_configuration,
 
             raw_accounts: get_accounts(vault)?,
             goals: GoalVaultValues::from_vault(vault)?,

@@ -22,8 +22,9 @@ Remaining this period: €456
 ===========================
 */
 
+use crate::period::Period;
 use crate::remaining;
-use crate::remaining::{Period, RemainingOperation};
+use crate::remaining::{RemainingOperation};
 use crate::vault::{VaultImpl, VaultReadable};
 use clap::Parser;
 use comfy_table::Table;
