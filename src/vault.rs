@@ -1,7 +1,8 @@
-use serde::de::DeserializeOwned;
-use serde_json::{from_reader, from_value, Value};
 use std::fs::File;
 use std::path::PathBuf;
+
+use serde::de::DeserializeOwned;
+use serde_json::{from_reader, from_value, Value};
 
 pub struct VaultImpl {
     pub(crate) path: PathBuf,

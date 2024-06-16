@@ -1,10 +1,11 @@
-use crate::{period::PeriodsConfiguration, vault::VaultReadable};
 use chrono::NaiveDate;
 #[cfg(test)]
 use mockall::automock;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::Deserialize;
+
+use crate::{period::PeriodsConfiguration, vault::VaultReadable};
 
 pub type Figure = Decimal;
 
@@ -129,8 +130,9 @@ impl<P: PeriodsConfiguration> Goal<P> for GoalImplementation {
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod test_remaining {
-    use super::{Figure, GoalImplementation};
     use chrono::NaiveDate;
+
+    use super::{Figure, GoalImplementation};
 
     fn make_goal(commited: Vec<(NaiveDate, Figure)>) -> GoalImplementation {
         return GoalImplementation {
@@ -220,12 +222,13 @@ the function works with those.*/
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod test_to_pay_at {
-    use crate::period::MockPeriodsConfiguration;
+    use chrono::{Datelike, Days, NaiveDate};
     use mockall::predicate::eq;
 
-    use super::{Figure, Goal, GoalImplementation};
+    use crate::period::MockPeriodsConfiguration;
     use crate::period::Period;
-    use chrono::{Datelike, Days, NaiveDate};
+
+    use super::{Figure, Goal, GoalImplementation};
 
     fn make_goal(commited: Vec<(NaiveDate, Figure)>) -> GoalImplementation {
         return GoalImplementation {

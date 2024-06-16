@@ -1,7 +1,8 @@
-use crate::period::periods::Period;
-use crate::period::periods_configuration::PeriodsConfiguration;
 use chrono::{Days, NaiveDate};
 use serde::Deserialize;
+
+use crate::period::periods::Period;
+use crate::period::periods_configuration::PeriodsConfiguration;
 
 pub type PeriodNumber = u16;
 #[derive(Deserialize)]
@@ -88,9 +89,11 @@ impl PeriodsConfiguration for FixedLengthPeriodConfiguration {
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod tests {
-    use super::{FixedLengthPeriodConfiguration, PeriodsConfiguration};
-    use crate::period::periods::Period;
     use chrono::NaiveDate;
+
+    use crate::period::periods::Period;
+
+    use super::{FixedLengthPeriodConfiguration, PeriodsConfiguration};
 
     fn date(day_of_month: u32) -> NaiveDate {
         return NaiveDate::from_ymd_opt(2023, 04, day_of_month).unwrap();

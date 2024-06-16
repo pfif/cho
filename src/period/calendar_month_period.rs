@@ -1,7 +1,8 @@
-use crate::period::periods::Period;
-use crate::period::PeriodsConfiguration;
 use chrono::{Datelike, Months, NaiveDate};
 use serde::Deserialize;
+
+use crate::period::periods::Period;
+use crate::period::PeriodsConfiguration;
 
 #[derive(Deserialize)]
 pub struct CalendarMonthPeriodConfiguration {}
@@ -38,11 +39,12 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
 
 #[cfg(test)]
 mod period_for_date_tests {
+    use chrono::NaiveDate;
+    use derive_builder::Builder;
+
     use crate::period::calendar_month_period::CalendarMonthPeriodConfiguration;
     use crate::period::periods::Period;
     use crate::period::PeriodsConfiguration;
-    use chrono::NaiveDate;
-    use derive_builder::Builder;
 
     fn date(month: u32, day: u32) -> NaiveDate {
         return NaiveDate::from_ymd_opt(2023, month, day).unwrap();
@@ -179,9 +181,10 @@ mod period_for_date_tests {
 
 #[cfg(test)]
 mod test_periods_between {
+    use chrono::NaiveDate;
+
     use crate::period::calendar_month_period::CalendarMonthPeriodConfiguration;
     use crate::period::PeriodsConfiguration;
-    use chrono::NaiveDate;
 
     fn date(month: u32, day: u32) -> NaiveDate {
         return NaiveDate::from_ymd_opt(2023, month, day).unwrap();

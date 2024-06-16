@@ -1,10 +1,11 @@
-use crate::period::calendar_month_period::CalendarMonthPeriodConfiguration;
-use crate::period::fixed_length_period::FixedLengthPeriodConfiguration;
-use crate::period::periods::Period;
 use chrono::NaiveDate;
 #[cfg(test)]
 use mockall::automock;
 use serde::Deserialize;
+
+use crate::period::calendar_month_period::CalendarMonthPeriodConfiguration;
+use crate::period::fixed_length_period::FixedLengthPeriodConfiguration;
+use crate::period::periods::Period;
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]

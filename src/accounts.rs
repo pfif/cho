@@ -1,4 +1,4 @@
-use std::fs::{read_dir, File};
+use std::fs::{File, read_dir};
 
 use chrono::NaiveDate;
 #[cfg(test)]
@@ -78,14 +78,15 @@ pub fn get_accounts<V: Vault>(vault: &V) -> Result<Vec<AccountJson>, String> {
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod tests_get_accounts {
-    use chrono::NaiveDate;
     use std::collections::HashSet;
     use std::fs::{create_dir, File};
     use std::io::prelude::*;
     use std::path::{Path, PathBuf};
+
+    use chrono::NaiveDate;
     use tempfile::{tempdir, TempDir};
 
-    use crate::accounts::{get_accounts, AccountJson, AmountListItem, ACCOUNT_DIR};
+    use crate::accounts::{ACCOUNT_DIR, AccountJson, AmountListItem, get_accounts};
     use crate::vault::Vault;
 
     struct MockVault {

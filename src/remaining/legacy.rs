@@ -1,18 +1,14 @@
-use chrono::{Local, NaiveDate};
 use std::collections::HashMap;
 
-use crate::accounts::{get_accounts, AccountJson, QueriableAccount};
-use crate::goals::{Goal, GoalImplementation, GoalVaultValues};
-use crate::period::Period;
-use crate::period::{AnyPeriodsConfiguration, PeriodsConfiguration};
-use crate::vault::{Vault, VaultReadable};
+use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::Deserialize;
 
-//////////////////
-// Public types //
-//////////////////
+use crate::accounts::QueriableAccount;
+use crate::goals::Goal;
+use crate::period::{Period, PeriodsConfiguration};
+use crate::remaining::operations::RemainingOperation;
 
 pub type Figure = Decimal;
 pub type Currency = String;
@@ -25,15 +21,6 @@ pub struct Amount {
     pub figure: Figure,
 }
 
-#[derive(Deserialize)]
-struct RemainingVaultValues {
-    periods_configuration: AnyPeriodsConfiguration,
-}
-
-impl VaultReadable for RemainingVaultValues {
-    const KEY: &'static str = "remaining";
-}
-
 #[cfg_attr(test, derive(Default, Debug, PartialEq, Eq, Hash))]
 pub struct DisplayAccount {
     pub name: String,
@@ -41,273 +28,6 @@ pub struct DisplayAccount {
     pub current_balance: Figure,
     pub difference: Figure,
     pub currency: Currency,
-}
-
-#[cfg_attr(test, derive(Default, Debug, PartialEq, Eq))]
-pub struct DisplayGoal {
-    pub name: String,
-    pub committed: Figure,
-    pub committed_this_period: Figure,
-    pub to_commit_this_period: Option<Figure>,
-    pub target: Figure,
-    pub currency: Currency,
-}
-
-#[cfg_attr(test, derive(Debug))]
-pub struct RemainingMoneyScreen {
-    pub current_period: Period,
-
-    pub overall_balance: DisplayAccount,
-    pub individual_balances: Vec<DisplayAccount>,
-
-    pub predicted_income: Option<Amount>,
-
-    pub overall_goal: DisplayGoal,
-    pub goals: Vec<DisplayGoal>,
-    pub uncommitted: Amount,
-    pub overcommitted: bool,
-
-    pub remaining: Amount,
-}
-
-////////////////////
-// Public methods //
-////////////////////
-
-pub struct RemainingOperation<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> {
-    rates: ExchangeRates,
-    target_currency: Currency,
-
-    date: NaiveDate,
-    periods_configuration: P,
-
-    raw_accounts: Vec<A>,
-    goals: Vec<G>,
-
-    predicted_income: Option<Amount>,
-}
-
-impl RemainingOperation<AccountJson, GoalImplementation, AnyPeriodsConfiguration> {
-    pub fn from_vault_value<V: Vault>(
-        exchange_rate: ExchangeRates,
-        target_currency: Currency,
-        predicted_income: Option<Amount>,
-        vault: &V,
-    ) -> Result<RemainingOperation<AccountJson, GoalImplementation, AnyPeriodsConfiguration>, String>
-    {
-        return Ok(RemainingOperation {
-            rates: exchange_rate,
-            target_currency,
-
-            date: Local::now().date_naive(),
-            periods_configuration: RemainingVaultValues::from_vault(vault)?.periods_configuration,
-
-            raw_accounts: get_accounts(vault)?,
-            goals: GoalVaultValues::from_vault(vault)?,
-
-            predicted_income,
-        });
-    }
-}
-
-impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperation<A, G, P> {
-    pub fn execute(self) -> Result<RemainingMoneyScreen, String> {
-        let current_period: Period = self
-            .periods_configuration
-            .period_for_date(&self.date)
-            .map_err(|error| "Failed to fetch Periods Configuration: ".to_string() + &error)?
-            .into();
-
-        let accounts = self
-            .raw_accounts
-            .iter()
-            .map(|a| {
-                return DisplayAccount::from_queriable_account(
-                    a,
-                    &current_period.start_date,
-                    &self.date,
-                );
-            })
-            .collect::<Result<Vec<DisplayAccount>, String>>()?;
-
-        let overall_balance = {
-            let (period_start_balance, current_balance) = accounts.iter().try_fold(
-                (dec!(0) as Figure, dec!(0) as Figure),
-                |(acc_period_start_balance, acc_current_balance),
-                 account|
-                 -> Result<(Figure, Figure), String> {
-                    let mut period_start_balance = account.period_start_balance;
-                    let mut current_balance = account.current_balance;
-
-                    if account.currency != self.target_currency {
-                        period_start_balance =
-                            self.convert(&period_start_balance, &account.currency)?;
-                        current_balance = self.convert(&current_balance, &account.currency)?;
-                    }
-
-                    return Ok((
-                        acc_period_start_balance + period_start_balance,
-                        acc_current_balance + current_balance,
-                    ));
-                },
-            )?;
-
-            DisplayAccount::from_values(
-                "Overall Balance".into(),
-                self.target_currency.clone(),
-                period_start_balance,
-                current_balance,
-            )
-        };
-
-        let goals = self
-            .goals
-            .iter()
-            .map(|goal| {
-                Ok(DisplayGoal {
-                    name: goal.name().clone(),
-                    committed: goal
-                        .committed()
-                        .iter()
-                        .fold(0.into(), |acc, (_, amount)| acc + amount),
-                    committed_this_period: goal.committed().iter().fold(
-                        0.into(),
-                        |acc, (date, amount)| {
-                            if date >= &current_period.start_date
-                                && date <= &current_period.end_date
-                            {
-                                acc + amount
-                            } else {
-                                acc
-                            }
-                        },
-                    ),
-                    to_commit_this_period: {
-                        let to_commit = goal.to_pay_at(&self.periods_configuration, &self.date)?;
-                        if to_commit == 0.into() {
-                            None
-                        } else {
-                            Some(to_commit)
-                        }
-                    },
-                    currency: goal.currency().clone(),
-                    target: Decimal::from(*goal.target()),
-                })
-            })
-            .collect::<Result<Vec<DisplayGoal>, String>>()?;
-        let overall_goal: DisplayGoal = goals.iter().try_fold(
-            DisplayGoal {
-                name: "Overall Goal".into(),
-                currency: self.target_currency.clone(),
-                target: dec!(0),
-                committed: dec!(0),
-                committed_this_period: dec!(0),
-                to_commit_this_period: None,
-            },
-            |acc, goal| -> Result<DisplayGoal, String> {
-                let mut target = goal.target;
-                let mut commited = goal.committed;
-                let mut committed_this_period = goal.committed_this_period;
-                let mut to_commit_this_period = goal.to_commit_this_period;
-
-                if goal.currency != self.target_currency {
-                    target = self.convert(&target, &goal.currency)?;
-                    commited = self.convert(&commited, &goal.currency)?;
-                    committed_this_period = self.convert(&committed_this_period, &goal.currency)?;
-                    to_commit_this_period = match to_commit_this_period {
-                        None => None,
-                        Some(i) => Some(self.convert(&i, &goal.currency)?),
-                    }
-                }
-
-                Ok(DisplayGoal {
-                    target: acc.target + target,
-                    committed: acc.committed + commited,
-                    to_commit_this_period: match to_commit_this_period {
-                        None => acc.to_commit_this_period,
-                        Some(amount) => {
-                            Some(acc.to_commit_this_period.unwrap_or(0.into()) + amount)
-                        }
-                    },
-                    committed_this_period: acc.committed_this_period + committed_this_period,
-                    ..acc
-                })
-            },
-        )?;
-
-        let predicted_income_in_target_currency = {
-            if let Some(predicted_income) = &self.predicted_income {
-                if predicted_income.currency != self.target_currency {
-                    Some(Amount {
-                        currency: self.target_currency.to_string(),
-                        figure: self
-                            .convert(&predicted_income.figure, &predicted_income.currency)?,
-                    })
-                } else {
-                    self.predicted_income.clone()
-                }
-            } else {
-                self.predicted_income.clone()
-            }
-        };
-
-        let remaining = match &predicted_income_in_target_currency {
-            None => dec!(0),
-            Some(i) => i.figure,
-        } + overall_balance.difference
-            - overall_goal.committed_this_period
-            - overall_goal.to_commit_this_period.unwrap_or(dec!(0));
-
-        let uncommitted = Amount {
-            figure: overall_balance.current_balance - overall_goal.committed,
-            currency: self.target_currency.clone(),
-        };
-        let overcommitted = &uncommitted.figure < &(0.into());
-
-        return Ok(RemainingMoneyScreen {
-            current_period,
-
-            overall_balance,
-            individual_balances: accounts,
-
-            predicted_income: predicted_income_in_target_currency,
-
-            overall_goal,
-            goals,
-            uncommitted,
-            overcommitted,
-
-            remaining: Amount {
-                figure: remaining,
-                currency: self.target_currency,
-            },
-        });
-    }
-
-    fn convert(&self, amount: &Figure, from: &Currency) -> Result<Figure, String> {
-        if from == &self.target_currency {
-            return Err(
-                "Attempt to convert from the target currency to the target currency".into(),
-            );
-        }
-        let exchange_rate = {
-            let target_currency_value = self.rate_for_currency(&self.target_currency)?;
-            let from_currency_value = self.rate_for_currency(from)?;
-
-            target_currency_value / from_currency_value
-        };
-
-        return Ok((amount * exchange_rate)
-            .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::MidpointNearestEven));
-    }
-
-    fn rate_for_currency(&self, name: &Currency) -> Result<Figure, String> {
-        return self
-            .rates
-            .get(name)
-            .ok_or(format!("Could not find currency for {}", name))
-            .copied();
-    }
 }
 
 impl DisplayAccount {
@@ -348,23 +68,258 @@ impl DisplayAccount {
     }
 }
 
+#[cfg_attr(test, derive(Default, Debug, PartialEq, Eq))]
+pub struct DisplayGoal {
+    pub name: String,
+    pub committed: Figure,
+    pub committed_this_period: Figure,
+    pub to_commit_this_period: Option<Figure>,
+    pub target: Figure,
+    pub currency: Currency,
+}
+
+#[cfg_attr(test, derive(Debug))]
+pub struct RemainingMoneyScreen {
+    pub current_period: Period,
+
+    pub overall_balance: DisplayAccount,
+    pub individual_balances: Vec<DisplayAccount>,
+
+    pub predicted_income: Option<Amount>,
+
+    pub overall_goal: DisplayGoal,
+    pub goals: Vec<DisplayGoal>,
+    pub uncommitted: Amount,
+    pub overcommitted: bool,
+
+    pub remaining: Amount,
+}
+
+pub fn compute_legacy_remaining_screen<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration>(
+    operation: &RemainingOperation<A, G, P>,
+) -> Result<RemainingMoneyScreen, String> {
+    let current_period: Period = operation
+        .periods_configuration
+        .period_for_date(&operation.date)
+        .map_err(|error| "Failed to fetch Periods Configuration: ".to_string() + &error)?
+        .into();
+
+    let accounts = operation
+        .raw_accounts
+        .iter()
+        .map(|a| {
+            return DisplayAccount::from_queriable_account(
+                a,
+                &current_period.start_date,
+                &operation.date,
+            );
+        })
+        .collect::<Result<Vec<DisplayAccount>, String>>()?;
+
+    let overall_balance = {
+        let (period_start_balance, current_balance) = accounts.iter().try_fold(
+            (dec!(0) as Figure, dec!(0) as Figure),
+            |(acc_period_start_balance, acc_current_balance),
+             account|
+             -> Result<(Figure, Figure), String> {
+                let mut period_start_balance = account.period_start_balance;
+                let mut current_balance = account.current_balance;
+
+                if account.currency != operation.target_currency {
+                    period_start_balance =
+                        convert(operation, &period_start_balance, &account.currency)?;
+                    current_balance = convert(operation, &current_balance, &account.currency)?;
+                }
+
+                return Ok((
+                    acc_period_start_balance + period_start_balance,
+                    acc_current_balance + current_balance,
+                ));
+            },
+        )?;
+
+        DisplayAccount::from_values(
+            "Overall Balance".into(),
+            operation.target_currency.clone(),
+            period_start_balance,
+            current_balance,
+        )
+    };
+
+    let goals = operation
+        .goals
+        .iter()
+        .map(|goal| {
+            Ok(DisplayGoal {
+                name: goal.name().clone(),
+                committed: goal
+                    .committed()
+                    .iter()
+                    .fold(0.into(), |acc, (_, amount)| acc + amount),
+                committed_this_period: goal.committed().iter().fold(
+                    0.into(),
+                    |acc, (date, amount)| {
+                        if date >= &current_period.start_date && date <= &current_period.end_date {
+                            acc + amount
+                        } else {
+                            acc
+                        }
+                    },
+                ),
+                to_commit_this_period: {
+                    let to_commit =
+                        goal.to_pay_at(&operation.periods_configuration, &operation.date)?;
+                    if to_commit == 0.into() {
+                        None
+                    } else {
+                        Some(to_commit)
+                    }
+                },
+                currency: goal.currency().clone(),
+                target: Decimal::from(*goal.target()),
+            })
+        })
+        .collect::<Result<Vec<DisplayGoal>, String>>()?;
+    let overall_goal: DisplayGoal = goals.iter().try_fold(
+        DisplayGoal {
+            name: "Overall Goal".into(),
+            currency: operation.target_currency.clone(),
+            target: dec!(0),
+            committed: dec!(0),
+            committed_this_period: dec!(0),
+            to_commit_this_period: None,
+        },
+        |acc, goal| -> Result<DisplayGoal, String> {
+            let mut target = goal.target;
+            let mut commited = goal.committed;
+            let mut committed_this_period = goal.committed_this_period;
+            let mut to_commit_this_period = goal.to_commit_this_period;
+
+            if goal.currency != operation.target_currency {
+                target = convert(operation, &target, &goal.currency)?;
+                commited = convert(operation, &commited, &goal.currency)?;
+                committed_this_period = convert(operation, &committed_this_period, &goal.currency)?;
+                to_commit_this_period = match to_commit_this_period {
+                    None => None,
+                    Some(i) => Some(convert(operation, &i, &goal.currency)?),
+                }
+            }
+
+            Ok(DisplayGoal {
+                target: acc.target + target,
+                committed: acc.committed + commited,
+                to_commit_this_period: match to_commit_this_period {
+                    None => acc.to_commit_this_period,
+                    Some(amount) => Some(acc.to_commit_this_period.unwrap_or(0.into()) + amount),
+                },
+                committed_this_period: acc.committed_this_period + committed_this_period,
+                ..acc
+            })
+        },
+    )?;
+
+    let predicted_income_in_target_currency = {
+        if let Some(predicted_income) = &operation.predicted_income {
+            if predicted_income.currency != operation.target_currency {
+                Some(Amount {
+                    currency: operation.target_currency.to_string(),
+                    figure: convert(
+                        operation,
+                        &predicted_income.figure,
+                        &predicted_income.currency,
+                    )?,
+                })
+            } else {
+                operation.predicted_income.clone()
+            }
+        } else {
+            operation.predicted_income.clone()
+        }
+    };
+
+    let remaining = match &predicted_income_in_target_currency {
+        None => dec!(0),
+        Some(i) => i.figure,
+    } + overall_balance.difference
+        - overall_goal.committed_this_period
+        - overall_goal.to_commit_this_period.unwrap_or(dec!(0));
+
+    let uncommitted = Amount {
+        figure: overall_balance.current_balance - overall_goal.committed,
+        currency: operation.target_currency.clone(),
+    };
+    let overcommitted = &uncommitted.figure < &(0.into());
+
+    return Ok(RemainingMoneyScreen {
+        current_period,
+
+        overall_balance,
+        individual_balances: accounts,
+
+        predicted_income: predicted_income_in_target_currency,
+
+        overall_goal,
+        goals,
+        uncommitted,
+        overcommitted,
+
+        remaining: Amount {
+            figure: remaining,
+            currency: operation.target_currency.clone(),
+        },
+    });
+}
+
+fn convert<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration>(
+    operation: &RemainingOperation<A, G, P>,
+    amount: &Figure,
+    from: &Currency,
+) -> Result<Figure, String> {
+    if from == &operation.target_currency {
+        return Err("Attempt to convert from the target currency to the target currency".into());
+    }
+    let exchange_rate = {
+        let target_currency_value = rate_for_currency(operation, &operation.target_currency)?;
+        let from_currency_value = rate_for_currency(operation, from)?;
+
+        target_currency_value / from_currency_value
+    };
+
+    return Ok((amount * exchange_rate)
+        .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::MidpointNearestEven));
+}
+
+fn rate_for_currency<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration>(
+    operation: &RemainingOperation<A, G, P>,
+    name: &Currency,
+) -> Result<Figure, String> {
+    return operation
+        .rates
+        .get(name)
+        .ok_or(format!("Could not find currency for {}", name))
+        .copied();
+}
+
 #[cfg(test)]
 mod tests_remaining_operation {
-    use super::{
-        Amount, Currency, DisplayAccount, DisplayGoal, Figure as RemainingFigure,
-        RemainingOperation,
-    };
+    use std::collections::HashMap;
+    use std::collections::HashSet;
+
+    use chrono::NaiveDate;
+    use derive_builder::Builder;
+    use mockall::predicate::eq;
+    use rust_decimal_macros::dec;
+
     use crate::accounts::{Figure as AccountFigure, FoundAmount, MockQueriableAccount};
     use crate::goals::{Figure as GoalFigure, MockGoal};
     use crate::period;
     use crate::period::MockPeriodsConfiguration;
     use crate::period::Period;
-    use chrono::NaiveDate;
-    use derive_builder::Builder;
-    use mockall::predicate::eq;
-    use rust_decimal_macros::dec;
-    use std::collections::HashMap;
-    use std::collections::HashSet;
+
+    use super::{
+        Amount, compute_legacy_remaining_screen, Currency, DisplayAccount, DisplayGoal,
+        Figure as RemainingFigure, RemainingOperation,
+    };
 
     fn mkdate(day: u32) -> NaiveDate {
         return NaiveDate::from_ymd_opt(2023, 12, day).unwrap();
@@ -538,7 +493,7 @@ mod tests_remaining_operation {
             let account_builder = MockQueriableAccountBuilder::default()
                 .period_start_date(self.period_start)
                 .today_date(self.today);
-            let instance = RemainingOperation {
+            let operation = RemainingOperation {
                 target_currency: self.target_currency,
                 rates: HashMap::from([
                     ("CREDIT".to_string(), self.rate_credit),
@@ -557,7 +512,7 @@ mod tests_remaining_operation {
                 goals: self.goals,
             };
 
-            let result = instance.execute().unwrap();
+            let result = compute_legacy_remaining_screen(&operation).unwrap();
 
             assert_eq!(
                 result
@@ -584,12 +539,12 @@ mod tests_remaining_operation {
         let today = mkdate(3);
         let periods_configuration = mkperiodsconfig(&mkdate(1), &mkdate(4), &today);
 
-        let instance = RemainingOperation {
+        let operation = RemainingOperation {
             date: today,
             periods_configuration,
             ..defaultinstance()
         };
-        let result = instance.execute();
+        let result = compute_legacy_remaining_screen(&operation);
 
         assert_eq!(
             result.unwrap().current_period,
@@ -610,12 +565,12 @@ mod tests_remaining_operation {
             .with(eq(today))
             .return_const(Err("inner error".to_string()));
 
-        let instance = RemainingOperation {
+        let operation = RemainingOperation {
             date: today,
             periods_configuration,
             ..defaultinstance()
         };
-        let result = instance.execute();
+        let result = compute_legacy_remaining_screen(&operation);
 
         assert_eq!(
             result.unwrap_err(),
@@ -642,7 +597,7 @@ mod tests_remaining_operation {
             .with(eq(mkdate(3)))
             .return_const(Err("some error".into()));
 
-        let instance = RemainingOperation {
+        let operation = RemainingOperation {
             periods_configuration: mkperiodsconfig(
                 &mkdate(1), // Period start
                 &mkdate(4),
@@ -651,7 +606,7 @@ mod tests_remaining_operation {
             raw_accounts: vec![raw_account],
             ..defaultinstance()
         };
-        let result = instance.execute();
+        let result = compute_legacy_remaining_screen(&operation);
         assert_eq!(
             result.unwrap_err(),
             "Error when querying account \"Failing account\": some error".to_string()
@@ -660,7 +615,7 @@ mod tests_remaining_operation {
 
     #[test]
     fn test__single_account__same_currency() {
-        let instance = RemainingOperation {
+        let operation = RemainingOperation {
             date: mkdate(3),
             periods_configuration: mkperiodsconfig(
                 &mkdate(1), // Period start
@@ -680,7 +635,7 @@ mod tests_remaining_operation {
                 .build()],
             ..defaultinstance()
         };
-        let result = instance.execute().unwrap();
+        let result = compute_legacy_remaining_screen(&operation).unwrap();
 
         assert_eq!(
             result.individual_balances,
@@ -715,7 +670,7 @@ mod tests_remaining_operation {
 
     #[test]
     fn test__single_account__different_currency() {
-        let instance = RemainingOperation {
+        let operation = RemainingOperation {
             date: mkdate(3),
             periods_configuration: mkperiodsconfig(
                 &mkdate(1), // Period start
@@ -739,7 +694,7 @@ mod tests_remaining_operation {
                 .build()],
             ..defaultinstance()
         };
-        let result = instance.execute().unwrap();
+        let result = compute_legacy_remaining_screen(&operation).unwrap();
 
         assert_eq!(
             result.individual_balances,
@@ -778,7 +733,7 @@ mod tests_remaining_operation {
             .period_start_date(mkdate(1))
             .today_date(mkdate(3));
 
-        let instance = RemainingOperation {
+        let operation = RemainingOperation {
             date: mkdate(3),
             periods_configuration: mkperiodsconfig(
                 &mkdate(1), // Period start
@@ -808,7 +763,7 @@ mod tests_remaining_operation {
             ],
             ..defaultinstance()
         };
-        let result = instance.execute().unwrap();
+        let result = compute_legacy_remaining_screen(&operation).unwrap();
 
         assert_eq!(
             HashSet::<DisplayAccount>::from_iter(result.individual_balances),
