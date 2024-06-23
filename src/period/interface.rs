@@ -1,11 +1,10 @@
+use crate::period::calendar_month_period::CalendarMonthPeriodConfiguration;
+use crate::period::fixed_length_period::FixedLengthPeriodConfiguration;
+use crate::vault::VaultReadable;
 use chrono::NaiveDate;
 #[cfg(test)]
 use mockall::automock;
 use serde::Deserialize;
-use crate::period::fixed_length_period::{FixedLengthPeriodConfiguration};
-use crate::period::calendar_month_period::{CalendarMonthPeriodConfiguration};
-use crate::vault::VaultReadable;
-
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
@@ -13,23 +12,23 @@ pub enum PeriodVaultValues {
     #[serde(rename = "fixed_length")]
     FixedLength(FixedLengthPeriodConfiguration),
     #[serde(rename = "monthly")]
-    CalendarMonth(CalendarMonthPeriodConfiguration)
+    CalendarMonth(CalendarMonthPeriodConfiguration),
 }
 
 impl VaultReadable for PeriodVaultValues {
     const KEY: &'static str = "periods_configuration";
 }
 
-impl PeriodVaultValues{
-    fn unpack(&self) -> &dyn PeriodsConfiguration{
+impl PeriodVaultValues {
+    fn unpack(&self) -> &dyn PeriodsConfiguration {
         match self {
-           PeriodVaultValues::FixedLength(p) => p,
-           PeriodVaultValues::CalendarMonth(p) => p
+            PeriodVaultValues::FixedLength(p) => p,
+            PeriodVaultValues::CalendarMonth(p) => p,
         }
     }
 }
 
-impl PeriodsConfiguration for PeriodVaultValues{
+impl PeriodsConfiguration for PeriodVaultValues {
     fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String> {
         return self.unpack().period_for_date(date);
     }
@@ -49,4 +48,3 @@ pub struct Period {
     pub start_date: NaiveDate,
     pub end_date: NaiveDate,
 }
-

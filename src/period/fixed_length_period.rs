@@ -1,6 +1,6 @@
+use crate::period::interface::{Period, PeriodsConfiguration};
 use chrono::{Days, NaiveDate};
 use serde::Deserialize;
-use crate::period::interface::{PeriodsConfiguration, Period};
 
 use crate::vault::VaultReadable;
 
@@ -13,7 +13,7 @@ pub struct FixedLengthPeriodConfiguration {
 
 pub struct ErrorStartBeforePeriodConfiguration;
 
-impl FixedLengthPeriodConfiguration{
+impl FixedLengthPeriodConfiguration {
     fn period_number_for_date(
         &self,
         date: &NaiveDate,

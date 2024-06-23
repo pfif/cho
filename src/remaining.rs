@@ -181,16 +181,18 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
                         .committed()
                         .iter()
                         .fold(0.into(), |acc, (_, amount)| acc + amount),
-                    committed_this_period: goal.
-                        committed().
-                        iter().
-                        fold(0.into(), |acc, (date, amount)| {
-                            if date >= &current_period.start_date && date <= &current_period.end_date {
+                    committed_this_period: goal.committed().iter().fold(
+                        0.into(),
+                        |acc, (date, amount)| {
+                            if date >= &current_period.start_date
+                                && date <= &current_period.end_date
+                            {
                                 acc + amount
                             } else {
                                 acc
                             }
-                        }),
+                        },
+                    ),
                     to_commit_this_period: {
                         let to_commit = goal.to_pay_at(&self.periods_configuration, &self.date)?;
                         if to_commit == 0.into() {
@@ -483,9 +485,7 @@ mod tests_remaining_operation {
     impl MockGoalBuilder {
         fn build(&self) -> MockGoal<MockPeriodsConfiguration> {
             let mut mock = MockGoal::new();
-            
-            
-            
+
             mock.expect_name().return_const("Mocked goal".into());
             mock.expect_currency()
                 .return_const(self.currency.clone().unwrap());
@@ -496,7 +496,8 @@ mod tests_remaining_operation {
                     .clone()
                     .unwrap()
                     .into_iter()
-                    .map(|(date, figure)| (date, GoalFigure::from(figure))).collect()
+                    .map(|(date, figure)| (date, GoalFigure::from(figure)))
+                    .collect(),
             );
             mock.expect_to_pay_at()
                 .return_const(Ok(self.to_pay_at.unwrap().into()));
@@ -896,10 +897,12 @@ mod tests_remaining_operation {
             expected_predicted_income: None,
 
             goals: vec![MockGoalBuilder::default()
-                .commited(vec![
-                    (mkdate(1), 2), // Outside of period
-                    (mkdate(16), 3)] // In Period
-                               )
+                .commited(
+                    vec![
+                        (mkdate(1), 2), // Outside of period
+                        (mkdate(16), 3),
+                    ], // In Period
+                )
                 .to_pay_at(0)
                 .target(15)
                 .currency("CREDIT")
@@ -926,7 +929,7 @@ mod tests_remaining_operation {
         }
         .test();
     }
-    
+
     #[test]
     fn test__goal__different_currencies__not_committed_this_period() {
         TestRunner {
@@ -967,7 +970,7 @@ mod tests_remaining_operation {
                 currency: "EUR".to_string(),
             },
         }
-            .test();
+        .test();
     }
 
     #[test]
@@ -1012,7 +1015,7 @@ mod tests_remaining_operation {
         }
         .test();
     }
-    
+
     #[test]
     fn test__goal__committed_this_period__have_to_pay_more() {
         TestRunner {
@@ -1053,9 +1056,9 @@ mod tests_remaining_operation {
                 currency: "EUR".to_string(),
             },
         }
-            .test();
+        .test();
     }
-    
+
     #[test]
     fn test__goal__nothing_to_pay__not_committed_this_period() {
         TestRunner {
@@ -1096,7 +1099,7 @@ mod tests_remaining_operation {
                 currency: "EUR".to_string(),
             },
         }
-            .test();
+        .test();
     }
 
     #[test]
@@ -1192,7 +1195,7 @@ mod tests_remaining_operation {
         }
         .test();
     }
-    
+
     #[test]
     fn test__goal__multiple_goals__different_currencies__not_committed_this_period() {
         TestRunner {
@@ -1241,7 +1244,7 @@ mod tests_remaining_operation {
                 currency: "EUR".to_string(),
             },
         }
-            .test();
+        .test();
     }
 
     #[test]
