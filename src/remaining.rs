@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 use crate::accounts::{get_accounts, AccountJson, QueriableAccount};
 use crate::goals::{Goal, GoalImplementation, GoalVaultValues};
+use crate::ignored_transaction::{IgnoredTransaction, IgnoredTransactionsVaultValues};
 use crate::period;
 use crate::period::{PeriodVaultValues, PeriodsConfiguration};
 use crate::vault::{Vault, VaultReadable};
@@ -90,6 +91,8 @@ pub struct RemainingOperation<A: QueriableAccount, G: Goal<P>, P: PeriodsConfigu
     raw_accounts: Vec<A>,
     goals: Vec<G>,
 
+    ignored_transactions: Vec<IgnoredTransaction>,
+
     predicted_income: Option<Amount>,
 }
 
@@ -110,6 +113,8 @@ impl RemainingOperation<AccountJson, GoalImplementation, PeriodVaultValues> {
 
             raw_accounts: get_accounts(vault)?,
             goals: GoalVaultValues::from_vault(vault)?,
+
+            ignored_transactions: IgnoredTransactionsVaultValues::from_vault(vault)?,
 
             predicted_income,
         });
@@ -255,12 +260,34 @@ impl<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> RemainingOperatio
             }
         };
 
+        let overall_ignored_transactions = self
+            .ignored_transactions
+            .iter()
+            .filter(|ignored_transaction| {
+                ignored_transaction.date >= current_period.start_date
+                    && ignored_transaction.date <= self.date
+            })
+            .map(|tr| {
+                if tr.currency == self.target_currency {
+                    return Ok(tr.amount)
+                } else {
+                    return self.convert(&tr.amount, &tr.currency)
+                }
+            })
+            .fold(Ok(0.into()), |acc_maybe, amount_maybe| -> Result<Figure, String> {
+                match (acc_maybe, amount_maybe) {
+                    (Ok(acc), Ok(amount)) => Ok(acc + amount),
+                    (e, _) => e 
+                }
+            })?;
+
         let remaining = match &predicted_income_in_target_currency {
             None => dec!(0),
             Some(i) => i.figure,
         } + overall_balance.difference
             - overall_goal.committed_this_period
-            - overall_goal.to_commit_this_period.unwrap_or(dec!(0));
+            - overall_goal.to_commit_this_period.unwrap_or(dec!(0))
+            - overall_ignored_transactions;
 
         let uncommitted = Amount {
             figure: overall_balance.current_balance - overall_goal.committed,
