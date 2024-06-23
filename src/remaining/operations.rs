@@ -1,13 +1,14 @@
 use chrono::{Local, NaiveDate};
 
-use crate::accounts::{AccountJson, get_accounts, QueriableAccount};
+use crate::accounts::{get_accounts, AccountJson, QueriableAccount};
+// use crate::amounts::ExchangeRates;
 use crate::goals::{Goal, GoalImplementation, GoalVaultValues};
 use crate::period::{AnyPeriodsConfiguration, PeriodsConfiguration};
+use crate::remaining::legacy::{compute_legacy_remaining_screen, RemainingMoneyScreen, ExchangeRates};
 use crate::remaining::{
-    legacy::{Amount, Currency, ExchangeRates},
+    legacy::{Amount, Currency},
     vault_values::RemainingVaultValues,
 };
-use crate::remaining::legacy::{compute_legacy_remaining_screen, RemainingMoneyScreen};
 use crate::vault::{Vault, VaultReadable};
 
 pub struct RemainingOperation<A: QueriableAccount, G: Goal<P>, P: PeriodsConfiguration> {

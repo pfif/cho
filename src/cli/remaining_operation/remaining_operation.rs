@@ -5,7 +5,9 @@ use std::path::PathBuf;
 use clap::Parser;
 use rust_decimal::Decimal;
 
-use crate::cli::legacy_remaining_money_screen::{Amount, RemainingMoneyScreen};
+use crate::cli::remaining_operation::legacy_remaining_money_screen::{
+    Amount, DisplayRemainingMoneyScreen,
+};
 use crate::remaining::RemainingOperation;
 use crate::vault::{VaultImpl, VaultReadable};
 
@@ -35,7 +37,7 @@ pub fn remaining_operation() {
 
         let output = remaining_money.execute()?;
 
-        let displayable_remaining_money_screen: RemainingMoneyScreen =
+        let displayable_remaining_money_screen: DisplayRemainingMoneyScreen =
             output.legacy_money_screen.into();
         Ok(format!("{}", displayable_remaining_money_screen))
     })();

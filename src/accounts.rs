@@ -1,4 +1,4 @@
-use std::fs::{File, read_dir};
+use std::fs::{read_dir, File};
 
 use chrono::NaiveDate;
 #[cfg(test)]
@@ -86,7 +86,7 @@ mod tests_get_accounts {
     use chrono::NaiveDate;
     use tempfile::{tempdir, TempDir};
 
-    use crate::accounts::{ACCOUNT_DIR, AccountJson, AmountListItem, get_accounts};
+    use crate::accounts::{get_accounts, AccountJson, AmountListItem, ACCOUNT_DIR};
     use crate::vault::Vault;
 
     struct MockVault {

@@ -32,11 +32,11 @@ use serde::Deserialize;
 use crate::period::Period;
 use crate::remaining;
 
-pub struct RemainingMoneyScreen {
+pub struct DisplayRemainingMoneyScreen {
     screen: remaining::RemainingMoneyScreen,
 }
 
-impl Display for RemainingMoneyScreen {
+impl Display for DisplayRemainingMoneyScreen {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -55,13 +55,13 @@ impl Display for RemainingMoneyScreen {
     }
 }
 
-impl From<remaining::RemainingMoneyScreen> for RemainingMoneyScreen {
+impl From<remaining::RemainingMoneyScreen> for DisplayRemainingMoneyScreen {
     fn from(value: remaining::RemainingMoneyScreen) -> Self {
-        RemainingMoneyScreen { screen: value }
+        DisplayRemainingMoneyScreen { screen: value }
     }
 }
 
-impl RemainingMoneyScreen {
+impl DisplayRemainingMoneyScreen {
     fn title(string: &str) -> String {
         let string_length = string.len();
         string.to_string() + "\n" + &"=".repeat(string_length)
@@ -97,7 +97,7 @@ impl RemainingMoneyScreen {
 
         format!(
             "{}\n{}",
-            RemainingMoneyScreen::title("Accounts".into()),
+            DisplayRemainingMoneyScreen::title("Accounts".into()),
             account_table
         )
     }
@@ -109,7 +109,7 @@ impl RemainingMoneyScreen {
             .clone()
             .map(|a| Amount::from(a).to_string());
 
-        RemainingMoneyScreen::title(&format!(
+        DisplayRemainingMoneyScreen::title(&format!(
             "(+) Predicted income: {}",
             predicted_income.unwrap_or("Not included".to_string())
         ))
@@ -158,14 +158,14 @@ impl RemainingMoneyScreen {
 
         format!(
             "{}\n{}\n{}",
-            RemainingMoneyScreen::title("(-) Goals".into()),
+            DisplayRemainingMoneyScreen::title("(-) Goals".into()),
             table,
             formatted_uncommited
         )
     }
 
     fn formatted_remaining(&self) -> String {
-        RemainingMoneyScreen::title(&format!(
+        DisplayRemainingMoneyScreen::title(&format!(
             "(=) Remaining this period: {}",
             Amount::from(self.screen.remaining.clone())
         ))

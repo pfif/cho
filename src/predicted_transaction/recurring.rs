@@ -2,9 +2,9 @@ use std::collections::HashSet;
 
 use serde::Deserialize;
 
-use transactions::Transaction;
+use transactions::TransactionList;
 
-use crate::amounts::{Currency, Figure};
+use crate::amounts::{CurrencyIdent, Figure};
 use crate::period::Period;
 use crate::period::PeriodsConfiguration;
 
@@ -14,16 +14,16 @@ use super::transactions;
 struct RecurringTransactionsConfiguration<T: PeriodsConfiguration> {
     name: String,
     amount: Figure,
-    currency: Currency,
+    currency: CurrencyIdent,
     when: T,
     paid: HashSet<Period>,
 }
 
 impl<T: PeriodsConfiguration> RecurringTransactionsConfiguration<T> {
-    fn generate_predicted_transaction(&self, p: Period) -> Transaction {
-        return Transaction {
-            amount: &self.amount,
-            currency: &self.currency,
+    fn generate_predicted_transaction_list(self, p: Period) -> TransactionList {
+        return TransactionList {
+            amount: self.amount,
+            currency: self.currency,
 
             occurrences: vec![],
         };

@@ -2,9 +2,9 @@ use std::fmt::Formatter;
 use std::str::FromStr;
 
 use chrono::{Datelike, Months, NaiveDate};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::{Error as DeError, Unexpected, Visitor};
 use serde::ser::Error as SerError;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Period {

@@ -317,7 +317,7 @@ mod tests_remaining_operation {
     use crate::period::Period;
 
     use super::{
-        Amount, compute_legacy_remaining_screen, Currency, DisplayAccount, DisplayGoal,
+        compute_legacy_remaining_screen, Amount, Currency, DisplayAccount, DisplayGoal,
         Figure as RemainingFigure, RemainingOperation,
     };
 

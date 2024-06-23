@@ -41,6 +41,7 @@ impl PeriodsConfiguration for AnyPeriodsConfiguration {
 
 #[cfg_attr(test, automock)]
 pub trait PeriodsConfiguration {
+    // TODO Add cross implementation checks that the data is within the returned period
     fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String>;
     fn number_of_periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, String>;
     fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<Vec<Period>, String>;
