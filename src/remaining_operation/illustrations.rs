@@ -28,6 +28,7 @@ impl OperandBuilder for dyn TimelineOperandBuilder {
     ) -> Result<Operand, String> {
         let (name, start_amount, wrapped_end_amount) = self.gather_values(period, today, exchange_rates)?;
         
+        // TODO Correct this - the model does not allow entries in illustrations to have different columns 
         let (end_amount, end_amount_description) = match wrapped_end_amount {
             TimelineOperandEnd::Current(amount) => (amount, "Current amount"),
             TimelineOperandEnd::Predicted(amount) => (amount,"End of period predicted amount")
