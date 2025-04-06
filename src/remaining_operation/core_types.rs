@@ -128,7 +128,7 @@ mod group {
 }
 
 pub struct Operand {
-    name: String,
-    amount: Amount,
-    illustration: HashMap<String, String>,
+    pub name: String,
+    pub amount: Amount,
+    pub illustration: HashMap<String, Amount>,
 }
