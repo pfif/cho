@@ -5,6 +5,7 @@ use crate::period::{Period, PeriodVaultValues, PeriodsConfiguration};
 use chrono::{Local, NaiveDate};
 use group::Group;
 use rust_decimal_macros::dec;
+use crate::accounts::AccountGetter;
 use crate::predicted_income::PredictedIncomeBuilder;
 use crate::vault::{Vault, VaultReadable};
 
@@ -22,7 +23,8 @@ impl RemainingOperation<PeriodVaultValues> {
                 date: Local::now().date_naive(),
                 periods_configuration: PeriodVaultValues::from_vault(vault)?,
                 group_factories: vec![
-                    PredictedIncomeBuilder::from_vault_value(include_predicted_income, vault)?.into()
+                    PredictedIncomeBuilder::from_vault_value(include_predicted_income, vault)?.into(),
+                    AccountGetter::from_files(vault)?.into()
                 ]
             }
         )

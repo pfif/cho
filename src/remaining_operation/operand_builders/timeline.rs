@@ -16,8 +16,8 @@ pub struct TimelineOperandValues {
     pub wrapper_end_amount: TimelineOperandEnd,
 }
 
-pub trait TimelineOperandBuilder {
-    fn gather_values(
+pub trait ProvidesTimelineOperandValues {
+    fn provide(
         &self,
         period: &Period,
         today: &NaiveDate,
@@ -26,14 +26,17 @@ pub trait TimelineOperandBuilder {
     ) -> Result<TimelineOperandValues, String>;
 }
 
-impl OperandBuilder for dyn TimelineOperandBuilder {
+pub struct TimelineOperandBuilder<V: ProvidesTimelineOperandValues> {
+    pub values_provider: V,
+}
+impl<V: ProvidesTimelineOperandValues> OperandBuilder for TimelineOperandBuilder<V> {
     fn build(
         &self,
         period: &Period,
         today: &NaiveDate,
         exchange_rates: &ExchangeRates,
     ) -> Result<Operand, String> {
-        let values = self.gather_values(period, today, exchange_rates)?;
+        let values = self.values_provider.provide(period, today, exchange_rates)?;
 
         let (end_amount, predicted) = match &values.wrapper_end_amount {
             TimelineOperandEnd::Current(amount) => (amount.clone(), false),

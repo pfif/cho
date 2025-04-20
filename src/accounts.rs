@@ -8,7 +8,8 @@ use serde_json::from_reader;
 use crate::period::Period;
 use crate::remaining_operation::amounts::Amount;
 use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
-use crate::remaining_operation::operand_builders::timeline::{TimelineOperandBuilder, TimelineOperandEnd, TimelineOperandValues};
+use crate::remaining_operation::core_types::{GroupBuilder, OperandBuilder};
+use crate::remaining_operation::operand_builders::timeline::{ProvidesTimelineOperandValues, TimelineOperandBuilder, TimelineOperandEnd, TimelineOperandValues};
 use crate::vault::Vault;
 
 // Public traits
@@ -35,21 +36,6 @@ pub trait QueriableAccount {
     fn currency(&self) -> &String;
 }
 
-// TODO - Unit tests for this
-impl TimelineOperandBuilder for dyn QueriableAccount {
-    fn gather_values(&self, period: &Period, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<TimelineOperandValues, String> {
-        let start_amount = self.amount_at(&period.start_date)?;
-        let end_amount = self.amount_at(&period.end_date)?;
-
-        Ok(
-            TimelineOperandValues {
-                name: self.name().clone(),
-                start_amount: start_amount.into_remaining_module_amount(self.currency(), exchange_rates)?,
-                wrapper_end_amount: TimelineOperandEnd::Current(end_amount.into_remaining_module_amount(self.currency(), exchange_rates)?)
-            }
-        )
-    }
-}
 
 // TODO - This should read the account from the Vault, otherwise this is breaking the abstraction of
 //        however we choose to store "state"
@@ -100,6 +86,30 @@ pub fn get_accounts<V: Vault>(vault: &V) -> Result<Vec<AccountJson>, String> {
     }
 
     return Ok(accounts);
+}
+
+pub struct AccountGetter{
+    accounts: Vec<AccountJson>
+}
+
+impl AccountGetter {
+    pub fn from_files<V: Vault>(vault: &V) -> Result<AccountGetter, String>{
+        Ok(AccountGetter{
+            accounts: get_accounts(vault)?
+        })
+    }
+}
+
+impl Into<GroupBuilder> for AccountGetter {
+    fn into(self) -> GroupBuilder {
+        GroupBuilder{
+            name: "Accounts".into(),
+            // TODO - I would love for this to be simpler. There must be a better way to model 
+            operand_factories: self.accounts.into_iter()
+                .map(|account| TimelineOperandBuilder{values_provider: account})
+                .map(|values_provider| Box::new(values_provider) as Box<dyn OperandBuilder>).collect()
+        }
+    }
 }
 
 #[allow(non_snake_case)]
@@ -222,6 +232,22 @@ pub struct AccountJson {
     name: String,
     currency: String,
     amounts: Vec<AmountListItem>,
+}
+
+// TODO - Unit tests for this
+impl ProvidesTimelineOperandValues for AccountJson {
+    fn provide(&self, period: &Period, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<TimelineOperandValues, String> {
+        let start_amount = self.amount_at(&period.start_date)?;
+        let end_amount = self.amount_at(&period.end_date)?;
+
+        Ok(
+            TimelineOperandValues {
+                name: self.name().clone(),
+                start_amount: start_amount.into_remaining_module_amount(self.currency(), exchange_rates)?,
+                wrapper_end_amount: TimelineOperandEnd::Current(end_amount.into_remaining_module_amount(self.currency(), exchange_rates)?)
+            }
+        )
+    }
 }
 
 #[derive(Deserialize, Hash, Eq, PartialEq, Debug)]
