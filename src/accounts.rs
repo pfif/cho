@@ -1,5 +1,4 @@
 use std::fs::{read_dir, File};
-use std::thread::current;
 use chrono::NaiveDate;
 #[cfg(test)]
 use mockall::automock;
@@ -9,7 +8,7 @@ use serde_json::from_reader;
 use crate::period::Period;
 use crate::remaining_operation::amounts::Amount;
 use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
-use crate::remaining_operation::illustrations::{TimelineOperandBuilder, TimelineOperandEnd, TimelineOperandValues};
+use crate::remaining_operation::operand_builders::timeline::{TimelineOperandBuilder, TimelineOperandEnd, TimelineOperandValues};
 use crate::vault::Vault;
 
 // Public traits

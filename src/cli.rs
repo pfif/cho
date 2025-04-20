@@ -23,20 +23,21 @@ Remaining this period: €456
 */
 
 use crate::remaining;
-use crate::remaining::{Period, RemainingOperation};
 use crate::vault::{VaultImpl, VaultReadable};
 use clap::Parser;
 use comfy_table::Table;
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use std::collections::HashMap;
 use std::env::current_dir;
 use std::fmt::{Display, Formatter};
 use std::iter::once;
 use std::path::PathBuf;
+use crate::remaining::Period;
+use crate::remaining_operation::core_types::RemainingOperation;
+use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
 
 pub fn remaining_operation() {
-    let result: Result<RemainingMoneyScreen, String> = (|| {
+    let result: Result<String, String> = (|| {
         let arguments = RemainingOptions::parse();
         let vault_path = match &arguments.vault {
             Some(a) => a.clone(),
@@ -44,27 +45,22 @@ pub fn remaining_operation() {
         };
         let vault = VaultImpl { path: vault_path };
 
-        // TODO turn predicted income into its own module, have it feed an Operand Group to PredictedIncome
-        let predicted_income = match arguments.include_predicted_income {
-            true => {
-                let raw_amount = PredictedIncome::from_vault(&vault)?;
-                Some(raw_amount.into())
-            }
-            false => None,
-        };
+        let exchange_rates = ExchangeRates::from_indent_and_rates(arguments.exchange_rates)?;
 
         // TODO call from vault value from the new module...
-        let remaining_money = RemainingOperation::from_vault_value(
-            HashMap::from_iter(arguments.exchange_rates),
-            arguments.target_currency,
-            predicted_income,
+        let remaining_money = RemainingOperation::from_vault_values(
+            arguments.include_predicted_income,
             &vault,
         )?;
 
-        let screen = remaining_money.execute()?;
+        let screen = remaining_money.execute(
+            &arguments.target_currency,
+            &exchange_rates,
+        )?;
 
         // ... build its display screen (with less use of Display, it's useless here)
-        Ok(screen.into())
+        //Ok(screen.into())
+        Ok(String::from(""))
     })();
 
     if let Ok(screen) = result {
@@ -78,12 +74,7 @@ pub fn remaining_operation() {
 
 type Figure = Decimal;
 type Currency = String;
-type ExchangeRate = (String, Decimal);
-
-type PredictedIncome = Amount;
-impl VaultReadable for PredictedIncome {
-    const KEY: &'static str = "predicted_income";
-}
+type OldExchangeRate = (String, Decimal);
 
 #[derive(Deserialize)]
 pub struct Amount {
@@ -217,8 +208,8 @@ impl<'a> Display for DisplayPeriod<'a> {
 
 // CLI ARGUMENTS PARSING
 
-fn parse_exchange_rate(s: &str) -> Result<ExchangeRate, String> {
-    let rate: Option<ExchangeRate> = (|| {
+fn parse_exchange_rate(s: &str) -> Result<OldExchangeRate, String> {
+    let rate: Option<OldExchangeRate> = (|| {
         let splitted_string = s.split(":").collect::<Vec<&str>>();
         if splitted_string.len() != 2 {
             return None;

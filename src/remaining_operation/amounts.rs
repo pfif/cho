@@ -22,12 +22,29 @@ pub mod exchange_rates {
     use std::collections::HashMap;
 
     pub struct ExchangeRates {
-        rate: HashMap<CurrencyIdent, Currency>,
+        currencies: HashMap<CurrencyIdent, Currency>,
     }
 
     impl ExchangeRates {
+        pub fn from_indent_and_rates(rates: Vec<(CurrencyIdent, Figure)>) -> Result<ExchangeRates, String> {
+            let currencies: Result<HashMap<CurrencyIdent, Currency>, String> = rates
+                .into_iter()
+                .map(|(ident, rate)| {
+                    let sign = match ident.as_str() {
+                        "EUR" => "€".to_string(),
+                        "JPY" => "¥".to_string(),
+                        _ => return Err(format!(
+                            "Unsupported currency: {}. We support only EUR and JPY for now.", ident)),
+                    };
+
+                    Ok((ident, Currency { rate, sign }))
+                })
+                .collect();
+
+            currencies.map(|rate| ExchangeRates { currencies: rate })
+        }
         pub fn get_currency(&self, ident: &CurrencyIdent) -> Result<&Currency, String> {
-            self.rate
+            self.currencies
                 .get(ident)
                 .ok_or(format!("Could not find currency ident: {}", ident))
         }

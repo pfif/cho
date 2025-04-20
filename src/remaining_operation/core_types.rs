@@ -1,32 +1,49 @@
 use std::collections::HashMap;
 use super::amounts::exchange_rates::ExchangeRates;
 use super::amounts::{Amount, CurrencyIdent};
-use crate::period::Period;
-use chrono::NaiveDate;
+use crate::period::{Period, PeriodVaultValues, PeriodsConfiguration};
+use chrono::{Local, NaiveDate};
 use group::Group;
 use rust_decimal_macros::dec;
+use crate::predicted_income::PredictedIncomeBuilder;
+use crate::vault::{Vault, VaultReadable};
 
 /* Entrypoint */
-struct RemainingOperation {
+pub struct RemainingOperation<P: PeriodsConfiguration> {
     group_factories: Vec<GroupBuilder>,
+    periods_configuration: P,
+    date: NaiveDate,
 }
 
-impl RemainingOperation {
-    fn from_vault_values() -> RemainingOperation {
-        todo!()
+impl RemainingOperation<PeriodVaultValues> {
+    pub fn from_vault_values<V: Vault>(include_predicted_income: bool, vault: &V) -> Result<RemainingOperation<PeriodVaultValues>, String> {
+        Ok(
+            RemainingOperation{
+                date: Local::now().date_naive(),
+                periods_configuration: PeriodVaultValues::from_vault(vault)?,
+                group_factories: vec![
+                    PredictedIncomeBuilder::from_vault_value(include_predicted_income, vault)?.into()
+                ]
+            }
+        )
     }
-    fn execute(
+}
+impl<P: PeriodsConfiguration> RemainingOperation<P> {
+    pub fn execute(
         self,
-        period: &Period,
-        today: &NaiveDate,
-
         target_currency: &CurrencyIdent,
         exchange_rates: &ExchangeRates,
     ) -> Result<RemainingOperationScreen, String> {
+
+        let current_period = self
+            .periods_configuration
+            .period_for_date(&self.date)
+            .map_err(|error| "Failed to fetch Periods Configuration: ".to_string() + &error)?;
+
         let groups = self
             .group_factories
-            .iter()
-            .map(|builder| builder.build(period, today, exchange_rates))
+            .into_iter()
+            .map(|builder| builder.build(&current_period, &self.date, exchange_rates))
             .collect::<Result<Vec<Group>, String>>()?;
 
         let mut remaining: Amount = exchange_rates.new_amount(target_currency,dec!(0))?;
@@ -37,26 +54,27 @@ impl RemainingOperation {
         }
 
         Ok(RemainingOperationScreen {
-            groups: groups,
-            remaining: remaining,
+            groups,
+            remaining,
         })
     }
 }
 
 /* Builders */
-struct GroupBuilder {
-    operand_factories: Vec<Box<dyn OperandBuilder>>,
+pub struct GroupBuilder {
+    pub name: String,
+    pub operand_factories: Vec<Box<dyn OperandBuilder>>,
 }
 
 impl GroupBuilder {
     // TODO Unit tests
     fn build(
-        &self,
+        self,
         period: &Period,
         today: &NaiveDate,
         exchange_rates: &ExchangeRates,
     ) -> Result<Group, String> {
-        let mut group = group::Group::new();
+        let mut group = group::Group::new(self.name);
         for operand_builder in self.operand_factories.iter() {
             operand_builder
                 .build(period, today, exchange_rates)
@@ -76,24 +94,27 @@ pub trait OperandBuilder {
 }
 
 /* Output types */
-struct RemainingOperationScreen {
+pub struct RemainingOperationScreen {
     pub groups: Vec<Group>,
     pub remaining: Amount,
 }
 
 // The struct Group has its own module to isolate its internal attribute
-mod group {
+pub mod group {
     use super::Operand;
 
     /* TODO - we're also not returning the total of each group */
     pub struct Group {
+        name: String,
         operands: Vec<Operand>,
         illustration_fields: Option<Vec<String>>,
     }
 
     impl Group {
-        pub(crate) fn new() -> Group {
+        // TODO - Apparently, one shouldn't pass String in? Or so I have heard
+        pub(crate) fn new(name: String) -> Group {
             Group {
+                name,
                 operands: vec![],
                 illustration_fields: None,
             }

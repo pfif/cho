@@ -1,6 +1,6 @@
-mod core_types;
+pub mod core_types;
 pub mod amounts;
-pub mod illustrations;
+pub mod operand_builders;
 
 // TODO Remove the TODOs before merging
 // TODO see if there isn't a better way to organize the code

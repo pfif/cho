@@ -1,9 +1,9 @@
-use crate::period::Period;
-use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
-use crate::remaining_operation::amounts::Amount;
-use crate::remaining_operation::core_types::{Illustration, IllustrationValue, Operand, OperandBuilder};
 use chrono::NaiveDate;
 use std::collections::HashMap;
+use crate::period::Period;
+use crate::remaining_operation::amounts::Amount;
+use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
+use crate::remaining_operation::core_types::{Illustration, IllustrationValue, Operand, OperandBuilder};
 
 pub enum TimelineOperandEnd {
     Current(Amount),
@@ -34,12 +34,12 @@ impl OperandBuilder for dyn TimelineOperandBuilder {
         exchange_rates: &ExchangeRates,
     ) -> Result<Operand, String> {
         let values = self.gather_values(period, today, exchange_rates)?;
-        
+
         let (end_amount, predicted) = match &values.wrapper_end_amount {
             TimelineOperandEnd::Current(amount) => (amount.clone(), false),
             TimelineOperandEnd::Predicted(amount) => (amount.clone(), true)
         };
-        
+
         let difference = &end_amount - &values.start_amount;
 
         let mut illustration: Illustration = HashMap::new();
