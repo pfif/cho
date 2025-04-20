@@ -44,13 +44,13 @@ impl OperandBuilder for dyn TimelineOperandBuilder {
 
         let mut illustration: Illustration = HashMap::new();
         illustration.insert("Period start amount".into(), IllustrationValue::Amount(values.start_amount));
-        illustration.insert("Period end amount".into(), IllustrationValue::Amount(end_amount.clone()));
+        illustration.insert("Period end amount".into(), IllustrationValue::Amount(end_amount));
         illustration.insert("Period end amount predicted".into(), IllustrationValue::Bool(predicted));
-        illustration.insert("Difference".into(),  IllustrationValue::Amount(difference));
+        illustration.insert("Difference".into(),  IllustrationValue::Amount(difference.clone()));
 
         Ok(Operand {
             name: values.name,
-            amount: end_amount,
+            amount: difference,
             illustration,
         })
     }
