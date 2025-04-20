@@ -5,9 +5,15 @@ use crate::remaining_operation::core_types::{Illustration, IllustrationValue, Op
 use chrono::NaiveDate;
 use std::collections::HashMap;
 
-enum TimelineOperandEnd {
+pub enum TimelineOperandEnd {
     Current(Amount),
     Predicted(Amount),
+}
+
+pub struct TimelineOperandValues {
+    pub name: String,
+    pub start_amount: Amount,
+    pub wrapper_end_amount: TimelineOperandEnd,
 }
 
 pub trait TimelineOperandBuilder {
@@ -16,7 +22,8 @@ pub trait TimelineOperandBuilder {
         period: &Period,
         today: &NaiveDate,
         exchange_rates: &ExchangeRates,
-    ) -> Result<(String, Amount, TimelineOperandEnd), String>;
+        // TODO - should we actually be getting references to all these values here, instead of copies? What impact does that have on memory?
+    ) -> Result<TimelineOperandValues, String>;
 }
 
 impl OperandBuilder for dyn TimelineOperandBuilder {
@@ -26,23 +33,23 @@ impl OperandBuilder for dyn TimelineOperandBuilder {
         today: &NaiveDate,
         exchange_rates: &ExchangeRates,
     ) -> Result<Operand, String> {
-        let (name, start_amount, wrapped_end_amount) = self.gather_values(period, today, exchange_rates)?;
+        let values = self.gather_values(period, today, exchange_rates)?;
         
-        let (end_amount, predicted) = match wrapped_end_amount {
-            TimelineOperandEnd::Current(amount) => (amount, false),
-            TimelineOperandEnd::Predicted(amount) => (amount, true)
+        let (end_amount, predicted) = match &values.wrapper_end_amount {
+            TimelineOperandEnd::Current(amount) => (amount.clone(), false),
+            TimelineOperandEnd::Predicted(amount) => (amount.clone(), true)
         };
         
-        let difference = &end_amount - &start_amount;
+        let difference = &end_amount - &values.start_amount;
 
         let mut illustration: Illustration = HashMap::new();
-        illustration.insert("Period start amount".into(), IllustrationValue::Amount(start_amount));
+        illustration.insert("Period start amount".into(), IllustrationValue::Amount(values.start_amount));
         illustration.insert("Period end amount".into(), IllustrationValue::Amount(end_amount.clone()));
         illustration.insert("Period end amount predicted".into(), IllustrationValue::Bool(predicted));
         illustration.insert("Difference".into(),  IllustrationValue::Amount(difference));
 
         Ok(Operand {
-            name,
+            name: values.name,
             amount: end_amount,
             illustration,
         })

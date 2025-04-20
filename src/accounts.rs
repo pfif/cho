@@ -1,11 +1,15 @@
 use std::fs::{read_dir, File};
-
+use std::thread::current;
 use chrono::NaiveDate;
 #[cfg(test)]
 use mockall::automock;
+use rust_decimal::Decimal;
 use serde::Deserialize;
 use serde_json::from_reader;
-
+use crate::period::Period;
+use crate::remaining_operation::amounts::Amount;
+use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
+use crate::remaining_operation::illustrations::{TimelineOperandBuilder, TimelineOperandEnd, TimelineOperandValues};
 use crate::vault::Vault;
 
 // Public traits
@@ -18,11 +22,34 @@ pub struct FoundAmount {
     pub estimated: bool,
 }
 
+impl FoundAmount {
+    // TODO This method is terribly named, but its need will be gone once we align the codebase to use Amount everywhere.
+    fn into_remaining_module_amount(self, currency: &String, exchange_rates: &ExchangeRates) -> Result<Amount, String> {
+        exchange_rates.new_amount(currency, Decimal::from(self.figure))
+    }
+}
+
 #[cfg_attr(test, automock)]
 pub trait QueriableAccount {
     fn amount_at(&self, date: &NaiveDate) -> Result<FoundAmount, String>;
     fn name(&self) -> &String;
     fn currency(&self) -> &String;
+}
+
+// TODO - Unit tests for this
+impl TimelineOperandBuilder for dyn QueriableAccount {
+    fn gather_values(&self, period: &Period, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<TimelineOperandValues, String> {
+        let start_amount = self.amount_at(&period.start_date)?;
+        let end_amount = self.amount_at(&period.end_date)?;
+
+        Ok(
+            TimelineOperandValues {
+                name: self.name().clone(),
+                start_amount: start_amount.into_remaining_module_amount(self.currency(), exchange_rates)?,
+                wrapper_end_amount: TimelineOperandEnd::Current(end_amount.into_remaining_module_amount(self.currency(), exchange_rates)?)
+            }
+        )
+    }
 }
 
 // Finder
