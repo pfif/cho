@@ -52,7 +52,8 @@ impl TimelineOperandBuilder for dyn QueriableAccount {
     }
 }
 
-// Finder
+// TODO - This should read the account from the Vault, otherwise this is breaking the abstraction of
+//        however we choose to store "state"
 pub fn get_accounts<V: Vault>(vault: &V) -> Result<Vec<AccountJson>, String> {
     let directory = vault.path();
     let dir_reader = match read_dir(directory.join(ACCOUNT_DIR)) {

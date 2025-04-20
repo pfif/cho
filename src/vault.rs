@@ -9,6 +9,10 @@ pub struct VaultImpl {
 
 pub trait Vault {
     fn read_vault_values<T: DeserializeOwned>(&self, name: String) -> Result<T, String>;
+
+    // TODO - Path is this abstraction leaking because of the way we first wrote the accounts module
+    //        (it does not rely on the "read_from_vault" impl). We will need to correct this if we
+    //        ever go into other non-file implementation of Vault
     fn path(&self) -> &PathBuf;
 }
 
