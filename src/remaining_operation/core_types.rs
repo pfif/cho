@@ -12,7 +12,7 @@ struct RemainingOperation {
 }
 
 impl RemainingOperation {
-    fn with_live_data() -> RemainingOperation {
+    fn from_vault_values() -> RemainingOperation {
         todo!()
     }
     fn execute(
