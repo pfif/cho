@@ -76,16 +76,26 @@ fn format_remaining_operation_screen(screen: &RemainingOperationScreen) -> Strin
     for group in screen.groups.iter() {
         let mut table = Table::new();
         let group_title = title(group.name());
+
         // TODO - do we need a column that shows the number used for the math?
-        table.set_header(group.illustration_fields());
+        let mut illustration_fields = vec![String::from("Name")];
+        illustration_fields.extend(group.illustration_fields());
+        table.set_header(illustration_fields);
+
         for operand in group.operands() {
-            let illustration_values = operand.illustration.clone().into_iter().map(|(_, value)| value);
-            table.add_row(illustration_values.map(|illustration_value| {
-                 match illustration_value {
-                     IllustrationValue::Amount(amount) => format!("{}", amount),
-                     IllustrationValue::Bool(bool) => (if bool { "✅" } else { "" }).into()
-                 }
-             }));
+            let mut illustration_values = vec![operand.name.clone()];
+
+            let raw_illustration_value = operand.illustration.clone()
+                .into_iter().map(|(_, value)| value)
+                .map(|illustration_value| {
+                    match illustration_value {
+                        IllustrationValue::Amount(amount) => format!("{}", amount),
+                        IllustrationValue::Bool(bool) => (if bool { "✅" } else { "" }).into()
+                    }
+                });
+
+            illustration_values.extend(raw_illustration_value);
+            table.add_row(illustration_values);
         }
 
         components.push(format!("{}\n{}", group_title, table.to_string()));
