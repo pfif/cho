@@ -427,7 +427,7 @@ mod tests_remaining_operation {
         setter(into),
         name = "MockQueriableAccountBuilder"
     )]
-    #[allow(unused)] // Builder is used, not class used to create Builder
+    #[allow(unused)] // Builder is used, not B (the class used to create Builder)
     struct MockQueriableAccountB {
         today_date: NaiveDate,
         period_start_date: NaiveDate,
@@ -530,6 +530,7 @@ mod tests_remaining_operation {
             raw_accounts: vec![],
             goals: vec![],
 
+            ignored_transactions: vec![],
             predicted_income: None,
         }
     }
@@ -587,6 +588,7 @@ mod tests_remaining_operation {
                 predicted_income: self.predicted_income,
 
                 goals: self.goals,
+                ignored_transactions: vec![],
             };
 
             let result = instance.execute().unwrap();
