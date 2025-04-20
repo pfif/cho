@@ -9,49 +9,33 @@ pub enum TimelineOperandEnd {
     Predicted(Amount),
 }
 
-pub struct TimelineOperandValues {
+pub struct TimelineOperandBuilder {
     pub name: String,
     pub start_amount: Amount,
     pub wrapper_end_amount: TimelineOperandEnd,
 }
-
-pub trait ProvidesTimelineOperandValues {
-    fn provide(
-        &self,
-        period: &Period,
-        today: &NaiveDate,
-        exchange_rates: &ExchangeRates,
-        // TODO - should we actually be getting references to all these values here, instead of copies? What impact does that have on memory?
-    ) -> Result<TimelineOperandValues, String>;
-}
-
-pub struct TimelineOperandBuilder<V: ProvidesTimelineOperandValues> {
-    pub values_provider: V,
-}
-impl<V: ProvidesTimelineOperandValues> OperandBuilder for TimelineOperandBuilder<V> {
+impl OperandBuilder for TimelineOperandBuilder {
     fn build(
         &self,
         period: &Period,
         today: &NaiveDate,
         exchange_rates: &ExchangeRates,
     ) -> Result<Operand, String> {
-        let values = self.values_provider.provide(period, today, exchange_rates)?;
-
-        let (end_amount, predicted) = match &values.wrapper_end_amount {
+        let (end_amount, predicted) = match &self.wrapper_end_amount {
             TimelineOperandEnd::Current(amount) => (amount.clone(), false),
             TimelineOperandEnd::Predicted(amount) => (amount.clone(), true)
         };
 
-        let difference = &end_amount - &values.start_amount;
+        let difference = &end_amount - &self.start_amount;
 
         let mut illustration: Illustration = Vec::new();
-        illustration.push(("Period start amount".into(), IllustrationValue::Amount(values.start_amount)));
+        illustration.push(("Period start amount".into(), IllustrationValue::Amount(self.start_amount.clone())));
         illustration.push(("Period end amount".into(), IllustrationValue::Amount(end_amount)));
         illustration.push(("Period end amount predicted".into(), IllustrationValue::Bool(predicted)));
         illustration.push(("Difference".into(), IllustrationValue::Amount(difference.clone())));
 
         Ok(Operand {
-            name: values.name,
+            name: self.name.clone(),
             amount: difference,
             illustration,
         })

@@ -8,8 +8,8 @@ use serde_json::from_reader;
 use crate::period::Period;
 use crate::remaining_operation::amounts::Amount;
 use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
-use crate::remaining_operation::core_types::{GroupBuilder, OperandBuilder};
-use crate::remaining_operation::operand_builders::timeline::{ProvidesTimelineOperandValues, TimelineOperandBuilder, TimelineOperandEnd, TimelineOperandValues};
+use crate::remaining_operation::core_types::{GroupBuilder, Operand, OperandBuilder};
+use crate::remaining_operation::operand_builders::timeline::{TimelineOperandBuilder, TimelineOperandEnd};
 use crate::vault::Vault;
 
 // Public traits
@@ -104,10 +104,7 @@ impl Into<GroupBuilder> for AccountGetter {
     fn into(self) -> GroupBuilder {
         GroupBuilder{
             name: "Accounts".into(),
-            // TODO - I would love for this to be simpler. There must be a better way to model 
-            operand_factories: self.accounts.into_iter()
-                .map(|account| TimelineOperandBuilder{values_provider: account})
-                .map(|values_provider| Box::new(values_provider) as Box<dyn OperandBuilder>).collect()
+            operand_factories: self.accounts.into_iter().map(|account| Box::new(account) as Box<dyn OperandBuilder>).collect()
         }
     }
 }
@@ -235,18 +232,17 @@ pub struct AccountJson {
 }
 
 // TODO - Unit tests for this
-impl ProvidesTimelineOperandValues for AccountJson {
-    fn provide(&self, period: &Period, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<TimelineOperandValues, String> {
-        let start_amount = self.amount_at(&period.start_date)?;
-        let end_amount = self.amount_at(&period.end_date)?;
+impl OperandBuilder for AccountJson {
+    fn build(&self, period: &Period, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Operand, String> {
+        let start_amount = self.amount_at(&period.start_date)?.into_remaining_module_amount(self.currency(), exchange_rates)?;
+        let end_amount = self.amount_at(&period.end_date)?.into_remaining_module_amount(self.currency(), exchange_rates)?;
 
-        Ok(
-            TimelineOperandValues {
-                name: self.name().clone(),
-                start_amount: start_amount.into_remaining_module_amount(self.currency(), exchange_rates)?,
-                wrapper_end_amount: TimelineOperandEnd::Current(end_amount.into_remaining_module_amount(self.currency(), exchange_rates)?)
-            }
-        )
+        let builder = TimelineOperandBuilder{
+            name: self.name.clone(),
+            start_amount,
+            wrapper_end_amount: TimelineOperandEnd::Current(end_amount)
+        };
+        builder.build(period, today, exchange_rates)
     }
 }
 
