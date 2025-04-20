@@ -6,9 +6,10 @@ pub type Figure = Decimal;
 pub type CurrencyIdent = String;
 pub type Sign = String;
 
-// TODO To make this code more efficient, to make sure we keep only one version of the currency in memory and as an exercice for me to understand lifetimes,
+// TODO To make this code more efficient, to make sure we keep only one version of the currency in memory and as an exercice for me to understand lifetimes( ??),
 //      remove the clone from here and use lifetimes.
 //      We shouldn't need more than one instance per currency
+//      Ian told me that Rc could be used for this use-case
 #[derive(Clone)]
 pub struct Currency {
     pub rate: Figure,
