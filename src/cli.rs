@@ -44,6 +44,7 @@ pub fn remaining_operation() {
         };
         let vault = VaultImpl { path: vault_path };
 
+        // TODO turn predicted income into its own module, have it feed an Operand Group to PredictedIncome
         let predicted_income = match arguments.include_predicted_income {
             true => {
                 let raw_amount = PredictedIncome::from_vault(&vault)?;
@@ -52,6 +53,7 @@ pub fn remaining_operation() {
             false => None,
         };
 
+        // TODO call from vault value from the new module...
         let remaining_money = RemainingOperation::from_vault_value(
             HashMap::from_iter(arguments.exchange_rates),
             arguments.target_currency,
@@ -61,6 +63,7 @@ pub fn remaining_operation() {
 
         let screen = remaining_money.execute()?;
 
+        // ... build its display screen (with less use of Display, it's useless here)
         Ok(screen.into())
     })();
 

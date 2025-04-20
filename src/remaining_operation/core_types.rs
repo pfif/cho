@@ -85,6 +85,7 @@ struct RemainingOperationScreen {
 mod group {
     use super::Operand;
 
+    /* TODO - we're also not returning the total of each group */
     pub struct Group {
         operands: Vec<Operand>,
         illustration_fields: Option<Vec<String>>,
