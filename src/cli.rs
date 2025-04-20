@@ -1,27 +1,3 @@
-/*
-Period start: 2023/02/01
-============
-
-Accounts
-========
-             | ING       | Credit Mutuel     | Wise            | LINE            | ゆうちょ              | Liquide      | Total
-Period start | €0        | €54775.19         | €2889.14        | ¥24796          | ¥3758343            | ¥13000       | €81518.52
-Current      | €0 (-€0)  | €54000.00 (-€547) | €3000 (+€28)    | ¥22300 (-¥796)  | ¥3266780 (-¥491563) | ¥12987 (-¥13)| €79518.52 (-€2000)
-
-(+) Predicted Income: €2000
-===========================
-
-(-) Goals
-=========
-                | Commited | Commited this period | Target |
-Retirement fund | €15000   | … (€500)             | €60000 |
-New iPhone      | €300     | ✅                   | €1000  |
-Total           | €15300   | … (€2500)            | €61000 |
-
-Remaining this period: €456
-===========================
-*/
-
 use crate::remaining;
 use crate::vault::{VaultImpl, VaultReadable};
 use clap::Parser;
