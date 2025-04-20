@@ -1,7 +1,7 @@
 use crate::period::Period;
 use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
 use crate::remaining_operation::amounts::Amount;
-use crate::remaining_operation::core_types::{Operand, OperandBuilder};
+use crate::remaining_operation::core_types::{Illustration, IllustrationValue, Operand, OperandBuilder};
 use chrono::NaiveDate;
 use std::collections::HashMap;
 
@@ -10,7 +10,7 @@ enum TimelineOperandEnd {
     Predicted(Amount),
 }
 
-trait TimelineOperandBuilder {
+pub trait TimelineOperandBuilder {
     fn gather_values(
         &self,
         period: &Period,
@@ -28,20 +28,18 @@ impl OperandBuilder for dyn TimelineOperandBuilder {
     ) -> Result<Operand, String> {
         let (name, start_amount, wrapped_end_amount) = self.gather_values(period, today, exchange_rates)?;
         
-        // TODO Correct this - the model does not allow entries in illustrations to have different columns 
-        let (end_amount, end_amount_description) = match wrapped_end_amount {
-            TimelineOperandEnd::Current(amount) => (amount, "Current amount"),
-            TimelineOperandEnd::Predicted(amount) => (amount,"End of period predicted amount")
+        let (end_amount, predicted) = match wrapped_end_amount {
+            TimelineOperandEnd::Current(amount) => (amount, false),
+            TimelineOperandEnd::Predicted(amount) => (amount, true)
         };
         
         let difference = &end_amount - &start_amount;
 
-        let mut illustration: HashMap<String, Amount> = HashMap::new();
-        illustration.insert("Period start amount".into(), start_amount);
-        illustration.insert(end_amount_description.into(), end_amount.clone());
-
-
-        illustration.insert("Difference".into(),  difference);
+        let mut illustration: Illustration = HashMap::new();
+        illustration.insert("Period start amount".into(), IllustrationValue::Amount(start_amount));
+        illustration.insert("Period end amount".into(), IllustrationValue::Amount(end_amount.clone()));
+        illustration.insert("Period end amount predicted".into(), IllustrationValue::Bool(predicted));
+        illustration.insert("Difference".into(),  IllustrationValue::Amount(difference));
 
         Ok(Operand {
             name,
