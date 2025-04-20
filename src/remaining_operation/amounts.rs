@@ -2,7 +2,6 @@ use std::fmt::{Display, Formatter};
 use crate::remaining_operation::amounts::amount::ImmutableAmount;
 use rust_decimal::Decimal;
 use std::ops;
-use crate::remaining::DisplayAccount;
 
 pub type Figure = Decimal;
 pub type CurrencyIdent = String;

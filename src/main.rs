@@ -3,7 +3,6 @@ mod cli;
 mod goals;
 mod ignored_transaction;
 mod period;
-mod remaining;
 mod vault;
 mod remaining_operation;
 mod predicted_income;
