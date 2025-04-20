@@ -9,6 +9,7 @@ use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
 
 mod formatting;
 mod argument_parsing;
+mod tests;
 
 pub fn remaining_operation() {
     let result: Result<String, String> = (|| {
