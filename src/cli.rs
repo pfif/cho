@@ -27,13 +27,13 @@ use crate::vault::{VaultImpl, VaultReadable};
 use clap::Parser;
 use comfy_table::Table;
 use rust_decimal::Decimal;
-use serde::Deserialize;
+use serde::{forward_to_deserialize_any, Deserialize};
 use std::env::current_dir;
 use std::fmt::{Display, Formatter};
 use std::iter::once;
 use std::path::PathBuf;
 use crate::remaining::Period;
-use crate::remaining_operation::core_types::RemainingOperation;
+use crate::remaining_operation::core_types::{IllustrationValue, RemainingOperation, RemainingOperationScreen};
 use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
 
 pub fn remaining_operation() {
@@ -58,9 +58,7 @@ pub fn remaining_operation() {
             &exchange_rates,
         )?;
 
-        // ... build its display screen (with less use of Display, it's useless here)
-        //Ok(screen.into())
-        Ok(String::from(""))
+        Ok(format_remaining_operation_screen(&screen))
     })();
 
     if let Ok(screen) = result {
@@ -70,13 +68,46 @@ pub fn remaining_operation() {
     }
 }
 
+fn format_remaining_operation_screen(screen: &RemainingOperationScreen) -> String {
+    let mut components = vec![title(&format!(
+        "Current period : {} to {}", screen.period.start_date, screen.period.end_date,
+    ))];
+
+    for group in screen.groups.iter() {
+        let mut table = Table::new();
+        let group_title = title(group.name());
+        // TODO - do we need a column that shows the number used for the math?
+        table.set_header(group.illustration_fields());
+        for operand in group.operands() {
+            let illustration_values = operand.illustration.clone().into_iter().map(|(_, value)| value);
+            table.add_row(illustration_values.map(|illustration_value| {
+                 match illustration_value {
+                     IllustrationValue::Amount(amount) => format!("{}", amount),
+                     IllustrationValue::Bool(bool) => (if bool { "✅" } else { "" }).into()
+                 }
+             }));
+        }
+
+        components.push(format!("{}\n{}", group_title, table.to_string()));
+    }
+
+    components.push(title(&format!("Remaining this period: {}", screen.remaining)));
+
+    components.join("\n\n")
+}
+
+
+fn title(string: &str) -> String {
+    let string_length = string.len();
+    string.to_string() + "\n" + &"=".repeat(string_length)
+}
+
 // TYPES AND ADAPTERS
 
 type Figure = Decimal;
 type Currency = String;
 type OldExchangeRate = (String, Decimal);
 
-#[derive(Deserialize)]
 pub struct Amount {
     currency: Currency,
     figure: Figure,

@@ -1,5 +1,4 @@
 use chrono::NaiveDate;
-use std::collections::HashMap;
 use crate::period::Period;
 use crate::remaining_operation::amounts::Amount;
 use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
@@ -45,11 +44,11 @@ impl<V: ProvidesTimelineOperandValues> OperandBuilder for TimelineOperandBuilder
 
         let difference = &end_amount - &values.start_amount;
 
-        let mut illustration: Illustration = HashMap::new();
-        illustration.insert("Period start amount".into(), IllustrationValue::Amount(values.start_amount));
-        illustration.insert("Period end amount".into(), IllustrationValue::Amount(end_amount));
-        illustration.insert("Period end amount predicted".into(), IllustrationValue::Bool(predicted));
-        illustration.insert("Difference".into(),  IllustrationValue::Amount(difference.clone()));
+        let mut illustration: Illustration = Vec::new();
+        illustration.push(("Period start amount".into(), IllustrationValue::Amount(values.start_amount)));
+        illustration.push(("Period end amount".into(), IllustrationValue::Amount(end_amount)));
+        illustration.push(("Period end amount predicted".into(), IllustrationValue::Bool(predicted)));
+        illustration.push(("Difference".into(), IllustrationValue::Amount(difference.clone())));
 
         Ok(Operand {
             name: values.name,

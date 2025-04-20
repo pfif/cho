@@ -6,7 +6,7 @@ use chrono::{Local, NaiveDate};
 use group::Group;
 use rust_decimal_macros::dec;
 use crate::accounts::AccountGetter;
-use crate::predicted_income::PredictedIncomeBuilder;
+use crate::predicted_income::{PredictedIncome};
 use crate::vault::{Vault, VaultReadable};
 
 /* Entrypoint */
@@ -18,14 +18,15 @@ pub struct RemainingOperation<P: PeriodsConfiguration> {
 
 impl RemainingOperation<PeriodVaultValues> {
     pub fn from_vault_values<V: Vault>(include_predicted_income: bool, vault: &V) -> Result<RemainingOperation<PeriodVaultValues>, String> {
+        let mut group_factories: Vec<GroupBuilder> = vec![AccountGetter::from_files(vault)?.into()];
+        if include_predicted_income {
+            group_factories.push(PredictedIncome::from_vault(vault)?.into());
+        }
         Ok(
             RemainingOperation{
                 date: Local::now().date_naive(),
                 periods_configuration: PeriodVaultValues::from_vault(vault)?,
-                group_factories: vec![
-                    PredictedIncomeBuilder::from_vault_value(include_predicted_income, vault)?.into(),
-                    AccountGetter::from_files(vault)?.into()
-                ]
+                group_factories
             }
         )
     }
@@ -56,6 +57,7 @@ impl<P: PeriodsConfiguration> RemainingOperation<P> {
         }
 
         Ok(RemainingOperationScreen {
+            period: current_period,
             groups,
             remaining,
         })
@@ -99,6 +101,7 @@ pub trait OperandBuilder {
 pub struct RemainingOperationScreen {
     pub groups: Vec<Group>,
     pub remaining: Amount,
+    pub period: Period,
 }
 
 // The struct Group has its own module to isolate its internal attribute
@@ -124,15 +127,16 @@ pub mod group {
         // TODO Unit tests
         pub fn add_operands(&mut self, o: Operand) -> Result<(), String> {
             if self.illustration_fields == None {
-                let fields = o.illustration.keys().cloned().collect();
+                let fields = o.illustration.iter().map(|(k, _)| k.clone()).collect();
                 self.illustration_fields = Some(fields)
             } else if let Some(illustration_fields) = &self.illustration_fields {
-                if o.illustration.keys().ne(illustration_fields) {
+                let field_names: Vec<String> = o.illustration.iter().map(|(k, _)| k.clone()).collect();
+                if field_names.iter().ne(illustration_fields) {
                     return Err(format!(
                         "Adding an operand ({:?}) whose fields ({:?}) does not match that of the rest of the operand in this group ({:?})",
                         o.name,
-                        o.illustration.keys(),
-                        self.illustration_fields
+                        field_names,
+                        illustration_fields
                     ));
                 }
 
@@ -142,11 +146,15 @@ pub mod group {
             Ok(())
         }
 
+        pub fn name(&self) -> &String { &self.name }
+        // TODO - Not a fan that, if there is a bug in `add_operands`, operands could be returned
+        //        with an irregular number of column, or with column not matchin the illustration
+        //        fields
         pub fn operands(&self) -> &Vec<Operand> {
             &self.operands
         }
-        pub fn illustration_fields(&self) -> &Option<Vec<String>> {
-            &self.illustration_fields
+        pub fn illustration_fields(&self) -> Vec<String> {
+            self.illustration_fields.clone().unwrap_or_else(|| vec![])
         }
     }
 }
@@ -157,12 +165,13 @@ pub mod group {
 //      just a list of columns
 //      Downstream code can decide how to display the value, but not only based on its type, not
 //      what it _is_
+#[derive(Clone)]
 pub enum IllustrationValue {
     Amount(Amount),
     Bool(bool)
 }
 
-pub type Illustration = HashMap<String, IllustrationValue>;
+pub type Illustration = Vec<(String, IllustrationValue)>;
 
 pub struct Operand {
     pub name: String,

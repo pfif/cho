@@ -1,6 +1,8 @@
+use std::fmt::{Display, Formatter};
 use crate::remaining_operation::amounts::amount::ImmutableAmount;
 use rust_decimal::Decimal;
 use std::ops;
+use crate::remaining::DisplayAccount;
 
 pub type Figure = Decimal;
 pub type CurrencyIdent = String;
@@ -93,6 +95,12 @@ mod amount {
 #[derive(Clone)]
 pub struct Amount {
     immutable_amount: ImmutableAmount,
+}
+
+impl Display for Amount {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.immutable_amount.currency().sign, self.immutable_amount.figure())
+    }
 }
 
 impl Amount {
