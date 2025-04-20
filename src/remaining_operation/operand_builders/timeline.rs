@@ -31,7 +31,7 @@ impl OperandBuilder for TimelineOperandBuilder {
         let mut illustration: Illustration = Vec::new();
         illustration.push(("Period start amount".into(), IllustrationValue::Amount(self.start_amount.clone())));
         illustration.push(("Period end amount".into(), IllustrationValue::Amount(end_amount)));
-        illustration.push(("Period end amount predicted".into(), IllustrationValue::Bool(predicted)));
+        illustration.push(("Committed".into(), IllustrationValue::Bool(!predicted)));
         illustration.push(("Difference".into(), IllustrationValue::Amount(difference.clone())));
 
         Ok(Operand {
