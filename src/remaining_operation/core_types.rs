@@ -148,7 +148,7 @@ pub mod group {
 
         pub fn name(&self) -> &String { &self.name }
         // TODO - Not a fan that, if there is a bug in `add_operands`, operands could be returned
-        //        with an irregular number of column, or with column not matchin the illustration
+        //        with an irregular number of column, or with column not matching the illustration
         //        fields
         pub fn operands(&self) -> &Vec<Operand> {
             &self.operands
