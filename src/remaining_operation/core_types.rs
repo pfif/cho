@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use super::amounts::exchange_rates::ExchangeRates;
 use super::amounts::{Amount, CurrencyIdent};
 use crate::period::{Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
+use crate::goals::{GoalVaultValues};
 use chrono::{Local, NaiveDate};
 use group::Group;
 use rust_decimal_macros::dec;
@@ -18,7 +19,10 @@ pub struct RemainingOperation {
 
 impl RemainingOperation {
     pub fn from_vault_values<V: Vault>(include_predicted_income: bool, vault: &V) -> Result<RemainingOperation, String> {
-        let mut group_factories: Vec<GroupBuilder> = vec![AccountGetter::from_files(vault)?.into()];
+        let mut group_factories: Vec<GroupBuilder> = vec![
+            AccountGetter::from_files(vault)?.into(),
+            GoalVaultValues::from_vault(vault)?.into() 
+        ];
         if include_predicted_income {
             group_factories.push(PredictedIncome::from_vault(vault)?.into());
         }
