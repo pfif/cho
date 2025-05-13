@@ -1,5 +1,5 @@
 use chrono::NaiveDate;
-use crate::period::Period;
+use crate::period::{Period, PeriodConfigurationVaultValue};
 use crate::remaining_operation::amounts::Amount;
 use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
 use crate::remaining_operation::core_types::{Illustration, IllustrationValue, Operand, OperandBuilder};
@@ -15,9 +15,10 @@ pub struct TimelineOperandBuilder {
     pub wrapper_end_amount: TimelineOperandEnd,
 }
 impl OperandBuilder for TimelineOperandBuilder {
+    // TODO this does not need to be a OperandBuilder anymore
     fn build(
         &self,
-        period: &Period,
+        period: &PeriodConfigurationVaultValue,
         today: &NaiveDate,
         exchange_rates: &ExchangeRates,
     ) -> Result<Operand, String> {

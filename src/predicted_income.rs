@@ -1,7 +1,7 @@
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use crate::period::Period;
+use crate::period::{Period, PeriodConfigurationVaultValue};
 use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
 use crate::remaining_operation::core_types::{GroupBuilder, IllustrationValue, Operand, OperandBuilder};
 use crate::vault::{Vault, VaultReadable};
@@ -18,7 +18,7 @@ impl VaultReadable for PredictedIncome {
 }
 
 impl OperandBuilder for PredictedIncome {
-    fn build(&self, period: &Period, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Operand, String> {
+    fn build(&self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Operand, String> {
         // TODO - This illustration might be best as a default illustration?
         let mut illustration = Vec::new();
         let amount = exchange_rates.new_amount(&self.currency, self.figure)?;

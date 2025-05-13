@@ -5,7 +5,7 @@ use mockall::automock;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use serde_json::from_reader;
-use crate::period::Period;
+use crate::period::{Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
 use crate::remaining_operation::amounts::Amount;
 use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
 use crate::remaining_operation::core_types::{GroupBuilder, Operand, OperandBuilder};
@@ -233,16 +233,17 @@ pub struct AccountJson {
 
 // TODO - Unit tests for this
 impl OperandBuilder for AccountJson {
-    fn build(&self, period: &Period, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Operand, String> {
-        let start_amount = self.amount_at(&period.start_date)?.into_remaining_module_amount(self.currency(), exchange_rates)?;
-        let end_amount = self.amount_at(&period.end_date)?.into_remaining_module_amount(self.currency(), exchange_rates)?;
+    fn build(&self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Operand, String> {
+        let current_period = period_config.period_for_date(today)?;
+        let start_amount = self.amount_at(&current_period.start_date)?.into_remaining_module_amount(self.currency(), exchange_rates)?;
+        let end_amount = self.amount_at(&current_period.end_date)?.into_remaining_module_amount(self.currency(), exchange_rates)?;
 
         let builder = TimelineOperandBuilder{
             name: self.name.clone(),
             start_amount,
             wrapper_end_amount: TimelineOperandEnd::Current(end_amount)
         };
-        builder.build(period, today, exchange_rates)
+        builder.build(period_config, today, exchange_rates)
     }
 }
 

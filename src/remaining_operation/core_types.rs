@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use super::amounts::exchange_rates::ExchangeRates;
 use super::amounts::{Amount, CurrencyIdent};
-use crate::period::{Period, PeriodVaultValues, PeriodsConfiguration};
+use crate::period::{Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
 use chrono::{Local, NaiveDate};
 use group::Group;
 use rust_decimal_macros::dec;
@@ -10,14 +10,14 @@ use crate::predicted_income::{PredictedIncome};
 use crate::vault::{Vault, VaultReadable};
 
 /* Entrypoint */
-pub struct RemainingOperation<P: PeriodsConfiguration> {
+pub struct RemainingOperation {
     group_factories: Vec<GroupBuilder>,
-    periods_configuration: P,
+    periods_configuration: PeriodConfigurationVaultValue,
     date: NaiveDate,
 }
 
-impl RemainingOperation<PeriodVaultValues> {
-    pub fn from_vault_values<V: Vault>(include_predicted_income: bool, vault: &V) -> Result<RemainingOperation<PeriodVaultValues>, String> {
+impl RemainingOperation {
+    pub fn from_vault_values<V: Vault>(include_predicted_income: bool, vault: &V) -> Result<RemainingOperation, String> {
         let mut group_factories: Vec<GroupBuilder> = vec![AccountGetter::from_files(vault)?.into()];
         if include_predicted_income {
             group_factories.push(PredictedIncome::from_vault(vault)?.into());
@@ -25,13 +25,13 @@ impl RemainingOperation<PeriodVaultValues> {
         Ok(
             RemainingOperation{
                 date: Local::now().date_naive(),
-                periods_configuration: PeriodVaultValues::from_vault(vault)?,
+                periods_configuration: PeriodConfigurationVaultValue::from_vault(vault)?,
                 group_factories
             }
         )
     }
 }
-impl<P: PeriodsConfiguration> RemainingOperation<P> {
+impl RemainingOperation {
     pub fn execute(
         self,
         target_currency: &CurrencyIdent,
@@ -46,7 +46,7 @@ impl<P: PeriodsConfiguration> RemainingOperation<P> {
         let groups = self
             .group_factories
             .into_iter()
-            .map(|builder| builder.build(&current_period, &self.date, exchange_rates))
+            .map(|builder| builder.build(&self.periods_configuration, &self.date, exchange_rates))
             .collect::<Result<Vec<Group>, String>>()?;
 
         let mut remaining: Amount = exchange_rates.new_amount(target_currency,dec!(0))?;
@@ -74,14 +74,14 @@ impl GroupBuilder {
     // TODO Unit tests
     fn build(
         self,
-        period: &Period,
+        period_configuration: &PeriodConfigurationVaultValue,
         today: &NaiveDate,
         exchange_rates: &ExchangeRates,
     ) -> Result<Group, String> {
         let mut group = group::Group::new(self.name);
         for operand_builder in self.operand_factories.iter() {
             operand_builder
-                .build(period, today, exchange_rates)
+                .build(period_configuration, today, exchange_rates)
                 .and_then(|operand| group.add_operands(operand))?
         }
         Ok(group)
@@ -89,9 +89,10 @@ impl GroupBuilder {
 }
 
 pub trait OperandBuilder {
+    // TODO shouldn't this consume self?
     fn build(
         &self,
-        period: &Period,
+        period_configuration: &PeriodConfigurationVaultValue,
         today: &NaiveDate,
         exchange_rates: &ExchangeRates,
     ) -> Result<Operand, String>;
