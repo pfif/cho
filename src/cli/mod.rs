@@ -37,6 +37,7 @@ pub fn remaining_operation() {
     })();
 
     if let Ok(screen) = result {
+        // TODO missing build ID
         print!("{}", screen)
     } else if let Err(error) = result {
         println!("Could not compute remaining amount: {}", error)
