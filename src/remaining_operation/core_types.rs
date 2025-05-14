@@ -166,6 +166,10 @@ pub mod group {
         pub fn illustration_fields(&self) -> Vec<String> {
             self.illustration_fields.clone().unwrap_or_else(|| vec![])
         }
+        
+        pub fn empty(&self) -> bool {
+            self.operands.is_empty()
+        }
     }
 }
 
