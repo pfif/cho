@@ -23,7 +23,8 @@ pub fn format_remaining_operation_screen(screen: &RemainingOperationScreen) -> S
                 .map(|illustration_value| {
                     match illustration_value {
                         IllustrationValue::Amount(amount) => format!("{}", amount),
-                        IllustrationValue::Bool(bool) => (if bool { "✅" } else { "" }).into()
+                        IllustrationValue::Bool(bool) => (if bool { "✅" } else { "" }).into(),
+                        IllustrationValue::Date(date) => date.to_string()
                     }
                 });
 

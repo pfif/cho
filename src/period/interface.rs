@@ -48,3 +48,9 @@ pub struct Period {
     pub start_date: NaiveDate,
     pub end_date: NaiveDate,
 }
+
+impl Period {
+    pub fn contains(&self, date: &NaiveDate) -> bool {
+        self.start_date <= *date && *date <= self.end_date
+    }
+}

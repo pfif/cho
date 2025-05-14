@@ -7,6 +7,7 @@ use chrono::{Local, NaiveDate};
 use group::Group;
 use rust_decimal_macros::dec;
 use crate::accounts::AccountGetter;
+use crate::ignored_transaction::IgnoredTransactionsVaultValues;
 use crate::predicted_income::{PredictedIncome};
 use crate::vault::{Vault, VaultReadable};
 
@@ -21,7 +22,8 @@ impl RemainingOperation {
     pub fn from_vault_values<V: Vault>(include_predicted_income: bool, vault: &V) -> Result<RemainingOperation, String> {
         let mut group_factories: Vec<GroupBuilder> = vec![
             AccountGetter::from_files(vault)?.into(),
-            GoalVaultValues::from_vault(vault)?.into() 
+            GoalVaultValues::from_vault(vault)?.into(),
+            IgnoredTransactionsVaultValues::from_vault(vault)?.into(),
         ];
         if include_predicted_income {
             group_factories.push(PredictedIncome::from_vault(vault)?.into());
@@ -176,7 +178,8 @@ pub mod group {
 #[derive(Clone, Debug)]
 pub enum IllustrationValue {
     Amount(Amount),
-    Bool(bool)
+    Bool(bool),
+    Date(NaiveDate),
 }
 
 pub type Illustration = Vec<(String, IllustrationValue)>;
