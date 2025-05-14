@@ -11,7 +11,7 @@ pub type Sign = String;
 //      remove the clone from here and use lifetimes.
 //      We shouldn't need more than one instance per currency
 //      Ian told me that Rc could be used for this use-case
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Currency {
     pub rate: Figure,
     pub sign: String,
@@ -66,7 +66,7 @@ pub mod exchange_rates {
 mod amount {
     use crate::remaining_operation::amounts::{Currency, Figure};
 
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
     pub struct ImmutableAmount {
         currency: Currency,
         figure: Figure,
@@ -91,7 +91,7 @@ mod amount {
 }
 
 // Amount should be instantiated using the ExchangeRate object
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Amount {
     immutable_amount: ImmutableAmount,
 }

@@ -170,7 +170,7 @@ pub mod group {
 //      just a list of columns
 //      Downstream code can decide how to display the value, but not only based on its type, not
 //      what it _is_
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum IllustrationValue {
     Amount(Amount),
     Bool(bool)
@@ -178,6 +178,7 @@ pub enum IllustrationValue {
 
 pub type Illustration = Vec<(String, IllustrationValue)>;
 
+#[derive(Debug)]
 pub struct Operand {
     pub name: String,
     pub amount: Amount,
