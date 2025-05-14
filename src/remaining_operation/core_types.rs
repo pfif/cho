@@ -144,10 +144,8 @@ pub mod group {
                         illustration_fields
                     ));
                 }
-
-                self.operands.push(o)
             }
-
+            self.operands.push(o);
             Ok(())
         }
 
