@@ -35,6 +35,8 @@ pub fn format_remaining_operation_screen(screen: &RemainingOperationScreen) -> S
     }
 
     components.push(title(&format!("Remaining this period: {}", screen.remaining)));
+    
+    components.push(format!("Release: {}", env!("RELEASE")));
 
     components.join("\n\n")
 }
