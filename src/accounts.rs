@@ -233,7 +233,7 @@ pub struct AccountJson {
 
 // TODO - Unit tests for this
 impl OperandBuilder for AccountJson {
-    fn build(&self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Operand, String> {
+    fn build(&self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
         let current_period = period_config.period_for_date(today)?;
         let start_amount = self.amount_at(&current_period.start_date)?.into_remaining_module_amount(self.currency(), exchange_rates)?;
         let end_amount = self.amount_at(&current_period.end_date)?.into_remaining_module_amount(self.currency(), exchange_rates)?;

@@ -144,13 +144,13 @@ impl<P: PeriodsConfiguration> Goal<P> for GoalImplementation {
 }
 
 impl OperandBuilder for GoalImplementation {
-    fn build(&self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Operand, String> {
+    fn build(&self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
         let to_pay_at_figure = self.to_pay_at(period_config, today)?;
         let to_pay_at_amount = exchange_rates.new_amount(&self.currency, to_pay_at_figure)?;
 
         let commited_amount = exchange_rates.new_amount(&self.currency, self.total_commited())?;
         let target_amount = exchange_rates.new_amount(&self.currency, self.target)?;
-        Ok(Operand{
+        Ok(Some(Operand{
             name: self.name.clone(),
             amount: to_pay_at_amount.clone(),
             illustration: vec![
@@ -159,7 +159,7 @@ impl OperandBuilder for GoalImplementation {
                 ("Payed in".into(), IllustrationValue::Bool(to_pay_at_figure == dec!(0))),
                 ("Target".into(), IllustrationValue::Amount(target_amount)),
             ]
-        })
+        }))
     }
 }
 

@@ -86,7 +86,12 @@ impl GroupBuilder {
         for operand_builder in self.operand_factories.iter() {
             operand_builder
                 .build(period_configuration, today, exchange_rates)
-                .and_then(|operand| group.add_operands(operand))?
+                .and_then(|operand| {
+                    match operand {
+                        Some(operand) => group.add_operands(operand),
+                        None => Ok(())
+                    }
+                })?
         }
         Ok(group)
     }
@@ -99,7 +104,7 @@ pub trait OperandBuilder {
         period_configuration: &PeriodConfigurationVaultValue,
         today: &NaiveDate,
         exchange_rates: &ExchangeRates,
-    ) -> Result<Operand, String>;
+    ) -> Result<Option<Operand>, String>;
 }
 
 /* Output types */

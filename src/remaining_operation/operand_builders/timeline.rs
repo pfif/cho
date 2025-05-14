@@ -21,7 +21,7 @@ impl OperandBuilder for TimelineOperandBuilder {
         period: &PeriodConfigurationVaultValue,
         today: &NaiveDate,
         exchange_rates: &ExchangeRates,
-    ) -> Result<Operand, String> {
+    ) -> Result<Option<Operand>, String> {
         let (end_amount, predicted) = match &self.wrapper_end_amount {
             TimelineOperandEnd::Current(amount) => (amount.clone(), false),
             TimelineOperandEnd::Predicted(amount) => (amount.clone(), true)
@@ -35,10 +35,10 @@ impl OperandBuilder for TimelineOperandBuilder {
         illustration.push(("Committed".into(), IllustrationValue::Bool(!predicted)));
         illustration.push(("Difference".into(), IllustrationValue::Amount(difference.clone())));
 
-        Ok(Operand {
+        Ok(Some(Operand {
             name: self.name.clone(),
             amount: difference,
             illustration,
-        })
+        }))
     }
 }
