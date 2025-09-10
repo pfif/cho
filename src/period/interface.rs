@@ -30,11 +30,11 @@ impl PeriodConfigurationVaultValue {
 
 impl PeriodsConfiguration for PeriodConfigurationVaultValue {
     fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String> {
-        return self.unpack().period_for_date(date);
+        self.unpack().period_for_date(date)
     }
 
     fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, String> {
-        return self.unpack().periods_between(start, end);
+        self.unpack().periods_between(start, end)
     }
 }
 

@@ -1,12 +1,15 @@
 use chrono::NaiveDate;
+use derive_builder::Builder;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use crate::period::{Period, PeriodConfigurationVaultValue};
 use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
 use crate::remaining_operation::core_types::{GroupBuilder, IllustrationValue, Operand, OperandBuilder};
+use crate::remaining_operation::core_types::group::Group;
 use crate::vault::{Vault, VaultReadable};
 
 
+#[cfg_attr(test, derive(Builder))]
 #[derive(Deserialize)]
 pub struct PredictedIncome{
     currency: String,
@@ -18,7 +21,7 @@ impl VaultReadable for PredictedIncome {
 }
 
 impl OperandBuilder for PredictedIncome {
-    fn build(&self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
+    fn build(self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
         // TODO - This illustration might be best as a default illustration?
         let mut illustration = Vec::new();
         let amount = exchange_rates.new_amount(&self.currency, self.figure)?;
@@ -32,12 +35,10 @@ impl OperandBuilder for PredictedIncome {
     }
 }
 
-impl Into<GroupBuilder> for PredictedIncome {
-    // TODO - This somehow does not work
-    fn into(self) -> GroupBuilder {
-        GroupBuilder {
-            name: "Predicted Income".into(),
-            operand_factories: vec![Box::from(self)],
-        }
+impl GroupBuilder for PredictedIncome {
+    fn build(self, period_configuration: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Group, String> {
+        let mut group = Group::new("Predicted Income");
+        group.add_operands_through_builder(self, period_configuration, today, exchange_rates)?;
+        Ok(group)
     }
 }

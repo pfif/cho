@@ -26,11 +26,11 @@ pub fn remaining_operation() {
         let remaining_money = RemainingOperation::from_vault_values(
             arguments.include_predicted_income,
             &vault,
+            exchange_rates,
         )?;
 
         let screen = remaining_money.execute(
             &arguments.target_currency,
-            &exchange_rates,
         )?;
 
         Ok(formatting::format_remaining_operation_screen(&screen))

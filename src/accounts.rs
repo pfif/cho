@@ -1,5 +1,6 @@
 use std::fs::{read_dir, File};
 use chrono::NaiveDate;
+use derive_builder::Builder;
 #[cfg(test)]
 use mockall::automock;
 use rust_decimal::Decimal;
@@ -9,6 +10,7 @@ use crate::period::{Period, PeriodConfigurationVaultValue, PeriodsConfiguration}
 use crate::remaining_operation::amounts::Amount;
 use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
 use crate::remaining_operation::core_types::{GroupBuilder, Operand, OperandBuilder};
+use crate::remaining_operation::core_types::group::Group;
 use crate::remaining_operation::operand_builders::timeline::{TimelineOperandBuilder, TimelineOperandEnd};
 use crate::vault::Vault;
 
@@ -100,12 +102,13 @@ impl AccountGetter {
     }
 }
 
-impl Into<GroupBuilder> for AccountGetter {
-    fn into(self) -> GroupBuilder {
-        GroupBuilder{
-            name: "Accounts".into(),
-            operand_factories: self.accounts.into_iter().map(|account| Box::new(account) as Box<dyn OperandBuilder>).collect()
+impl GroupBuilder for AccountGetter {
+    fn build(self, period_configuration: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Group, String> {
+        let mut group = Group::new("Accounts");
+        for account in self.accounts {
+            group.add_operands_through_builder(account, period_configuration, today, exchange_rates)?
         }
+        Ok(group)
     }
 }
 
@@ -224,16 +227,27 @@ mod tests_get_accounts {
 }
 
 // JSON implementation
-#[derive(Deserialize, Hash, Eq, PartialEq, Debug)]
+#[derive(Deserialize, Hash, Eq, PartialEq, Debug, Clone)]
 pub struct AccountJson {
     name: String,
     currency: String,
     amounts: Vec<AmountListItem>,
 }
 
+#[cfg(test)]
+impl AccountJson {
+    pub(crate) fn new(name: String, currency: String, amounts: Vec<(NaiveDate, Figure)>) -> AccountJson {
+        AccountJson{
+            name,
+            currency,
+            amounts: amounts.into_iter().map(|(date, amount)| AmountListItem{date, amount}).collect()
+        }
+    }
+}
+
 // TODO - Unit tests for this
 impl OperandBuilder for AccountJson {
-    fn build(&self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
+    fn build(self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
         let current_period = period_config.period_for_date(today)?;
         let start_amount = self.amount_at(&current_period.start_date)?.into_remaining_module_amount(self.currency(), exchange_rates)?;
         let end_amount = self.amount_at(&current_period.end_date)?.into_remaining_module_amount(self.currency(), exchange_rates)?;
@@ -247,7 +261,7 @@ impl OperandBuilder for AccountJson {
     }
 }
 
-#[derive(Deserialize, Hash, Eq, PartialEq, Debug)]
+#[derive(Deserialize, Hash, Eq, PartialEq, Debug, Clone)]
 pub struct AmountListItem {
     date: NaiveDate,
     amount: Figure,

@@ -1,5 +1,6 @@
 use crate::{period::PeriodsConfiguration, vault::VaultReadable};
 use chrono::NaiveDate;
+use derive_builder::Builder;
 #[cfg(test)]
 use mockall::automock;
 use rust_decimal::Decimal;
@@ -8,6 +9,7 @@ use serde::Deserialize;
 use crate::period::{Period, PeriodConfigurationVaultValue};
 use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
 use crate::remaining_operation::core_types::{GroupBuilder, IllustrationValue, Operand, OperandBuilder};
+use crate::remaining_operation::core_types::group::Group;
 
 pub type Figure = Decimal;
 
@@ -17,17 +19,18 @@ impl VaultReadable for GoalVaultValues {
     const KEY: &'static str = "goals";
 }
 
-impl Into<GroupBuilder> for GoalVaultValues {
-    fn into(self) -> GroupBuilder {
-        GroupBuilder{
-            name: "Goals".into(),
-            operand_factories: self.into_iter().map(
-                |goal| Box::new(goal) as Box<dyn OperandBuilder>).collect()
+impl GroupBuilder for GoalVaultValues {
+    fn build(self, period_configuration: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Group, String> {
+        let mut group = Group::new("Goals");
+        for goal in self.into_iter(){
+            group.add_operands_through_builder(goal, period_configuration, today, exchange_rates)?
         }
+        Ok(group)
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
+#[derive(Builder)]
 pub struct GoalImplementation {
     name: String,
     currency: String,
@@ -144,14 +147,14 @@ impl<P: PeriodsConfiguration> Goal<P> for GoalImplementation {
 }
 
 impl OperandBuilder for GoalImplementation {
-    fn build(&self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
+    fn build(self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
         let to_pay_at_figure = self.to_pay_at(period_config, today)?;
         let to_pay_at_amount = exchange_rates.new_amount(&self.currency, to_pay_at_figure)?;
 
         let commited_amount = exchange_rates.new_amount(&self.currency, self.total_commited())?;
         let target_amount = exchange_rates.new_amount(&self.currency, self.target)?;
         Ok(Some(Operand{
-            name: self.name.clone(),
+            name: self.name,
             amount: to_pay_at_amount.clone(),
             illustration: vec![
                 ("Amount".into(), IllustrationValue::Amount(to_pay_at_amount)),

@@ -1,26 +1,28 @@
 use crate::vault::VaultReadable;
 use chrono::NaiveDate;
+use derive_builder::Builder;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::Deserialize;
 use crate::period::{PeriodConfigurationVaultValue, PeriodsConfiguration};
 use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
 use crate::remaining_operation::core_types::{GroupBuilder, IllustrationValue, Operand, OperandBuilder};
+use crate::remaining_operation::core_types::group::Group;
 
 pub type Figure = Decimal;
 pub type Currency = String;
 
-#[cfg_attr(test, derive(Clone))]
+#[cfg_attr(test, derive(Clone, Builder))]
 #[derive(Deserialize)]
 pub struct IgnoredTransaction {
-    pub name: String,
-    pub currency: Currency,
-    pub amount: Figure,
-    pub date: NaiveDate,
+    name: String,
+    currency: Currency,
+    amount: Figure,
+    date: NaiveDate,
 }
 
 impl OperandBuilder for IgnoredTransaction {
-    fn build(&self, period_configuration: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
+    fn build(self, period_configuration: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
         let current_period = period_configuration.period_for_date(today)?;
         if !current_period.contains(&self.date) {
            return Ok(None);
@@ -49,11 +51,12 @@ impl VaultReadable for IgnoredTransactionsVaultValues {
     const KEY: &'static str = "ignored_transactions";
 }
 
-impl Into<GroupBuilder> for IgnoredTransactionsVaultValues {
-    fn into(self) -> GroupBuilder {
-        GroupBuilder{
-            name: "Ignored transactions".to_string(),
-            operand_factories: self.into_iter().map(|ignored_transaction: IgnoredTransaction| Box::from(ignored_transaction) as Box<dyn OperandBuilder>).collect()
+impl GroupBuilder for IgnoredTransactionsVaultValues {
+    fn build(self, period_configuration: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Group, String> {
+        let mut group = Group::new("Ignored transaction");
+        for ignored_transaction in self.into_iter() {
+            group.add_operands_through_builder(ignored_transaction, &period_configuration, &today, &exchange_rates)?
         }
+        Ok(group)
     }
 }

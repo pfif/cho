@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use crate::remaining_operation::amounts::amount::ImmutableAmount;
 use rust_decimal::Decimal;
 use std::ops;
@@ -11,7 +11,7 @@ pub type Sign = String;
 //      remove the clone from here and use lifetimes.
 //      We shouldn't need more than one instance per currency
 //      Ian told me that Rc could be used for this use-case
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Currency {
     pub rate: Figure,
     pub sign: String,
@@ -22,6 +22,7 @@ pub mod exchange_rates {
     use crate::remaining_operation::amounts::amount::ImmutableAmount;
     use std::collections::HashMap;
 
+    #[derive(Clone)]
     pub struct ExchangeRates {
         currencies: HashMap<CurrencyIdent, Currency>,
     }
@@ -61,12 +62,26 @@ pub mod exchange_rates {
             })
         }
     }
+
+    #[cfg(test)]
+    impl ExchangeRates {
+        pub fn from_indent_rates_and_sign(rates: Vec<(CurrencyIdent, Figure, String)>) -> ExchangeRates {
+            let currencies: HashMap<CurrencyIdent, Currency> = rates
+                .into_iter()
+                .map(|(ident, rate, sign)| {
+                    (ident, Currency { rate, sign })
+                })
+                .collect();
+
+            ExchangeRates { currencies }
+        }
+    }
 }
 
 mod amount {
     use crate::remaining_operation::amounts::{Currency, Figure};
 
-    #[derive(Clone, Debug)]
+    #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct ImmutableAmount {
         currency: Currency,
         figure: Figure,
@@ -91,7 +106,7 @@ mod amount {
 }
 
 // Amount should be instantiated using the ExchangeRate object
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Amount {
     immutable_amount: ImmutableAmount,
 }
@@ -108,6 +123,12 @@ impl Amount {
 impl Display for Amount {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{}", self.immutable_amount.currency().sign, self.immutable_amount.figure())
+    }
+}
+
+impl Debug for Amount {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
     }
 }
 

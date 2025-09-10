@@ -17,7 +17,7 @@ pub struct TimelineOperandBuilder {
 impl OperandBuilder for TimelineOperandBuilder {
     // TODO this does not need to be a OperandBuilder anymore
     fn build(
-        &self,
+        self,
         period: &PeriodConfigurationVaultValue,
         today: &NaiveDate,
         exchange_rates: &ExchangeRates,
