@@ -9,7 +9,6 @@ use serde::Deserialize;
 use crate::period::{Period, PeriodConfigurationVaultValue};
 use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
 use crate::remaining_operation::core_types::{GroupBuilder, IllustrationValue, Operand, OperandBuilder};
-use crate::remaining_operation::core_types::group::Group;
 
 pub type Figure = Decimal;
 
@@ -19,13 +18,9 @@ impl VaultReadable for GoalVaultValues {
     const KEY: &'static str = "goals";
 }
 
-impl GroupBuilder for GoalVaultValues {
-    fn build(self, period_configuration: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Group, String> {
-        let mut group = Group::new("Goals");
-        for goal in self.into_iter(){
-            group.add_operands_through_builder(goal, period_configuration, today, exchange_rates)?
-        }
-        Ok(group)
+impl GroupBuilder<GoalImplementation> for GoalVaultValues {
+    fn build(self) -> Result<(String, Vec<GoalImplementation>), String> {
+        Ok(("Goals".into(), self.into_iter().collect()))
     }
 }
 
@@ -149,7 +144,26 @@ impl<P: PeriodsConfiguration> Goal<P> for GoalImplementation {
 impl OperandBuilder for GoalImplementation {
     fn build(self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
         let to_pay_at_figure = self.to_pay_at(period_config, today)?;
-        let to_pay_at_amount = exchange_rates.new_amount(&self.currency, to_pay_at_figure)?;
+        let (to_pay_at_figure, payed_in) = if to_pay_at_figure == dec!(0) {
+            let current_period = period_config.period_for_date(today)?;
+            (self.committed.iter().fold(
+                0.into(),
+                |acc, (date, amount)| {
+                    if date >= &current_period.start_date
+                        && date <= &current_period.end_date
+                    {
+                        acc + amount
+                    } else {
+                        acc
+                    }
+                },
+            ), true)
+        } else {
+            (to_pay_at_figure, false)
+        };
+
+        let zero = exchange_rates.new_amount(&self.currency, dec!(0))?;
+        let to_pay_at_amount = zero.sub(&exchange_rates.new_amount(&self.currency, to_pay_at_figure)?);
 
         let commited_amount = exchange_rates.new_amount(&self.currency, self.total_commited())?;
         let target_amount = exchange_rates.new_amount(&self.currency, self.target)?;
@@ -159,7 +173,7 @@ impl OperandBuilder for GoalImplementation {
             illustration: vec![
                 ("Amount".into(), IllustrationValue::Amount(to_pay_at_amount)),
                 ("Committed".into(), IllustrationValue::Amount(commited_amount)),
-                ("Payed in".into(), IllustrationValue::Bool(to_pay_at_figure == dec!(0))),
+                ("Payed in".into(), IllustrationValue::Bool(payed_in)),
                 ("Target".into(), IllustrationValue::Amount(target_amount)),
             ]
         }))

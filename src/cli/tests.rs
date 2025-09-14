@@ -5,25 +5,15 @@ mod format_remaining_operation_screen_tests {
     use rust_decimal_macros::dec;
     use crate::cli::formatting::format_remaining_operation_screen;
     use crate::period::Period;
+    use pretty_assertions::assert_eq;
     use crate::remaining_operation::amounts::{Amount, Currency};
+    use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
     use crate::remaining_operation::core_types::group::Group;
     use crate::remaining_operation::core_types::{Illustration, IllustrationValue, Operand, RemainingOperationScreen};
     
-    fn make_currency(sign: &str) -> Currency {
-        Currency {
-            rate: dec!(1),
-            sign: sign.into()
-        }
-    }
-    
-    fn make_amount(sign: &str, value: rust_decimal::Decimal) -> Amount {
-        let currency = make_currency(sign);
-        Amount::new_mock(&currency, value)
-    }
-    
-    fn make_operand(name: String, extra_column: bool) -> Operand {
-        let five = make_amount("CREDIT", dec!(5));
-        let six = make_amount("EURO", dec!(6));
+    fn make_operand(exchange_rates: &ExchangeRates, name: String, extra_column: bool) -> Operand {
+        let five = exchange_rates.new_amount(&"JPY".to_string(), dec!(5)).expect("Could create amount");
+        let six = exchange_rates.new_amount(&"EUR".to_string(), dec!(6)).expect("Could create amount");
         
         let mut illustration: Illustration = Vec::new();
         illustration.push(("First amount".into(), IllustrationValue::Amount(five.clone())));
@@ -51,40 +41,45 @@ mod format_remaining_operation_screen_tests {
     }
     impl TestTable {
         fn test(self) {
+            let exchange_rates = ExchangeRates::from_indent_and_rates(vec![
+                ("JPY".to_string(), dec!(1)),
+                ("EUR".to_string(), dec!(2))
+            ]).expect("Can create exchange rates");
+
             let mut groups = vec![];
             if self.include_empty_group {
-                let empty_group = Group::new("Empty".into());
-                groups.push(empty_group);
+                let empty_group = Group::new("Empty".into(), vec![]).expect("Could make group");
+                groups.push(empty_group.into_remaining_operation_screen_group(&exchange_rates, &"EUR".to_string()).expect("Could make group"));
             }
              
             if self.include_normal_group {
-                let mut normal_group = Group::new("Normal group".into());
-                normal_group.add_operands(make_operand("Payment for house".into(), false)).expect("Could add operand");
-                normal_group.add_operands(make_operand("Payment for dog".into(), false)).expect("Could add operand");
-                normal_group.add_operands(make_operand("Payment for cat".into(), false)).expect("Could add operand");
-                
-                groups.push(normal_group);
+                let normal_group = Group::new("Normal group".into(), vec![
+                    make_operand(&exchange_rates, "Payment for house".into(), false),
+                    make_operand(&exchange_rates, "Payment for dog".into(), false),
+                    make_operand(&exchange_rates, "Payment for cat".into(), false)
+                ]).expect("Could make group");
+                groups.push(normal_group.into_remaining_operation_screen_group(&exchange_rates, &"EUR".to_string()).expect("Could make group"));
             }
             
             if self.include_extra_column_group {
-                let mut extra_column_group = Group::new("Extra column group".into());
-                extra_column_group.add_operands(make_operand("Payment for Mr Spock".into(), true)).expect("Could add operand");
-                extra_column_group.add_operands(make_operand("Payment for Jean Luc".into(), true)).expect("Could add operand");
-                extra_column_group.add_operands(make_operand("Payment for Katherine".into(), true)).expect("Could add operand");
-                
-                groups.push(extra_column_group);
+                let extra_column_group = Group::new("Extra column group".into(), vec![
+                make_operand(&exchange_rates, "Payment for Mr Spock".into(), true),
+                make_operand(&exchange_rates, "Payment for Jean Luc".into(), true),
+                make_operand(&exchange_rates, "Payment for Katherine".into(), true)
+                ]).expect("Could make group");
+
+                groups.push(extra_column_group.into_remaining_operation_screen_group(&exchange_rates, &"EUR".to_string()).expect("Could make group"));
             }
             
             let screen = RemainingOperationScreen{
                 groups,
-                remaining: make_amount("EURO", dec!(100)),
+                remaining: exchange_rates.new_amount(&"EUR".to_string(), dec!(100)).expect("Could create amount"),
                 period: Period{
                     start_date: NaiveDate::from_ymd_opt(2025,1,1).unwrap(),
                     end_date: NaiveDate::from_ymd_opt(2025, 1, 31).unwrap()
                 },
             };
             
-            println!("{}", format_remaining_operation_screen(&screen));
             assert_eq!(format_remaining_operation_screen(&screen), self.expected_output)
         }
     }
@@ -107,11 +102,11 @@ Normal group
 +-------------------+--------------+---------------+-----------+-----------+
 | Name              | First amount | Second amount | Is enough | Is luxury |
 +==========================================================================+
-| Payment for house | CREDIT5      | EURO6         | ✅        |           |
+| Payment for house | ¥5           | €6            | ✅        |           |
 |-------------------+--------------+---------------+-----------+-----------|
-| Payment for dog   | CREDIT5      | EURO6         | ✅        |           |
+| Payment for dog   | ¥5           | €6            | ✅        |           |
 |-------------------+--------------+---------------+-----------+-----------|
-| Payment for cat   | CREDIT5      | EURO6         | ✅        |           |
+| Payment for cat   | ¥5           | €6            | ✅        |           |
 +-------------------+--------------+---------------+-----------+-----------+
 
 Extra column group
@@ -119,15 +114,15 @@ Extra column group
 +-----------------------+--------------+---------------+-----------+-----------+--------------+
 | Name                  | First amount | Second amount | Is enough | Is luxury | Extra column |
 +=============================================================================================+
-| Payment for Mr Spock  | CREDIT5      | EURO6         | ✅        |           | ✅           |
+| Payment for Mr Spock  | ¥5           | €6            | ✅        |           | ✅           |
 |-----------------------+--------------+---------------+-----------+-----------+--------------|
-| Payment for Jean Luc  | CREDIT5      | EURO6         | ✅        |           | ✅           |
+| Payment for Jean Luc  | ¥5           | €6            | ✅        |           | ✅           |
 |-----------------------+--------------+---------------+-----------+-----------+--------------|
-| Payment for Katherine | CREDIT5      | EURO6         | ✅        |           | ✅           |
+| Payment for Katherine | ¥5           | €6            | ✅        |           | ✅           |
 +-----------------------+--------------+---------------+-----------+-----------+--------------+
 
-Remaining this period: EURO100
-==============================
+Remaining this period: €100
+=============================
 
 Release: Development build"#.to_string(),
         }.test()

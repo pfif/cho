@@ -21,6 +21,7 @@ pub struct IgnoredTransaction {
     date: NaiveDate,
 }
 
+// TODO requires tests!!
 impl OperandBuilder for IgnoredTransaction {
     fn build(self, period_configuration: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
         let current_period = period_configuration.period_for_date(today)?;
@@ -29,7 +30,7 @@ impl OperandBuilder for IgnoredTransaction {
         };
         
         let amount = exchange_rates.new_amount(&self.currency, self.amount)?;
-        let (included, operand_amount) = if self.date >= *today {
+        let (included, operand_amount) = if self.date <= *today {
             (true, amount.clone())
         } else {
             (false, exchange_rates.new_amount(&self.currency, dec![0])?)
@@ -39,7 +40,7 @@ impl OperandBuilder for IgnoredTransaction {
             amount: operand_amount, 
             illustration: vec![
                 ("Amount".to_string(), IllustrationValue::Amount(amount)),
-                ("Included".to_string(), IllustrationValue::Bool(false)),
+                ("Included".to_string(), IllustrationValue::Bool(included)),
                 ("Date".to_string(), IllustrationValue::Date(self.date.clone()))
             ]
         }))
@@ -51,12 +52,8 @@ impl VaultReadable for IgnoredTransactionsVaultValues {
     const KEY: &'static str = "ignored_transactions";
 }
 
-impl GroupBuilder for IgnoredTransactionsVaultValues {
-    fn build(self, period_configuration: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Group, String> {
-        let mut group = Group::new("Ignored transaction");
-        for ignored_transaction in self.into_iter() {
-            group.add_operands_through_builder(ignored_transaction, &period_configuration, &today, &exchange_rates)?
-        }
-        Ok(group)
+impl GroupBuilder<IgnoredTransaction> for IgnoredTransactionsVaultValues {
+    fn build(self) -> Result<(String, Vec<IgnoredTransaction>), String> {
+        Ok(("Ignored Transactions".into(), self.into_iter().collect()))
     }
 }

@@ -102,13 +102,9 @@ impl AccountGetter {
     }
 }
 
-impl GroupBuilder for AccountGetter {
-    fn build(self, period_configuration: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Group, String> {
-        let mut group = Group::new("Accounts");
-        for account in self.accounts {
-            group.add_operands_through_builder(account, period_configuration, today, exchange_rates)?
-        }
-        Ok(group)
+impl GroupBuilder<AccountJson> for AccountGetter {
+    fn build(self) -> Result<(String, Vec<AccountJson>), String> {
+        Ok(("Accounts".into(), self.accounts))
     }
 }
 

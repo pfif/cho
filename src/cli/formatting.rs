@@ -8,16 +8,16 @@ pub fn format_remaining_operation_screen(screen: &RemainingOperationScreen) -> S
     ))];
 
     for group in screen.groups.iter() {
-        let group_title = title(group.name());
+        let group_title = title(&group.name);
         let content = if !group.empty() {
             let mut table = Table::new();
 
             // TODO - do we need a column that shows the number used for the math?
             let mut illustration_fields = vec![String::from("Name")];
-            illustration_fields.extend(group.illustration_fields());
+            illustration_fields.extend(group.illustration_fields.clone());
             table.set_header(illustration_fields);
 
-            for operand in group.operands() {
+            for operand in group.operands.iter() {
                 let mut illustration_values = vec![operand.name.clone()];
 
                 let raw_illustration_value = operand

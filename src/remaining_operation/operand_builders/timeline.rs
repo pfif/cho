@@ -27,7 +27,7 @@ impl OperandBuilder for TimelineOperandBuilder {
             TimelineOperandEnd::Predicted(amount) => (amount.clone(), true)
         };
 
-        let difference = &end_amount - &self.start_amount;
+        let difference = end_amount.sub(&self.start_amount);
 
         let mut illustration: Illustration = Vec::new();
         illustration.push(("Period start amount".into(), IllustrationValue::Amount(self.start_amount.clone())));

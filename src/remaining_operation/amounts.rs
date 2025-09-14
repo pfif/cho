@@ -151,10 +151,8 @@ impl Amount {
     }
 }
 
-impl ops::Add for &Amount {
-    type Output = Amount;
-
-    fn add(self, other_amount: Self) -> Self::Output {
+impl Amount {
+    pub fn add(&self, other_amount: &Amount) -> Amount {
         let other_amount_converted = other_amount.convert(self.immutable_amount.currency());
         let new_immutable_amount = ImmutableAmount::new(
             self.immutable_amount.currency(),
@@ -164,12 +162,8 @@ impl ops::Add for &Amount {
             immutable_amount: new_immutable_amount,
         }
     }
-}
 
-impl ops::Sub for &Amount {
-    type Output = Amount;
-
-    fn sub(self, other_amount: Self) -> Self::Output {
+    pub fn sub(&self, other_amount: &Amount) -> Amount {
         let other_amount_converted = other_amount.convert(self.immutable_amount.currency());
         let new_immutable_amount = ImmutableAmount::new(
             self.immutable_amount.currency(),

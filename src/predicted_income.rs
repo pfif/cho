@@ -28,17 +28,15 @@ impl OperandBuilder for PredictedIncome {
         illustration.push(("Amount".into(), IllustrationValue::Amount(amount.clone())));
 
         Ok(Some(Operand{
-            name: "Predicted income".to_string(),
+            name: "Predicted Income".to_string(),
             amount,
             illustration,
         }))
     }
 }
 
-impl GroupBuilder for PredictedIncome {
-    fn build(self, period_configuration: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Group, String> {
-        let mut group = Group::new("Predicted Income");
-        group.add_operands_through_builder(self, period_configuration, today, exchange_rates)?;
-        Ok(group)
+impl GroupBuilder<PredictedIncome> for PredictedIncome {
+    fn build(self) -> Result<(String, Vec<PredictedIncome>), String> {
+        Ok(("Predicted Income".into(), vec![self]))
     }
 }
