@@ -59,18 +59,18 @@ mod format_remaining_operation_screen_tests {
              
             if self.include_normal_group {
                 let mut normal_group = Group::new("Normal group".into());
-                normal_group.add_operands(make_operand("Payment for house".into(), false));
-                normal_group.add_operands(make_operand("Payment for dog".into(), false));
-                normal_group.add_operands(make_operand("Payment for cat".into(), false));
+                normal_group.add_operands(make_operand("Payment for house".into(), false)).expect("Could add operand");
+                normal_group.add_operands(make_operand("Payment for dog".into(), false)).expect("Could add operand");
+                normal_group.add_operands(make_operand("Payment for cat".into(), false)).expect("Could add operand");
                 
                 groups.push(normal_group);
             }
             
             if self.include_extra_column_group {
                 let mut extra_column_group = Group::new("Extra column group".into());
-                extra_column_group.add_operands(make_operand("Payment for Mr Spock".into(), true));
-                extra_column_group.add_operands(make_operand("Payment for Jean Luc".into(), true));
-                extra_column_group.add_operands(make_operand("Payment for Katherine".into(), true));
+                extra_column_group.add_operands(make_operand("Payment for Mr Spock".into(), true)).expect("Could add operand");
+                extra_column_group.add_operands(make_operand("Payment for Jean Luc".into(), true)).expect("Could add operand");
+                extra_column_group.add_operands(make_operand("Payment for Katherine".into(), true)).expect("Could add operand");
                 
                 groups.push(extra_column_group);
             }
@@ -84,6 +84,7 @@ mod format_remaining_operation_screen_tests {
                 },
             };
             
+            println!("{}", format_remaining_operation_screen(&screen));
             assert_eq!(format_remaining_operation_screen(&screen), self.expected_output)
         }
     }
@@ -99,33 +100,36 @@ mod format_remaining_operation_screen_tests {
 
 Empty
 =====
-+------+
-| Name |
-+======+
-+------+
+No operands for this period
 
 Normal group
 ============
-+-----------------+--------------+---------------+-----------+-----------+
-| Name            | First amount | Second amount | Is enough | Is luxury |
-+========================================================================+
-| Payment for dog | CREDIT5      | EURO6         | ✅        |           |
-|-----------------+--------------+---------------+-----------+-----------|
-| Payment for cat | CREDIT5      | EURO6         | ✅        |           |
-+-----------------+--------------+---------------+-----------+-----------+
++-------------------+--------------+---------------+-----------+-----------+
+| Name              | First amount | Second amount | Is enough | Is luxury |
++==========================================================================+
+| Payment for house | CREDIT5      | EURO6         | ✅        |           |
+|-------------------+--------------+---------------+-----------+-----------|
+| Payment for dog   | CREDIT5      | EURO6         | ✅        |           |
+|-------------------+--------------+---------------+-----------+-----------|
+| Payment for cat   | CREDIT5      | EURO6         | ✅        |           |
++-------------------+--------------+---------------+-----------+-----------+
 
 Extra column group
 ==================
 +-----------------------+--------------+---------------+-----------+-----------+--------------+
 | Name                  | First amount | Second amount | Is enough | Is luxury | Extra column |
 +=============================================================================================+
+| Payment for Mr Spock  | CREDIT5      | EURO6         | ✅        |           | ✅           |
+|-----------------------+--------------+---------------+-----------+-----------+--------------|
 | Payment for Jean Luc  | CREDIT5      | EURO6         | ✅        |           | ✅           |
 |-----------------------+--------------+---------------+-----------+-----------+--------------|
 | Payment for Katherine | CREDIT5      | EURO6         | ✅        |           | ✅           |
 +-----------------------+--------------+---------------+-----------+-----------+--------------+
 
 Remaining this period: EURO100
-=============================="#.to_string(),
+==============================
+
+Release: Development build"#.to_string(),
         }.test()
     }
 }
