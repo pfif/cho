@@ -1,1 +1,6 @@
-TODO SWITCH ENTIRE APP TO USE rust_decimal
+TODO switch entire app to use rust_decimal
+
+To install:
+```bash
+cargo install --path .
+```
