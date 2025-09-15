@@ -23,14 +23,12 @@ impl VaultReadable for PredictedIncome {
 impl OperandBuilder for PredictedIncome {
     fn build(self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
         // TODO - This illustration might be best as a default illustration?
-        let mut illustration = Vec::new();
         let amount = exchange_rates.new_amount(&self.currency, self.figure)?;
-        illustration.push(("Amount".into(), IllustrationValue::Amount(amount.clone())));
 
         Ok(Some(Operand{
             name: "Predicted Income".to_string(),
             amount,
-            illustration,
+            illustration: Vec::new(),
         }))
     }
 }

@@ -169,9 +169,8 @@ impl OperandBuilder for GoalImplementation {
         let target_amount = exchange_rates.new_amount(&self.currency, self.target)?;
         Ok(Some(Operand{
             name: self.name,
-            amount: to_pay_at_amount.clone(),
+            amount: to_pay_at_amount,
             illustration: vec![
-                ("Amount".into(), IllustrationValue::Amount(to_pay_at_amount)),
                 ("Committed".into(), IllustrationValue::Amount(commited_amount)),
                 ("Payed in".into(), IllustrationValue::Bool(payed_in)),
                 ("Target".into(), IllustrationValue::Amount(target_amount)),

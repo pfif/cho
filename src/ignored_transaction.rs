@@ -39,7 +39,6 @@ impl OperandBuilder for IgnoredTransaction {
             name: self.name.clone(),
             amount: operand_amount, 
             illustration: vec![
-                ("Amount".to_string(), IllustrationValue::Amount(amount)),
                 ("Included".to_string(), IllustrationValue::Bool(included)),
                 ("Date".to_string(), IllustrationValue::Date(self.date.clone()))
             ]

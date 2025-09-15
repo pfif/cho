@@ -1,5 +1,6 @@
 use crate::remaining_operation::core_types::{IllustrationValue, RemainingOperationScreen};
 use comfy_table::Table;
+use serde_json::to_string;
 
 pub fn format_remaining_operation_screen(screen: &RemainingOperationScreen) -> String {
     let mut components = vec![title(&format!(
@@ -12,13 +13,18 @@ pub fn format_remaining_operation_screen(screen: &RemainingOperationScreen) -> S
         let content = if !group.empty() {
             let mut table = Table::new();
 
-            // TODO - do we need a column that shows the number used for the math?
-            let mut illustration_fields = vec![String::from("Name")];
+            let mut illustration_fields = vec![
+                String::from("Name"),
+                String::from("Amount")
+            ];
             illustration_fields.extend(group.illustration_fields.clone());
             table.set_header(illustration_fields);
 
             for operand in group.operands.iter() {
-                let mut illustration_values = vec![operand.name.clone()];
+                let mut illustration_values = vec![
+                    operand.name.clone(),
+                    operand.amount.to_string()
+                ];
 
                 let raw_illustration_value = operand
                     .illustration
@@ -26,7 +32,7 @@ pub fn format_remaining_operation_screen(screen: &RemainingOperationScreen) -> S
                     .into_iter()
                     .map(|(_, value)| value)
                     .map(|illustration_value| match illustration_value {
-                        IllustrationValue::Amount(amount) => format!("{}", amount),
+                        IllustrationValue::Amount(amount) => amount.to_string(),
                         IllustrationValue::Bool(bool) => (if bool { "✅" } else { "" }).into(),
                         IllustrationValue::Date(date) => date.to_string(),
                     });
@@ -34,6 +40,14 @@ pub fn format_remaining_operation_screen(screen: &RemainingOperationScreen) -> S
                 illustration_values.extend(raw_illustration_value);
                 table.add_row(illustration_values);
             }
+            
+            let mut total_row = vec![
+                "Total".to_string(),
+                group.total.to_string()
+            ];
+            total_row.extend(group.illustration_fields.iter().map(|_| "".to_string()));
+            table.add_row(total_row);
+            
             table.to_string()
         } else {
             "No operands for this period".to_string()
