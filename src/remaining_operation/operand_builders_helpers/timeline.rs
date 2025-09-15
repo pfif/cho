@@ -9,18 +9,14 @@ pub enum TimelineOperandEnd {
     Predicted(Amount),
 }
 
-pub struct TimelineOperandBuilder {
+pub struct TimelineOperandBuilderHelper {
     pub name: String,
     pub start_amount: Amount,
     pub wrapper_end_amount: TimelineOperandEnd,
 }
-impl OperandBuilder for TimelineOperandBuilder {
-    // TODO this does not need to be a OperandBuilder anymore
-    fn build(
+impl TimelineOperandBuilderHelper {
+    pub fn build(
         self,
-        period: &PeriodConfigurationVaultValue,
-        today: &NaiveDate,
-        exchange_rates: &ExchangeRates,
     ) -> Result<Option<Operand>, String> {
         let (end_amount, predicted) = match &self.wrapper_end_amount {
             TimelineOperandEnd::Current(amount) => (amount.clone(), false),

@@ -11,7 +11,7 @@ use crate::remaining_operation::amounts::Amount;
 use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
 use crate::remaining_operation::core_types::{GroupBuilder, Operand, OperandBuilder};
 use crate::remaining_operation::core_types::group::Group;
-use crate::remaining_operation::operand_builders::timeline::{TimelineOperandBuilder, TimelineOperandEnd};
+use crate::remaining_operation::operand_builders_helpers::timeline::{TimelineOperandBuilderHelper, TimelineOperandEnd};
 use crate::vault::Vault;
 
 // Public traits
@@ -248,12 +248,12 @@ impl OperandBuilder for AccountJson {
         let start_amount = self.amount_at(&current_period.start_date)?.into_remaining_module_amount(self.currency(), exchange_rates)?;
         let end_amount = self.amount_at(&current_period.end_date)?.into_remaining_module_amount(self.currency(), exchange_rates)?;
 
-        let builder = TimelineOperandBuilder{
+        let builder = TimelineOperandBuilderHelper {
             name: self.name.clone(),
             start_amount,
             wrapper_end_amount: TimelineOperandEnd::Current(end_amount)
         };
-        builder.build(period_config, today, exchange_rates)
+        builder.build()
     }
 }
 

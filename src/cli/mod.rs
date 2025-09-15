@@ -22,7 +22,6 @@ pub fn remaining_operation() {
 
         let exchange_rates = ExchangeRates::from_indent_and_rates(arguments.exchange_rates)?;
 
-        // TODO call from vault value from the new module...
         let remaining_money = RemainingOperation::from_vault_values(
             arguments.include_predicted_income,
             &vault,
