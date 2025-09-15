@@ -139,7 +139,6 @@ pub mod group {
     use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
     use super::{GroupBuilder, Operand, OperandBuilder, RemainingOperationScreenGroup};
 
-    /* TODO - we're also not returning the total of each group */
     #[derive(Clone, PartialEq, Eq, Debug)]
     pub struct Group {
         name: String,
@@ -202,9 +201,6 @@ pub mod group {
         }
 
         pub fn name(&self) -> &String { &self.name }
-        // TODO - Not a fan that, if there is a bug in `add_operands`, operands could be returned
-        //        with an irregular number of column, or with column not matching the illustration
-        //        fields
         pub fn operands(&self) -> &Vec<Operand> {
             &self.operands
         }
