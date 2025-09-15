@@ -8,33 +8,33 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
-pub enum PeriodVaultValues {
+pub enum PeriodConfigurationVaultValue {
     #[serde(rename = "fixed_length")]
     FixedLength(FixedLengthPeriodConfiguration),
     #[serde(rename = "monthly")]
     CalendarMonth(CalendarMonthPeriodConfiguration),
 }
 
-impl VaultReadable for PeriodVaultValues {
+impl VaultReadable for PeriodConfigurationVaultValue {
     const KEY: &'static str = "periods_configuration";
 }
 
-impl PeriodVaultValues {
+impl PeriodConfigurationVaultValue {
     fn unpack(&self) -> &dyn PeriodsConfiguration {
         match self {
-            PeriodVaultValues::FixedLength(p) => p,
-            PeriodVaultValues::CalendarMonth(p) => p,
+            PeriodConfigurationVaultValue::FixedLength(p) => p,
+            PeriodConfigurationVaultValue::CalendarMonth(p) => p,
         }
     }
 }
 
-impl PeriodsConfiguration for PeriodVaultValues {
+impl PeriodsConfiguration for PeriodConfigurationVaultValue {
     fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String> {
-        return self.unpack().period_for_date(date);
+        self.unpack().period_for_date(date)
     }
 
     fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, String> {
-        return self.unpack().periods_between(start, end);
+        self.unpack().periods_between(start, end)
     }
 }
 
@@ -47,4 +47,10 @@ pub trait PeriodsConfiguration {
 pub struct Period {
     pub start_date: NaiveDate,
     pub end_date: NaiveDate,
+}
+
+impl Period {
+    pub fn contains(&self, date: &NaiveDate) -> bool {
+        self.start_date <= *date && *date <= self.end_date
+    }
 }

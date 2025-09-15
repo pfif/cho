@@ -1,11 +1,17 @@
 use std::fs::{read_dir, File};
-
 use chrono::NaiveDate;
+use derive_builder::Builder;
 #[cfg(test)]
 use mockall::automock;
+use rust_decimal::Decimal;
 use serde::Deserialize;
 use serde_json::from_reader;
-
+use crate::period::{Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
+use crate::remaining_operation::amounts::Amount;
+use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
+use crate::remaining_operation::core_types::{GroupBuilder, Operand, OperandBuilder};
+use crate::remaining_operation::core_types::group::Group;
+use crate::remaining_operation::operand_builders_helpers::timeline::{TimelineOperandBuilderHelper, TimelineOperandEnd};
 use crate::vault::Vault;
 
 // Public traits
@@ -18,6 +24,13 @@ pub struct FoundAmount {
     pub estimated: bool,
 }
 
+impl FoundAmount {
+    // TODO Rename to "into amount" once the entire codebase has adopted the amount module
+    fn into_remaining_module_amount(self, currency: &String, exchange_rates: &ExchangeRates) -> Result<Amount, String> {
+        exchange_rates.new_amount(currency, Decimal::from(self.figure))
+    }
+}
+
 #[cfg_attr(test, automock)]
 pub trait QueriableAccount {
     fn amount_at(&self, date: &NaiveDate) -> Result<FoundAmount, String>;
@@ -25,54 +38,70 @@ pub trait QueriableAccount {
     fn currency(&self) -> &String;
 }
 
-// Finder
-pub fn get_accounts<V: Vault>(vault: &V) -> Result<Vec<AccountJson>, String> {
-    let directory = vault.path();
-    let dir_reader = match read_dir(directory.join(ACCOUNT_DIR)) {
-        Err(why) => {
-            return Err("Could not read the Accounts directory: ".to_string() + &why.to_string())
-        }
-        Ok(reader) => reader,
-    };
 
-    let mut accounts: Vec<AccountJson> = Vec::new();
+pub struct AccountGetter{
+    accounts: Vec<AccountJson>
+}
 
-    for maybe_dir_entry in dir_reader {
-        let dir_entry =
-            maybe_dir_entry.map_err(|why| return format!("Could not read file: {}", why))?;
-
-        let path = dir_entry.path();
-        let path_str = if let Some(s) = &(path).to_str() {
-            s
-        } else {
-            "(unable to get filename)"
+impl AccountGetter {
+    // TODO - This should read the account from the Vault, otherwise this is breaking the abstraction of
+    //        however we choose to store "state". We assume it is always through a file
+    pub fn from_vault<V: Vault>(vault: &V) -> Result<AccountGetter, String>{
+        let directory = vault.path();
+        let dir_reader = match read_dir(directory.join(ACCOUNT_DIR)) {
+            Err(why) => {
+                return Err("Could not read the Accounts directory: ".to_string() + &why.to_string())
+            }
+            Ok(reader) => reader,
         };
 
-        let file_type = dir_entry.file_type().map_err(|why| {
-            return format!("Could not read the file type of {}: {}", path_str, why);
-        })?;
+        let mut accounts: Vec<AccountJson> = Vec::new();
 
-        if file_type.is_file() {
-            let file = match File::open(&path) {
-                Err(why) => return Err(format!("Could not read file {}: {}", path_str, why)),
-                Ok(file) => file,
+        for maybe_dir_entry in dir_reader {
+            let dir_entry =
+                maybe_dir_entry.map_err(|why| return format!("Could not read file: {}", why))?;
+
+            let path = dir_entry.path();
+            let path_str = if let Some(s) = &(path).to_str() {
+                s
+            } else {
+                "(unable to get filename)"
             };
 
-            let account: AccountJson = match from_reader(file) {
-                Err(why) => {
-                    return Err(format!(
-                        "Could not parse account for file {}: {}",
-                        path_str, why
-                    ))
-                }
-                Ok(file) => file,
-            };
+            let file_type = dir_entry.file_type().map_err(|why| {
+                return format!("Could not read the file type of {}: {}", path_str, why);
+            })?;
 
-            accounts.push(account);
+            if file_type.is_file() {
+                let file = match File::open(&path) {
+                    Err(why) => return Err(format!("Could not read file {}: {}", path_str, why)),
+                    Ok(file) => file,
+                };
+
+                let account: AccountJson = match from_reader(file) {
+                    Err(why) => {
+                        return Err(format!(
+                            "Could not parse account for file {}: {}",
+                            path_str, why
+                        ))
+                    }
+                    Ok(file) => file,
+                };
+
+                accounts.push(account);
+            }
         }
-    }
 
-    return Ok(accounts);
+        Ok(AccountGetter{
+            accounts: accounts
+        })
+    }
+}
+
+impl GroupBuilder<AccountJson> for AccountGetter {
+    fn build(self) -> Result<(String, Vec<AccountJson>), String> {
+        Ok(("Accounts".into(), self.accounts))
+    }
 }
 
 #[allow(non_snake_case)]
@@ -85,7 +114,7 @@ mod tests_get_accounts {
     use std::path::{Path, PathBuf};
     use tempfile::{tempdir, TempDir};
 
-    use crate::accounts::{get_accounts, AccountJson, AmountListItem, ACCOUNT_DIR};
+    use crate::accounts::{AccountGetter, AccountJson, AmountListItem, ACCOUNT_DIR};
     use crate::vault::Vault;
 
     struct MockVault {
@@ -183,21 +212,48 @@ mod tests_get_accounts {
         };
 
         assert_eq!(
-            HashSet::from_iter(get_accounts(&vault).unwrap()),
+            HashSet::from_iter(AccountGetter::from_vault(&vault).unwrap().accounts),
             expected_accounts
         )
     }
 }
 
 // JSON implementation
-#[derive(Deserialize, Hash, Eq, PartialEq, Debug)]
+#[derive(Deserialize, Hash, Eq, PartialEq, Debug, Clone)]
 pub struct AccountJson {
     name: String,
     currency: String,
     amounts: Vec<AmountListItem>,
 }
 
-#[derive(Deserialize, Hash, Eq, PartialEq, Debug)]
+#[cfg(test)]
+impl AccountJson {
+    pub(crate) fn new(name: String, currency: String, amounts: Vec<(NaiveDate, Figure)>) -> AccountJson {
+        AccountJson{
+            name,
+            currency,
+            amounts: amounts.into_iter().map(|(date, amount)| AmountListItem{date, amount}).collect()
+        }
+    }
+}
+
+// TODO - Unit tests for this
+impl OperandBuilder for AccountJson {
+    fn build(self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
+        let current_period = period_config.period_for_date(today)?;
+        let start_amount = self.amount_at(&current_period.start_date)?.into_remaining_module_amount(self.currency(), exchange_rates)?;
+        let end_amount = self.amount_at(&current_period.end_date)?.into_remaining_module_amount(self.currency(), exchange_rates)?;
+
+        let builder = TimelineOperandBuilderHelper {
+            name: self.name.clone(),
+            start_amount,
+            wrapper_end_amount: TimelineOperandEnd::Current(end_amount)
+        };
+        builder.build()
+    }
+}
+
+#[derive(Deserialize, Hash, Eq, PartialEq, Debug, Clone)]
 pub struct AmountListItem {
     date: NaiveDate,
     amount: Figure,
