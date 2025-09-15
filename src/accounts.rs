@@ -25,7 +25,7 @@ pub struct FoundAmount {
 }
 
 impl FoundAmount {
-    // TODO This method is terribly named, but its need will be gone once we align the codebase to use Amount everywhere.
+    // TODO Renme to "into amount" once the entire codebase has adopted the amount module
     fn into_remaining_module_amount(self, currency: &String, exchange_rates: &ExchangeRates) -> Result<Amount, String> {
         exchange_rates.new_amount(currency, Decimal::from(self.figure))
     }
@@ -40,7 +40,7 @@ pub trait QueriableAccount {
 
 
 // TODO - This should read the account from the Vault, otherwise this is breaking the abstraction of
-//        however we choose to store "state"
+//        however we choose to store "state". We assume it is always through a file
 pub fn get_accounts<V: Vault>(vault: &V) -> Result<Vec<AccountJson>, String> {
     let directory = vault.path();
     let dir_reader = match read_dir(directory.join(ACCOUNT_DIR)) {
