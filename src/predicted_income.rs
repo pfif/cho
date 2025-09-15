@@ -22,7 +22,6 @@ impl VaultReadable for PredictedIncome {
 
 impl OperandBuilder for PredictedIncome {
     fn build(self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
-        // TODO - This illustration might be best as a default illustration?
         let amount = exchange_rates.new_amount(&self.currency, self.figure)?;
 
         Ok(Some(Operand{
