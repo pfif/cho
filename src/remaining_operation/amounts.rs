@@ -111,15 +111,6 @@ pub struct Amount {
     immutable_amount: ImmutableAmount,
 }
 
-#[cfg(test)]
-impl Amount {
-    pub(crate) fn new_mock(currency: &Currency, figure: Figure) -> Amount {
-        Amount {
-            immutable_amount: ImmutableAmount::new(currency, figure),
-        }
-    } 
-}
-
 impl Display for Amount {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{}", self.immutable_amount.currency().sign, self.immutable_amount.figure())
