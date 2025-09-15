@@ -1,9 +1,10 @@
 use chrono::NaiveDate;
+use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::Deserialize;
 use crate::amounts::{Amount, RawAmount};
 use crate::amounts::exchange_rates::ExchangeRates;
-use crate::period::{Period, PeriodConfigurationVaultValue};
+use crate::period::{Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
 use crate::remaining_operation::core_types::{Operand, OperandBuilder};
 use crate::vault::VaultReadable;
 
@@ -36,18 +37,23 @@ pub struct BucketThisPeriod {
 }
 
 impl Bucket {
-   fn for_period(&self, period: &Period, ex: &ExchangeRates) -> Result<BucketThisPeriod, String> {
-       let (target_amount, _) = self.lines
+   fn for_period(&self, period_config: &PeriodConfigurationVaultValue, date: &NaiveDate, ex: &ExchangeRates) -> Result<BucketThisPeriod, String> {
+       let (target_amount, target_date) = self.lines
            .iter()
            .find_map(|(_, line)| match line {
                Line::SetTarget{amount, target_date} => Some((amount, target_date)),
                _ => None
            })
            .ok_or("No target for bucket".to_string())?;
+       
+       let recommended_deposit_figure = ex.new_amount(
+           &target_amount.currency,
+           target_amount.figure / &Decimal::from(period_config.periods_between(date, target_date)?)
+       )?;
    
         Ok(BucketThisPeriod{
-            changed: target_amount.to_amount(ex)?,
-            current_recommended_deposit: target_amount.to_amount(ex)?,
+            changed: recommended_deposit_figure.clone(),
+            current_recommended_deposit: recommended_deposit_figure.clone(),
         }) 
    }
 }
@@ -76,8 +82,6 @@ mod test {
     - test__for_period__no_lines
 
     - test__for_period__current_target_last_period
-    - test__for_period__current_target_next_period
-    - test__for_period__current_target_next_next_period
 
     - test__for_period__yen__one_deposit_this_period
     - test__for_period__yen__one_deposit_last_period
@@ -131,6 +135,7 @@ mod test {
     - target: no target this period / some target this period / two target this period
     - current target: last period / this period / next period / period after next
      */
+    use derive_builder::Builder;
     use pretty_assertions::assert_eq;
     use crate::period::{CalendarMonthPeriodConfiguration, PeriodsConfiguration};
     use super::*;
@@ -138,44 +143,95 @@ mod test {
     fn mkdate(month: u32, date: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(2025, month, date).expect("Can create date")
     }
+    
+    type TestResult = Result<BucketThisPeriod, String>;
+    type ExpectedFn = Box<dyn Fn(&ExchangeRates) -> TestResult>;
+    
+    struct Test {
+        lines: Vec<(NaiveDate, Line)>,
+        expected: ExpectedFn
+    }
+
+    impl Default for Test {
+        fn default() -> Self {
+            Test{
+                lines: Vec::new(),
+                expected: Box::new(|_| Err("Please setup the test".to_string()))
+            }
+        }
+    }
+
+    impl Test {
+        pub fn add_line(mut self, line: (NaiveDate, Line)) -> Self {
+            self.lines.push(line);
+            self
+        }
+
+        pub fn expect_error(mut self, error: &str) -> Self {
+            let error_string = error.to_string();
+            self.expected = Box::new(move |_| Err(error_string.clone()));
+            self
+        }
+        
+        pub fn expect_bucket(mut self, bucket_fn: impl Fn(&ExchangeRates) -> BucketThisPeriod + 'static) -> Self {
+            self.expected = Box::new(move |ex| Ok(bucket_fn(ex)));
+            self
+        }
+    }
+
+    impl Test {
+        fn execute(self) -> () {
+            let ex = ExchangeRates::for_tests();
+            let period_configuration = PeriodConfigurationVaultValue::CalendarMonth(CalendarMonthPeriodConfiguration {});
+            let today = mkdate(9, 15);
+            
+            let bucket = Bucket { lines: self.lines };
+            
+            assert_eq!(
+                bucket.for_period(&period_configuration, &today, &ex),
+                (self.expected)(&ex)
+            );
+        }
+    }
 
     #[test]
     fn test__for_period__period_change__yen__one_deposit_this_period__no_target() {
-        let ex = ExchangeRates::for_tests();
-        let period_configuration = PeriodConfigurationVaultValue::CalendarMonth(CalendarMonthPeriodConfiguration {});
-        let today = mkdate(9, 15);
-        let period = period_configuration.period_for_date(&today).expect("can create period");
-
-        let bucket = Bucket { lines:
-        vec![
-            (today.clone(), Line::Deposit(RawAmount::yen("10000")))
-        ] };
-
-        assert_eq!(
-            bucket.for_period(&period, &ex),
-            Err("No target for bucket".into())
-        )
+        Test::default()
+            .add_line((mkdate(9, 15), Line::Deposit(RawAmount::yen("10000"))))
+            .expect_error("No target for bucket")
+            .execute()
     }
 
     #[test]
     fn test__for_period__current_target_this_period() {
-        let ex = ExchangeRates::for_tests();
-        let period_configuration = PeriodConfigurationVaultValue::CalendarMonth(CalendarMonthPeriodConfiguration {});
-        let today = NaiveDate::from_ymd_opt(2025, 9, 15).expect("can create date");
-        let period = period_configuration.period_for_date(&today).expect("can create period");
-
-        let bucket = Bucket { lines: vec![
-            (today.clone(), Line::SetTarget{amount: RawAmount::yen("100000"), target_date: mkdate(9, 30)})
-        ] };
-
-        assert_eq!(
-            bucket.for_period(&period, &ex),
-            Ok(
-                BucketThisPeriod{
-                    changed: ex.yen("100000"),
-                    current_recommended_deposit: ex.yen("100000")
-                }
-            )
-        )
+        Test::default()
+            .add_line((mkdate(9, 15), Line::SetTarget{amount: RawAmount::yen("100000"), target_date: mkdate(9, 30)}))
+            .expect_bucket(|ex| BucketThisPeriod {
+                changed: ex.yen("100000"),
+                current_recommended_deposit: ex.yen("100000")
+            })
+            .execute()
+    }
+    
+    #[test]
+    fn test__for_period__current_target_next_period() {
+        Test::default()
+            .add_line((mkdate(9, 15), Line::SetTarget{amount: RawAmount::yen("100000"), target_date: mkdate(10, 31)}))
+            .expect_bucket(|ex| BucketThisPeriod {
+                changed: ex.yen("50000"),
+                current_recommended_deposit: ex.yen("50000")
+            })
+            .execute()
+    }
+    
+    #[test]
+    fn test__for_period__current_target_next_next_period() {
+        Test::default()
+            .add_line((mkdate(9, 15), Line::SetTarget{amount: RawAmount::yen("100000"), target_date: mkdate(11, 30)}))
+            .expect_bucket(|ex| BucketThisPeriod {
+                changed: ex.yen("33333.33"),
+                current_recommended_deposit: ex.yen("33333.33")
+            })
+            .execute()
     }
 }

@@ -181,8 +181,8 @@ impl Amount {
 
 #[derive(Deserialize)]
 pub struct RawAmount {
-    currency: CurrencyIdent,
-    figure: Figure,
+    pub currency: CurrencyIdent,
+    pub figure: Figure,
 }
 
 impl RawAmount {
