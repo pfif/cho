@@ -39,65 +39,61 @@ pub trait QueriableAccount {
 }
 
 
-// TODO - This should read the account from the Vault, otherwise this is breaking the abstraction of
-//        however we choose to store "state". We assume it is always through a file
-pub fn get_accounts<V: Vault>(vault: &V) -> Result<Vec<AccountJson>, String> {
-    let directory = vault.path();
-    let dir_reader = match read_dir(directory.join(ACCOUNT_DIR)) {
-        Err(why) => {
-            return Err("Could not read the Accounts directory: ".to_string() + &why.to_string())
-        }
-        Ok(reader) => reader,
-    };
-
-    let mut accounts: Vec<AccountJson> = Vec::new();
-
-    for maybe_dir_entry in dir_reader {
-        let dir_entry =
-            maybe_dir_entry.map_err(|why| return format!("Could not read file: {}", why))?;
-
-        let path = dir_entry.path();
-        let path_str = if let Some(s) = &(path).to_str() {
-            s
-        } else {
-            "(unable to get filename)"
-        };
-
-        let file_type = dir_entry.file_type().map_err(|why| {
-            return format!("Could not read the file type of {}: {}", path_str, why);
-        })?;
-
-        if file_type.is_file() {
-            let file = match File::open(&path) {
-                Err(why) => return Err(format!("Could not read file {}: {}", path_str, why)),
-                Ok(file) => file,
-            };
-
-            let account: AccountJson = match from_reader(file) {
-                Err(why) => {
-                    return Err(format!(
-                        "Could not parse account for file {}: {}",
-                        path_str, why
-                    ))
-                }
-                Ok(file) => file,
-            };
-
-            accounts.push(account);
-        }
-    }
-
-    return Ok(accounts);
-}
-
 pub struct AccountGetter{
     accounts: Vec<AccountJson>
 }
 
 impl AccountGetter {
-    pub fn from_files<V: Vault>(vault: &V) -> Result<AccountGetter, String>{
+    // TODO - This should read the account from the Vault, otherwise this is breaking the abstraction of
+    //        however we choose to store "state". We assume it is always through a file
+    pub fn from_vault<V: Vault>(vault: &V) -> Result<AccountGetter, String>{
+        let directory = vault.path();
+        let dir_reader = match read_dir(directory.join(ACCOUNT_DIR)) {
+            Err(why) => {
+                return Err("Could not read the Accounts directory: ".to_string() + &why.to_string())
+            }
+            Ok(reader) => reader,
+        };
+
+        let mut accounts: Vec<AccountJson> = Vec::new();
+
+        for maybe_dir_entry in dir_reader {
+            let dir_entry =
+                maybe_dir_entry.map_err(|why| return format!("Could not read file: {}", why))?;
+
+            let path = dir_entry.path();
+            let path_str = if let Some(s) = &(path).to_str() {
+                s
+            } else {
+                "(unable to get filename)"
+            };
+
+            let file_type = dir_entry.file_type().map_err(|why| {
+                return format!("Could not read the file type of {}: {}", path_str, why);
+            })?;
+
+            if file_type.is_file() {
+                let file = match File::open(&path) {
+                    Err(why) => return Err(format!("Could not read file {}: {}", path_str, why)),
+                    Ok(file) => file,
+                };
+
+                let account: AccountJson = match from_reader(file) {
+                    Err(why) => {
+                        return Err(format!(
+                            "Could not parse account for file {}: {}",
+                            path_str, why
+                        ))
+                    }
+                    Ok(file) => file,
+                };
+
+                accounts.push(account);
+            }
+        }
+
         Ok(AccountGetter{
-            accounts: get_accounts(vault)?
+            accounts: accounts
         })
     }
 }
@@ -118,7 +114,7 @@ mod tests_get_accounts {
     use std::path::{Path, PathBuf};
     use tempfile::{tempdir, TempDir};
 
-    use crate::accounts::{get_accounts, AccountJson, AmountListItem, ACCOUNT_DIR};
+    use crate::accounts::{AccountGetter, AccountJson, AmountListItem, ACCOUNT_DIR};
     use crate::vault::Vault;
 
     struct MockVault {
@@ -216,7 +212,7 @@ mod tests_get_accounts {
         };
 
         assert_eq!(
-            HashSet::from_iter(get_accounts(&vault).unwrap()),
+            HashSet::from_iter(AccountGetter::from_vault(&vault).unwrap().accounts),
             expected_accounts
         )
     }

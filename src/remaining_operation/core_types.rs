@@ -41,7 +41,7 @@ impl RemainingOperation {
             Local::now().date_naive(),
             exchange_rates,
         );
-        operation.add_group(AccountGetter::from_files(vault)?)?;
+        operation.add_group(AccountGetter::from_vault(vault)?)?;
         operation.add_group(GoalVaultValues::from_vault(vault)?)?;
         operation.add_group(IgnoredTransactionsVaultValues::from_vault(vault)?)?;
         if include_predicted_income {
