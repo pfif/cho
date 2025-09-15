@@ -274,7 +274,7 @@ mod test {
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
     use crate::accounts::{AccountJson};
-    use crate::goals::{GoalImplementationBuilder};
+    use crate::goals::{GoalBuilder};
     use crate::ignored_transaction::{IgnoredTransactionBuilder};
     use crate::period::{CalendarMonthPeriodConfiguration, Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
     use crate::predicted_income::{PredictedIncomeBuilder};
@@ -383,7 +383,7 @@ mod test {
         };
         remaining_operation.add_group(accounts).expect("Can add accounts");
 
-        let goal_must_commit = GoalImplementationBuilder::default()
+        let goal_must_commit = GoalBuilder::default()
             .name("Goal must commit".to_string())
             .currency("EUR".to_string())
             .target(dec!(200))
@@ -394,7 +394,7 @@ mod test {
             .build()
             .expect("Can build goal");
 
-        let goal_already_committed = GoalImplementationBuilder::default()
+        let goal_already_committed = GoalBuilder::default()
             .name("Goal already committed".to_string())
             .currency("EUR".to_string())
             .target(dec!(500))

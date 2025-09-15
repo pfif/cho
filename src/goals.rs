@@ -12,21 +12,21 @@ use crate::remaining_operation::core_types::{GroupBuilder, IllustrationValue, Op
 
 pub type Figure = Decimal;
 
-pub type GoalVaultValues = Vec<GoalImplementation>;
+pub type GoalVaultValues = Vec<Goal>;
 
 impl VaultReadable for GoalVaultValues {
     const KEY: &'static str = "goals";
 }
 
-impl GroupBuilder<GoalImplementation> for GoalVaultValues {
-    fn build(self) -> Result<(String, Vec<GoalImplementation>), String> {
+impl GroupBuilder<Goal> for GoalVaultValues {
+    fn build(self) -> Result<(String, Vec<Goal>), String> {
         Ok(("Goals".into(), self.into_iter().collect()))
     }
 }
 
 #[derive(Deserialize, Clone)]
 #[derive(Builder)]
-pub struct GoalImplementation {
+pub struct Goal {
     name: String,
     currency: String,
     target: Figure,
@@ -34,19 +34,7 @@ pub struct GoalImplementation {
     target_date: NaiveDate,
 }
 
-#[cfg_attr(test, automock)]
-pub trait Goal<P: PeriodsConfiguration> {
-    fn name(&self) -> &String;
-    fn currency(&self) -> &String;
-    fn target(&self) -> &Figure;
-    fn committed(&self) -> &Vec<(NaiveDate, Figure)>;
-    fn target_date(&self) -> &NaiveDate;
-
-    fn remaining(&self) -> Result<Figure, String>;
-    fn to_pay_at(&self, period_config: &P, date: &NaiveDate) -> Result<Figure, String>;
-}
-
-impl GoalImplementation {
+impl Goal {
     fn total_commited(&self) -> Figure {
         self.committed
             .iter()
@@ -61,38 +49,8 @@ impl GoalImplementation {
 
         return Ok(self.target - total_commited);
     }
-}
 
-impl<P: PeriodsConfiguration> Goal<P> for GoalImplementation {
-    fn name(&self) -> &String {
-        return &self.name;
-    }
-
-    fn currency(&self) -> &String {
-        return &self.currency;
-    }
-
-    fn target(&self) -> &Figure {
-        return &self.target;
-    }
-
-    fn committed(&self) -> &Vec<(NaiveDate, Figure)> {
-        return &self.committed;
-    }
-
-    fn target_date(&self) -> &NaiveDate {
-        return &self.target_date;
-    }
-
-    fn remaining(&self) -> Result<Figure, String> {
-        /* Telling the compiler that, when looking for the
-         * implementation of Goal<P>.remaining() for
-         * GoalImplementation on any P, it should use GoalImplementation's
-         * function directly */
-        self.remaining()
-    }
-
-    fn to_pay_at(&self, period_config: &P, date: &NaiveDate) -> Result<Figure, String> {
+    fn to_pay_at<P: PeriodsConfiguration>(&self, period_config: &P, date: &NaiveDate) -> Result<Figure, String> {
         if date > &self.target_date {
             return self.remaining();
         }
@@ -135,13 +93,13 @@ impl<P: PeriodsConfiguration> Goal<P> for GoalImplementation {
 
         let remaining = self.remaining()?;
 
-        return Ok(
+        Ok(
             remaining / Decimal::from(period_config.periods_between(date, &self.target_date)?)
-        );
+        )
     }
 }
 
-impl OperandBuilder for GoalImplementation {
+impl OperandBuilder for Goal {
     fn build(self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
         let to_pay_at_figure = self.to_pay_at(period_config, today)?;
         let (to_pay_at_figure, payed_in) = if to_pay_at_figure == dec!(0) {
@@ -182,11 +140,11 @@ impl OperandBuilder for GoalImplementation {
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod test_remaining {
-    use super::{Figure, GoalImplementation};
+    use super::{Figure, Goal};
     use chrono::NaiveDate;
 
-    fn make_goal(commited: Vec<(NaiveDate, Figure)>) -> GoalImplementation {
-        return GoalImplementation {
+    fn make_goal(commited: Vec<(NaiveDate, Figure)>) -> Goal {
+        return Goal {
             name: "Test goal".to_string(),
             currency: "JPY".to_string(),
             target: 100.into(),
@@ -276,11 +234,11 @@ mod test_to_pay_at {
     use crate::period::{MockPeriodsConfiguration, Period};
     use mockall::predicate::eq;
 
-    use super::{Figure, Goal, GoalImplementation};
+    use super::{Figure, Goal};
     use chrono::{Datelike, Days, NaiveDate};
 
-    fn make_goal(commited: Vec<(NaiveDate, Figure)>) -> GoalImplementation {
-        return GoalImplementation {
+    fn make_goal(commited: Vec<(NaiveDate, Figure)>) -> Goal {
+        return Goal {
             name: "Test goal".to_string(),
             currency: "JPY".to_string(),
             target: 100.into(),
