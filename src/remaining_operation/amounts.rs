@@ -142,7 +142,7 @@ impl Amount {
 
         let new_immutable_amount = ImmutableAmount::new(
             target_currency,
-            self.immutable_amount.figure() * exchange_rate,
+            (self.immutable_amount.figure() * exchange_rate).round_dp_with_strategy(2, rust_decimal::RoundingStrategy::MidpointNearestEven)
         );
 
         Amount {
