@@ -6,8 +6,8 @@ mod format_remaining_operation_screen_tests {
     use crate::cli::formatting::format_remaining_operation_screen;
     use crate::period::Period;
     use pretty_assertions::assert_eq;
-    use crate::remaining_operation::amounts::{Amount, Currency};
-    use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
+    use crate::amounts::{Amount, Currency};
+    use crate::amounts::exchange_rates::ExchangeRates;
     use crate::remaining_operation::core_types::group::Group;
     use crate::remaining_operation::core_types::{Illustration, IllustrationValue, Operand, RemainingOperationScreen};
     

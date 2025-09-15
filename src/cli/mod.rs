@@ -5,7 +5,7 @@ use std::env::current_dir;
 use std::fmt::Display;
 use argument_parsing::RemainingOptions;
 use crate::remaining_operation::core_types::RemainingOperation;
-use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
+use crate::amounts::exchange_rates::ExchangeRates;
 
 mod formatting;
 mod argument_parsing;

@@ -1,5 +1,5 @@
-use super::amounts::exchange_rates::ExchangeRates;
-use super::amounts::{Amount, CurrencyIdent};
+use crate::amounts::exchange_rates::ExchangeRates;
+use crate::amounts::{Amount, CurrencyIdent};
 use crate::period::{Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
 use crate::goals::{GoalVaultValues};
 use chrono::{Local, NaiveDate};
@@ -135,8 +135,8 @@ pub mod group {
     use chrono::NaiveDate;
     use rust_decimal_macros::dec;
     use crate::period::PeriodConfigurationVaultValue;
-    use crate::remaining_operation::amounts::{Amount, Currency, CurrencyIdent};
-    use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
+    use crate::amounts::{Amount, Currency, CurrencyIdent};
+    use crate::amounts::exchange_rates::ExchangeRates;
     use super::{GroupBuilder, Operand, OperandBuilder, RemainingOperationScreenGroup};
 
     #[derive(Clone, PartialEq, Eq, Debug)]
@@ -268,8 +268,8 @@ mod test {
     use crate::ignored_transaction::{IgnoredTransactionBuilder};
     use crate::period::{CalendarMonthPeriodConfiguration, Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
     use crate::predicted_income::{PredictedIncomeBuilder};
-    use crate::remaining_operation::amounts::Amount;
-    use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
+    use crate::amounts::Amount;
+    use crate::amounts::exchange_rates::ExchangeRates;
     use crate::remaining_operation::core_types::{GroupBuilder, Operand, OperandBuilder, RemainingOperation, RemainingOperationScreenGroup};
     use pretty_assertions::assert_eq;
     use crate::remaining_operation::core_types::group::Group;

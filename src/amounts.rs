@@ -1,5 +1,5 @@
 use std::fmt::{Debug, Display, Formatter};
-use crate::remaining_operation::amounts::amount::ImmutableAmount;
+use crate::amounts::amount::ImmutableAmount;
 use rust_decimal::Decimal;
 use std::ops;
 
@@ -19,7 +19,7 @@ pub struct Currency {
 
 pub mod exchange_rates {
     use super::{Amount, Currency, CurrencyIdent, Figure};
-    use crate::remaining_operation::amounts::amount::ImmutableAmount;
+    use crate::amounts::amount::ImmutableAmount;
     use std::collections::HashMap;
 
     #[derive(Clone)]
@@ -79,7 +79,7 @@ pub mod exchange_rates {
 }
 
 mod amount {
-    use crate::remaining_operation::amounts::{Currency, Figure};
+    use crate::amounts::{Currency, Figure};
 
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct ImmutableAmount {
