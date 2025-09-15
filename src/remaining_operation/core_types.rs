@@ -307,13 +307,6 @@ mod test {
         let today = mkdate(8, 20);
         let exchange_rates = ExchangeRates::for_tests();
 
-        let amount_e = |amount: &str| {
-            exchange_rates.new_amount(&"EUR".to_string(), Decimal::from_str_exact(amount).expect("Can build currency")).expect("Can create amount")
-        };
-
-        let amount_j = |amount: &str| {
-            exchange_rates.new_amount(&"JPY".to_string(), Decimal::from_str_exact(amount).expect("Can build currency")).expect("Can create amount")
-        };
 
         let mut remaining_operation = RemainingOperation::new(
             period_configuration,
@@ -465,7 +458,7 @@ mod test {
         assert_eq!(
             result_eur,
             RemainingOperationScreen {
-                remaining: amount_e("850.00"),
+                remaining: exchange_rates.euro("850.00"),
                 period: Period {
                     start_date: mkdate(8, 1),
                     end_date: mkdate(8, 31),
@@ -476,79 +469,79 @@ mod test {
                         operands: vec![
                             Operand {
                                 name: "account in euros left".to_string(),
-                                amount: amount_e("1200"),
+                                amount: exchange_rates.euro("1200"),
                                 illustration: vec![
-                                    ("Period start amount".into(), IllustrationValue::Amount(amount_e("1000"))),
-                                    ("Period end amount".into(), IllustrationValue::Amount(amount_e("2200"))),
+                                    ("Period start amount".into(), IllustrationValue::Amount(exchange_rates.euro("1000"))),
+                                    ("Period end amount".into(), IllustrationValue::Amount(exchange_rates.euro("2200"))),
                                     ("Committed".into(), IllustrationValue::Bool(true)),
-                                    ("Difference".into(), IllustrationValue::Amount(amount_e("1200"))),
+                                    ("Difference".into(), IllustrationValue::Amount(exchange_rates.euro("1200"))),
                                 ],
                             },
                             Operand {
                                 name: "account in euros right".to_string(),
-                                amount: amount_e("-200"),
+                                amount: exchange_rates.euro("-200"),
                                 illustration: vec![
-                                    ("Period start amount".into(), IllustrationValue::Amount(amount_e("500"))),
-                                    ("Period end amount".into(), IllustrationValue::Amount(amount_e("300"))),
+                                    ("Period start amount".into(), IllustrationValue::Amount(exchange_rates.euro("500"))),
+                                    ("Period end amount".into(), IllustrationValue::Amount(exchange_rates.euro("300"))),
                                     ("Committed".into(), IllustrationValue::Bool(true)),
-                                    ("Difference".into(), IllustrationValue::Amount(amount_e("-200"))),
+                                    ("Difference".into(), IllustrationValue::Amount(exchange_rates.euro("-200"))),
                                 ],
                             },
                             Operand {
                                 name: "account in yen left".to_string(),
-                                amount: amount_j("0"),
+                                amount: exchange_rates.yen("0"),
                                 illustration: vec![
-                                    ("Period start amount".into(), IllustrationValue::Amount(amount_j("500"))),
-                                    ("Period end amount".into(), IllustrationValue::Amount(amount_j("500"))),
+                                    ("Period start amount".into(), IllustrationValue::Amount(exchange_rates.yen("500"))),
+                                    ("Period end amount".into(), IllustrationValue::Amount(exchange_rates.yen("500"))),
                                     ("Committed".into(), IllustrationValue::Bool(true)),
-                                    ("Difference".into(), IllustrationValue::Amount(amount_j("0"))),
+                                    ("Difference".into(), IllustrationValue::Amount(exchange_rates.yen("0"))),
                                 ],
                             },
                             Operand {
                                 name: "account in yen right".to_string(),
-                                amount: amount_j("0"),
+                                amount: exchange_rates.yen("0"),
                                 illustration: vec![
-                                    ("Period start amount".into(), IllustrationValue::Amount(amount_j("700"))),
-                                    ("Period end amount".into(), IllustrationValue::Amount(amount_j("700"))),
+                                    ("Period start amount".into(), IllustrationValue::Amount(exchange_rates.yen("700"))),
+                                    ("Period end amount".into(), IllustrationValue::Amount(exchange_rates.yen("700"))),
                                     ("Committed".into(), IllustrationValue::Bool(true)),
-                                    ("Difference".into(), IllustrationValue::Amount(amount_j("0"))),
+                                    ("Difference".into(), IllustrationValue::Amount(exchange_rates.yen("0"))),
                                 ],
                             },
                         ],
                         illustration_fields: vec!["Period start amount".into(), "Period end amount".into(), "Committed".into(), "Difference".into()],
-                        total: amount_e("1000.00")
+                        total: exchange_rates.euro("1000.00")
                     },
                     RemainingOperationScreenGroup {
                         name: "Goals".into(),
                         operands: vec![
                             Operand {
                                 name: "Goal must commit".to_string(),
-                                amount: amount_e("-50"),
+                                amount: exchange_rates.euro("-50"),
                                 illustration: vec![
-                                    ("Committed".into(), IllustrationValue::Amount(amount_e("150"))),
+                                    ("Committed".into(), IllustrationValue::Amount(exchange_rates.euro("150"))),
                                     ("Payed in".into(), IllustrationValue::Bool(false)),
-                                    ("Target".into(), IllustrationValue::Amount(amount_e("200"))),
+                                    ("Target".into(), IllustrationValue::Amount(exchange_rates.euro("200"))),
                                 ]
                             },
                             Operand {
                                 name: "Goal already committed".to_string(),
-                                amount: amount_e("-100"),
+                                amount: exchange_rates.euro("-100"),
                                 illustration: vec![
-                                    ("Committed".into(), IllustrationValue::Amount(amount_e("200"))),
+                                    ("Committed".into(), IllustrationValue::Amount(exchange_rates.euro("200"))),
                                     ("Payed in".into(), IllustrationValue::Bool(true)),
-                                    ("Target".into(), IllustrationValue::Amount(amount_e("500"))),
+                                    ("Target".into(), IllustrationValue::Amount(exchange_rates.euro("500"))),
                                 ]
                             },
                         ],
                         illustration_fields: vec!["Committed".into(), "Payed in".into(), "Target".into()],
-                        total: amount_e("-150.00")
+                        total: exchange_rates.euro("-150.00")
                     },
                     RemainingOperationScreenGroup {
                         name: "Ignored transactions".into(),
                         operands: vec![
                             Operand {
                                 name: "Ignored incoming".to_string(),
-                                amount: amount_e("200"),
+                                amount: exchange_rates.euro("200"),
                                 illustration: vec![
                                     ("Included".to_string(), IllustrationValue::Bool(true)),
                                     ("Date".to_string(), IllustrationValue::Date(mkdate(8, 15)))
@@ -556,7 +549,7 @@ mod test {
                             },
                             Operand {
                                 name: "Ignored outgoing".to_string(),
-                                amount: amount_j("-800"),
+                                amount: exchange_rates.yen("-800"),
                                 illustration: vec![
                                     ("Included".to_string(), IllustrationValue::Bool(true)),
                                     ("Date".to_string(), IllustrationValue::Date(mkdate(8, 14)))
@@ -564,7 +557,7 @@ mod test {
                             },
                             Operand {
                                 name: "Ignored later this month".to_string(),
-                                amount: amount_e("0"),
+                                amount: exchange_rates.euro("0"),
                                 illustration: vec![
                                     ("Included".to_string(), IllustrationValue::Bool(false)),
                                     ("Date".to_string(), IllustrationValue::Date(mkdate(8, 21)))
@@ -572,29 +565,29 @@ mod test {
                             },
                         ],
                         illustration_fields: vec!["Included".into(), "Date".into()],
-                        total: amount_e("-200.00")
+                        total: exchange_rates.euro("-200.00")
                     },
                     RemainingOperationScreenGroup {
                         name: "Predicted Income".into(),
                         operands: vec![Operand {
                             name: "Predicted Income".to_string(),
-                            amount: amount_j("400"),
+                            amount: exchange_rates.yen("400"),
                             illustration: vec![],
                         }],
                         illustration_fields: vec![],
-                        total: amount_e("200.00")
+                        total: exchange_rates.euro("200.00")
                     }
                 ],
             }
         );
         let result_jpy = remaining_operation.execute(&"JPY".to_string()).expect("Can execute remaining operation for yens");
         assert_eq!(result_jpy.groups.iter().map(|g| g.total.clone()).collect::<Vec<Amount>>(), vec![
-            amount_j("2000"),
-            amount_j("-300"),
-            amount_j("-400"),
-            amount_j("400")
+            exchange_rates.yen("2000"),
+            exchange_rates.yen("-300"),
+            exchange_rates.yen("-400"),
+            exchange_rates.yen("400")
         ]);
-
-        assert_eq!(result_jpy.remaining, amount_j("1700"));
+        
+        assert_eq!(result_jpy.remaining, exchange_rates.yen("1700"));
     }
 }

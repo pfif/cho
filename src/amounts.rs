@@ -22,6 +22,7 @@ pub mod exchange_rates {
     use super::{Amount, Currency, CurrencyIdent, Figure};
     use crate::amounts::amount::ImmutableAmount;
     use std::collections::HashMap;
+    use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
 
     #[derive(Clone)]
@@ -72,6 +73,20 @@ pub mod exchange_rates {
                 ("EUR".to_string(), dec!(1)),
                 ("JPY".to_string(), dec!(2))
             ]).expect("Can create exchange rates")
+        }
+        
+        pub fn yen(&self, figure: &str) -> Amount {
+            self.new_amount(
+                &"JPY".to_string(),
+                Decimal::from_str_exact(figure).expect("can build a decimal from passed string")
+            ).expect("Can create an amount")
+        }
+        
+        pub fn euro(&self, figure: &str) -> Amount {
+            self.new_amount(
+                &"EUR".to_string(),
+                Decimal::from_str_exact(figure).expect("can build a decimal from passed string")
+            ).expect("Can create an amount")
         }
     }
 }
@@ -169,6 +184,13 @@ pub struct RawAmount {
     currency: CurrencyIdent,
     figure: Figure,
 }
+
+impl RawAmount {
+    pub fn to_amount(&self, exchange_rates: &exchange_rates::ExchangeRates) -> Result<Amount, String> {
+        exchange_rates.new_amount(&self.currency, self.figure)
+    }
+}
+
 
 #[cfg(test)]
 impl RawAmount {
