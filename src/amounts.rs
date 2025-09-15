@@ -2,6 +2,7 @@ use std::fmt::{Debug, Display, Formatter};
 use crate::amounts::amount::ImmutableAmount;
 use rust_decimal::Decimal;
 use std::ops;
+use serde::Deserialize;
 
 pub type Figure = Decimal;
 pub type CurrencyIdent = String;
@@ -21,6 +22,7 @@ pub mod exchange_rates {
     use super::{Amount, Currency, CurrencyIdent, Figure};
     use crate::amounts::amount::ImmutableAmount;
     use std::collections::HashMap;
+    use rust_decimal_macros::dec;
 
     #[derive(Clone)]
     pub struct ExchangeRates {
@@ -65,15 +67,11 @@ pub mod exchange_rates {
 
     #[cfg(test)]
     impl ExchangeRates {
-        pub fn from_indent_rates_and_sign(rates: Vec<(CurrencyIdent, Figure, String)>) -> ExchangeRates {
-            let currencies: HashMap<CurrencyIdent, Currency> = rates
-                .into_iter()
-                .map(|(ident, rate, sign)| {
-                    (ident, Currency { rate, sign })
-                })
-                .collect();
-
-            ExchangeRates { currencies }
+        pub fn for_tests() -> ExchangeRates {
+            ExchangeRates::from_indent_and_rates(vec![
+                ("EUR".to_string(), dec!(1)),
+                ("JPY".to_string(), dec!(2))
+            ]).expect("Can create exchange rates")
         }
     }
 }
@@ -162,6 +160,22 @@ impl Amount {
         );
         Amount {
             immutable_amount: new_immutable_amount,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct RawAmount {
+    currency: CurrencyIdent,
+    figure: Figure,
+}
+
+#[cfg(test)]
+impl RawAmount {
+    pub fn yen(figure: &str) -> RawAmount {
+        RawAmount {
+            currency: "JPY".to_string(),
+            figure: Decimal::from_str_exact(figure).expect("can build a decimal from passed string"),
         }
     }
 }

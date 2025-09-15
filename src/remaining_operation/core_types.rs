@@ -305,10 +305,7 @@ mod test {
 
         let period_configuration = PeriodConfigurationVaultValue::CalendarMonth(CalendarMonthPeriodConfiguration {});
         let today = mkdate(8, 20);
-        let exchange_rates = ExchangeRates::from_indent_and_rates(vec![
-            ("EUR".to_string(), dec!(1)),
-            ("JPY".to_string(), dec!(2))
-        ]).expect("Can create exchange rates");
+        let exchange_rates = ExchangeRates::for_tests();
 
         let amount_e = |amount: &str| {
             exchange_rates.new_amount(&"EUR".to_string(), Decimal::from_str_exact(amount).expect("Can build currency")).expect("Can create amount")

@@ -41,10 +41,7 @@ mod format_remaining_operation_screen_tests {
     }
     impl TestTable {
         fn test(self) {
-            let exchange_rates = ExchangeRates::from_indent_and_rates(vec![
-                ("JPY".to_string(), dec!(1)),
-                ("EUR".to_string(), dec!(2))
-            ]).expect("Can create exchange rates");
+            let exchange_rates = ExchangeRates::for_tests();
 
             let mut groups = vec![];
             if self.include_empty_group {
@@ -108,7 +105,7 @@ Normal group
 |-------------------+--------+--------------+---------------+-----------+-----------|
 | Payment for cat   | ¥5     | ¥5           | €6            | ✅        |           |
 |-------------------+--------+--------------+---------------+-----------+-----------|
-| Total             | €30    |              |               |           |           |
+| Total             | €7.50  |              |               |           |           |
 +-------------------+--------+--------------+---------------+-----------+-----------+
 
 Extra column group
@@ -122,7 +119,7 @@ Extra column group
 |-----------------------+--------+--------------+---------------+-----------+-----------+--------------|
 | Payment for Katherine | ¥5     | ¥5           | €6            | ✅        |           | ✅           |
 |-----------------------+--------+--------------+---------------+-----------+-----------+--------------|
-| Total                 | €30    |              |               |           |           |              |
+| Total                 | €7.50  |              |               |           |           |              |
 +-----------------------+--------+--------------+---------------+-----------+-----------+--------------+
 
 Remaining this period: €100
