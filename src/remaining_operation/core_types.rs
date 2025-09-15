@@ -245,12 +245,6 @@ pub mod group {
     }
 }
 
-// TODO Problem with IlLustrationValue - they exists to split logic from view - we don't dictate
-//      how to show the value, we just return a type
-//      However, this feels incompatible with not returning a type of Illustration, and instead
-//      just a list of columns
-//      Downstream code can decide how to display the value, but not only based on its type, not
-//      what it _is_
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IllustrationValue {
     Amount(Amount),

@@ -25,7 +25,7 @@ pub struct FoundAmount {
 }
 
 impl FoundAmount {
-    // TODO Renme to "into amount" once the entire codebase has adopted the amount module
+    // TODO Rename to "into amount" once the entire codebase has adopted the amount module
     fn into_remaining_module_amount(self, currency: &String, exchange_rates: &ExchangeRates) -> Result<Amount, String> {
         exchange_rates.new_amount(currency, Decimal::from(self.figure))
     }
