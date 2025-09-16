@@ -2,7 +2,7 @@ use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::Deserialize;
-use crate::amounts::{Amount, RawAmount};
+use crate::amounts::{Amount, Figure, RawAmount};
 use crate::amounts::exchange_rates::ExchangeRates;
 use crate::period::{ErrorPeriodsBetween, Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
 use crate::remaining_operation::core_types::{Operand, OperandBuilder};
@@ -34,6 +34,7 @@ pub struct BucketThisPeriod {
     // TODO this name is bad
     changed: Amount,
     current_recommended_deposit: Amount,
+    current_actual_deposit: Amount,
 }
 
 impl Bucket {
@@ -52,14 +53,17 @@ impl Bucket {
            any => any?
        };
 
-       let recommended_deposit_figure = ex.new_amount(
-           &target_amount.currency,
-           target_amount.figure / &Decimal::from(number_of_periods)
-       )?;
+       let new_amount = |fig: Figure| -> Result<Amount, String> {
+           Ok(ex.new_amount( &target_amount.currency, fig)?)
+       };
+       
+       let recommended_deposit_figure = new_amount(
+           target_amount.figure / &Decimal::from(number_of_periods))?;
    
         Ok(BucketThisPeriod{
             changed: recommended_deposit_figure.clone(),
             current_recommended_deposit: recommended_deposit_figure.clone(),
+            current_actual_deposit: new_amount(dec!(0))?,
         }) 
    }
 }
@@ -197,6 +201,7 @@ mod test {
         }
     }
 
+    /* Testing errors */
     #[test]
     fn test__for_period__period_change__yen__one_deposit_this_period__no_target() {
         Test::default()
@@ -217,7 +222,8 @@ mod test {
             .add_line((mkdate(9, 15), Line::SetTarget{amount: RawAmount::yen("100000"), target_date: mkdate(8, 31)}))
             .expect_bucket(|ex| BucketThisPeriod {
                 changed: ex.yen("100000"),
-                current_recommended_deposit: ex.yen("100000")
+                current_recommended_deposit: ex.yen("100000"),
+                current_actual_deposit: ex.yen("0")
             })
             .execute()
     }
@@ -228,7 +234,8 @@ mod test {
             .add_line((mkdate(9, 15), Line::SetTarget{amount: RawAmount::yen("100000"), target_date: mkdate(9, 30)}))
             .expect_bucket(|ex| BucketThisPeriod {
                 changed: ex.yen("100000"),
-                current_recommended_deposit: ex.yen("100000")
+                current_recommended_deposit: ex.yen("100000"),
+                current_actual_deposit: ex.yen("0")
             })
             .execute()
     }
@@ -239,7 +246,8 @@ mod test {
             .add_line((mkdate(9, 15), Line::SetTarget{amount: RawAmount::yen("100000"), target_date: mkdate(10, 31)}))
             .expect_bucket(|ex| BucketThisPeriod {
                 changed: ex.yen("50000"),
-                current_recommended_deposit: ex.yen("50000")
+                current_recommended_deposit: ex.yen("50000"),
+                current_actual_deposit: ex.yen("0")
             })
             .execute()
     }
@@ -250,7 +258,8 @@ mod test {
             .add_line((mkdate(9, 15), Line::SetTarget{amount: RawAmount::yen("100000"), target_date: mkdate(11, 30)}))
             .expect_bucket(|ex| BucketThisPeriod {
                 changed: ex.yen("33333.33"),
-                current_recommended_deposit: ex.yen("33333.33")
+                current_recommended_deposit: ex.yen("33333.33"),
+                current_actual_deposit: ex.yen("0")
             })
             .execute()
     }
