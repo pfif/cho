@@ -19,7 +19,7 @@ pub struct Currency {
 }
 
 pub mod exchange_rates {
-    use super::{Amount, Currency, CurrencyIdent, Figure};
+    use super::{Amount, Currency, CurrencyIdent, Figure, RawAmount};
     use crate::amounts::amount::ImmutableAmount;
     use std::collections::HashMap;
     use rust_decimal::Decimal;
@@ -63,6 +63,13 @@ pub mod exchange_rates {
             Ok(Amount {
                 immutable_amount: ImmutableAmount::new(currency, figure),
             })
+        }
+        
+        pub fn new_amount_from_raw_amount(
+            &self,
+            raw_amount: &RawAmount,
+        ) -> Result<Amount, String>{
+           self.new_amount(&raw_amount.currency, raw_amount.figure)
         }
     }
 

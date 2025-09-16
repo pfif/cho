@@ -47,6 +47,14 @@ impl Bucket {
            })
            .ok_or("No target for bucket".to_string())?;
 
+       let deposit = self.lines
+           .iter()
+           .find_map(|(_, line)| match line {
+               Line::Deposit(amount) => Some(amount),
+               _ => None
+           })
+           .map_or(Ok(None), |amount| ex.new_amount_from_raw_amount(amount).map(Some))?;
+
        let number_of_periods = match period_config.periods_between(date, target_date) {
            Ok(nb) => nb,
            Err(ErrorPeriodsBetween::EndBeforeStart) => 1,
@@ -56,15 +64,16 @@ impl Bucket {
        let new_amount = |fig: Figure| -> Result<Amount, String> {
            Ok(ex.new_amount( &target_amount.currency, fig)?)
        };
-       
+
        let recommended_deposit_figure = new_amount(
            target_amount.figure / &Decimal::from(number_of_periods))?;
    
-        Ok(BucketThisPeriod{
-            changed: recommended_deposit_figure.clone(),
-            current_recommended_deposit: recommended_deposit_figure.clone(),
-            current_actual_deposit: new_amount(dec!(0))?,
-        }) 
+       Ok(BucketThisPeriod{
+           // TODO too many clones
+           changed: deposit.clone().unwrap_or(recommended_deposit_figure.clone()),
+           current_recommended_deposit: recommended_deposit_figure.clone(),
+           current_actual_deposit: deposit.clone().unwrap_or(new_amount(dec!(0))?),
+       })
    }
 }
 
@@ -89,9 +98,12 @@ mod test {
     - Target date
 
     Test list:
-    - test__for_period__yen__one_deposit_this_period
+    - test__for_period__yen__two_deposits_this_period___recommended
+    - test__for_period__yen__one_deposit_this_period_before_today__partial
+    - test__for_period__yen__one_deposit_this_period___recommended
     - test__for_period__yen__one_deposit_last_period
     - test__for_period__yen__one_deposit_next_period
+    - test__for_period__yen__one_deposit_this_period_after_period
     - test__for_period__yen__one_deposit_this_last_next_period
     - test__for_period__yen__two_deposit_this_last_next_period
 
@@ -102,7 +114,7 @@ mod test {
     - test__for_period__yen__one_withdrawal_this_last_next_period
     - test__for_period__yen__two_withdrawal_this_last_next_period
 
-    (test target set separately?)
+    - (test target set separately?)
 
     - test__for_period__yen__one_of_each_this_period
     - test__for_period__yen__one_of_each_this_last_period
@@ -110,6 +122,9 @@ mod test {
 
     - test__for_period__yen__two_of_each_this_last_next_period
 
+    - (test to see if formatting the buckets in json is easy)
+
+    FUTURE TESTS
     - test__for_period__yen_euro__one_deposit_this_period
     - test__for_period__yen_euro__one_withdrawal_this_period
 
@@ -262,5 +277,24 @@ mod test {
                 current_actual_deposit: ex.yen("0")
             })
             .execute()
+    }
+
+    #[test]
+    fn test__for_period__yen__one_deposit_this_period_today__partial() {
+        Test::default()
+            .add_line((mkdate(9, 1), Line::SetTarget{amount: RawAmount::yen("100000"), target_date: mkdate(12, 30)}))
+            .add_line((mkdate(9, 15), Line::Deposit(RawAmount::yen("10000"))))
+            .expect_bucket(
+                |ex| {
+                   BucketThisPeriod {
+                       changed: ex.yen("10000"),
+                       current_recommended_deposit: ex.yen("25000"),
+                       current_actual_deposit: ex.yen("10000"),
+                   }
+                }
+            )
+            .execute()
+        ;
+
     }
 }
