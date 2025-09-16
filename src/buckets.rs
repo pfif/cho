@@ -4,7 +4,7 @@ use rust_decimal_macros::dec;
 use serde::Deserialize;
 use crate::amounts::{Amount, RawAmount};
 use crate::amounts::exchange_rates::ExchangeRates;
-use crate::period::{Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
+use crate::period::{ErrorPeriodsBetween, Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
 use crate::remaining_operation::core_types::{Operand, OperandBuilder};
 use crate::vault::VaultReadable;
 
@@ -45,10 +45,16 @@ impl Bucket {
                _ => None
            })
            .ok_or("No target for bucket".to_string())?;
-       
+
+       let number_of_periods = match period_config.periods_between(date, target_date) {
+           Ok(nb) => nb,
+           Err(ErrorPeriodsBetween::EndBeforeStart) => 1,
+           any => any?
+       };
+
        let recommended_deposit_figure = ex.new_amount(
            &target_amount.currency,
-           target_amount.figure / &Decimal::from(period_config.periods_between(date, target_date)?)
+           target_amount.figure / &Decimal::from(number_of_periods)
        )?;
    
         Ok(BucketThisPeriod{
@@ -79,20 +85,18 @@ mod test {
     - Target date
 
     Test list:
-    - test__for_period__no_lines
-
-    - test__for_period__current_target_last_period
-
     - test__for_period__yen__one_deposit_this_period
     - test__for_period__yen__one_deposit_last_period
     - test__for_period__yen__one_deposit_next_period
     - test__for_period__yen__one_deposit_this_last_next_period
+    - test__for_period__yen__two_deposit_this_last_next_period
 
 
     - test__for_period__yen__one_withdrawal_this_period
     - test__for_period__yen__one_withdrawal_last_period
     - test__for_period__yen__one_withdrawal_next_period
     - test__for_period__yen__one_withdrawal_this_last_next_period
+    - test__for_period__yen__two_withdrawal_this_last_next_period
 
     (test target set separately?)
 
@@ -135,11 +139,10 @@ mod test {
     - target: no target this period / some target this period / two target this period
     - current target: last period / this period / next period / period after next
      */
-    use derive_builder::Builder;
     use pretty_assertions::assert_eq;
     use crate::period::{CalendarMonthPeriodConfiguration, PeriodsConfiguration};
     use super::*;
-    
+
     fn mkdate(month: u32, date: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(2025, month, date).expect("Can create date")
     }
@@ -173,8 +176,8 @@ mod test {
             self
         }
         
-        pub fn expect_bucket(mut self, bucket_fn: impl Fn(&ExchangeRates) -> BucketThisPeriod + 'static) -> Self {
-            self.expected = Box::new(move |ex| Ok(bucket_fn(ex)));
+        pub fn expect_bucket(mut self, bucket_builder: impl Fn(&ExchangeRates) -> BucketThisPeriod + 'static) -> Self {
+            self.expected = Box::new(move |ex| Ok(bucket_builder(ex)));
             self
         }
     }
@@ -184,7 +187,7 @@ mod test {
             let ex = ExchangeRates::for_tests();
             let period_configuration = PeriodConfigurationVaultValue::CalendarMonth(CalendarMonthPeriodConfiguration {});
             let today = mkdate(9, 15);
-            
+
             let bucket = Bucket { lines: self.lines };
             
             assert_eq!(
@@ -199,6 +202,23 @@ mod test {
         Test::default()
             .add_line((mkdate(9, 15), Line::Deposit(RawAmount::yen("10000"))))
             .expect_error("No target for bucket")
+            .execute()
+    }
+
+    fn test__for_period__period_change__yen__one_deposit_this_period__no_lines() {
+        Test::default()
+            .expect_error("No target for bucket")
+            .execute()
+    }
+
+    #[test]
+    fn test__for_period__current_target_last_period() {
+        Test::default()
+            .add_line((mkdate(9, 15), Line::SetTarget{amount: RawAmount::yen("100000"), target_date: mkdate(8, 31)}))
+            .expect_bucket(|ex| BucketThisPeriod {
+                changed: ex.yen("100000"),
+                current_recommended_deposit: ex.yen("100000")
+            })
             .execute()
     }
 

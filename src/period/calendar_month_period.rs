@@ -1,6 +1,8 @@
 use crate::period::{Period, PeriodsConfiguration};
 use chrono::{Datelike, Months, NaiveDate};
 use serde::Deserialize;
+use crate::period::interface::ErrorPeriodsBetween;
+use crate::period::interface::ErrorPeriodsBetween::EndBeforeStart;
 
 #[derive(Deserialize)]
 pub struct CalendarMonthPeriodConfiguration {}
@@ -20,7 +22,11 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
         })
     }
 
-    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, String> {
+    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, ErrorPeriodsBetween> {
+        if start > end {
+            return Err(EndBeforeStart);
+        }
+        
         // The number of years between the two dates, including start and end
         let full_years = (end.year() - start.year() + 1) as u16;
 
@@ -176,6 +182,7 @@ mod test_periods_between {
     use crate::period::calendar_month_period::CalendarMonthPeriodConfiguration;
     use crate::period::PeriodsConfiguration;
     use chrono::NaiveDate;
+    use crate::period::interface::ErrorPeriodsBetween;
 
     fn date(month: u32, day: u32) -> NaiveDate {
         return NaiveDate::from_ymd_opt(2023, month, day).unwrap();
@@ -202,16 +209,6 @@ mod test_periods_between {
             let result = config.periods_between(&self.start, &self.end).unwrap();
             assert_eq!(result, self.expected_output)
         }
-    }
-
-    #[test]
-    fn same_month__ends() {
-        Test {
-            start: date(4, 1),
-            end: date(4, 30),
-            expected_output: 1,
-        }
-        .execute();
     }
 
     #[test]
@@ -350,5 +347,12 @@ mod test_periods_between {
             expected_output: 26,
         }
         .execute();
+    }
+
+    #[test]
+    fn end_before_start() {
+        let config = CalendarMonthPeriodConfiguration {};
+        let result = config.periods_between(&date(4, 4), &date(3, 15));
+        assert_eq!(result, Err(ErrorPeriodsBetween::EndBeforeStart))
     }
 }

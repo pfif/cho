@@ -231,7 +231,7 @@ the function works with those.*/
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod test_to_pay_at {
-    use crate::period::{MockPeriodsConfiguration, Period};
+    use crate::period::{MockPeriodsConfiguration, Period, ErrorPeriodsBetween};
     use mockall::predicate::eq;
 
     use super::{Figure, Goal};
@@ -296,7 +296,7 @@ mod test_to_pay_at {
             28 => Ok(3),
             1 => Ok(2),
             5 => Ok(1),
-            9 => Err("Period after last, the query would make no sense".to_string()),
+            9 => Err(ErrorPeriodsBetween::Miscelaneous("Period after last, the query would make no sense".to_string())),
             _ => panic!("Unexpected date passed to make_period_config"),
         };
 
