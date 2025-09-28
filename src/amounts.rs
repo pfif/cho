@@ -208,3 +208,15 @@ impl RawAmount {
         }
     }
 }
+
+impl RawAmount {
+    pub fn add(&self, other_amount: &RawAmount) -> Result<RawAmount, String> {
+        if other_amount.currency != self.currency {
+            return Err("Tried to add two raw amounts with different currencies".into())
+        }
+        Ok(RawAmount {
+            currency: self.currency.clone(),
+            figure: self.figure + other_amount.figure,
+        })
+    }
+}
