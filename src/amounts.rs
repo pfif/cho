@@ -2,6 +2,7 @@ use std::fmt::{Debug, Display, Formatter};
 use crate::amounts::amount::ImmutableAmount;
 use rust_decimal::Decimal;
 use std::ops;
+use rust_decimal_macros::dec;
 use serde::Deserialize;
 
 pub type Figure = Decimal;
@@ -184,6 +185,27 @@ impl Amount {
             immutable_amount: new_immutable_amount,
         }
     }
+    
+    pub fn minus(&self, other_amount: &Amount) -> Amount {
+        let other_amount_converted = other_amount.convert(self.immutable_amount.currency());
+        let new_immutable_amount = ImmutableAmount::new(
+            self.immutable_amount.currency(),
+            self.immutable_amount.figure() - other_amount_converted.immutable_amount.figure(),
+        );
+        Amount {
+            immutable_amount: new_immutable_amount,
+        }
+    }
+
+    // TODO this (and all the operations) probably need to be made into traits
+    pub fn div_decimal(&self, divisor: &Decimal) -> Amount {
+        Amount {
+            immutable_amount: ImmutableAmount::new(
+                self.immutable_amount.currency(),
+                self.immutable_amount.figure() / divisor
+            )
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -196,6 +218,23 @@ impl RawAmount {
     pub fn to_amount(&self, exchange_rates: &exchange_rates::ExchangeRates) -> Result<Amount, String> {
         exchange_rates.new_amount(&self.currency, self.figure)
     }
+    
+    pub fn zero(currency: &CurrencyIdent) -> RawAmount {
+        RawAmount {
+            currency: currency.clone(),
+            figure: dec!(0)
+        }
+    }
+    
+    pub fn add(&self, other_amount: &RawAmount) -> Result<RawAmount, String> {
+        if other_amount.currency != self.currency {
+            return Err("Tried to add two raw amounts with different currencies".into())
+        }
+        Ok(RawAmount {
+            currency: self.currency.clone(),
+            figure: self.figure + other_amount.figure,
+        })
+    }
 }
 
 
@@ -206,17 +245,5 @@ impl RawAmount {
             currency: "JPY".to_string(),
             figure: Decimal::from_str_exact(figure).expect("can build a decimal from passed string"),
         }
-    }
-}
-
-impl RawAmount {
-    pub fn add(&self, other_amount: &RawAmount) -> Result<RawAmount, String> {
-        if other_amount.currency != self.currency {
-            return Err("Tried to add two raw amounts with different currencies".into())
-        }
-        Ok(RawAmount {
-            currency: self.currency.clone(),
-            figure: self.figure + other_amount.figure,
-        })
     }
 }
