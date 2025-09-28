@@ -327,11 +327,28 @@ mod test {
     }
 
     #[test]
-    fn test__for_period__yen__two_deposits_this_period___recommended(){
+    fn test__for_period__yen__two_deposits_this_period__recommended(){
         Test::default()
             .set_target_one_hundred_thousand_in_four_months()
             .add_line(mkdate(9, 3), Line::Deposit(RawAmount::yen("10000")))
             .add_line(mkdate(9, 5), Line::Deposit(RawAmount::yen("15000")))
+            .expect_bucket(
+                |ex| {
+                    BucketThisPeriod {
+                        changed: ex.yen("25000"),
+                        current_recommended_deposit: ex.yen("25000"),
+                        current_actual_deposit: ex.yen("25000"),
+                    }
+                }
+            )
+            .execute();
+    }
+
+    #[test]
+    fn test__for_period__yen__one_deposit_this_period_before_today__partial() {
+        Test::default()
+            .set_target_one_hundred_thousand_in_four_months()
+            .add_line(mkdate(9, 3), Line::Deposit(RawAmount::yen("25000")))
             .expect_bucket(
                 |ex| {
                     BucketThisPeriod {
