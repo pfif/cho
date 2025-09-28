@@ -300,6 +300,16 @@ mod test {
             )
         }
 
+        pub fn target_set_many_periods_ago_twelve_hundred_in_twelve_months(mut self) -> Self {
+            self.add_line(
+                mkdate(1, 1),
+                Line::SetTarget {
+                    amount: RawAmount::yen("1200"),
+                    target_date: mkdate(12, 30),
+                },
+            )
+        }
+
         pub fn expect_error(mut self, error: &str) -> Self {
             let error_string = error.to_string();
             self.expected = Box::new(move |_| Err(error_string.clone()));
@@ -433,7 +443,7 @@ mod test {
     mod deposits {
         use super::*;
 
-        mod this_period {
+        mod this_period_until_today {
             use super::*;
             #[test]
             fn one_deposit_today__partial() {
@@ -452,7 +462,7 @@ mod test {
             #[test]
             fn two_deposits__recommended() {
                 Test::default()
-                    .target_set_last_period_one_hundred_thousand_in_five_months()
+                    .target_set_in_current_period_one_hundred_thousand_in_four_months()
                     .add_line(mkdate(9, 3), Line::Deposit(RawAmount::yen("10000")))
                     .add_line(mkdate(9, 5), Line::Deposit(RawAmount::yen("15000")))
                     .expect_bucket(|ex| BucketThisPeriod {
@@ -465,10 +475,10 @@ mod test {
             }
 
             #[test]
-            fn one_deposit_before_today__partial() {
+            fn one_deposit_period_start__partial() {
                 Test::default()
-                    .target_set_last_period_one_hundred_thousand_in_five_months()
-                    .add_line(mkdate(9, 3), Line::Deposit(RawAmount::yen("10000")))
+                    .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                    .add_line(mkdate(9, 1), Line::Deposit(RawAmount::yen("10000")))
                     .expect_bucket(|ex| BucketThisPeriod {
                         recommended_or_actual_change: ex.yen("10000"),
                         current_recommended_deposit: ex.yen("25000"),
@@ -477,8 +487,36 @@ mod test {
                     })
                     .execute();
             }
+
+            #[test]
+            fn one_deposit_before_today__partial() {
+                Test::default()
+                    .target_set_last_period_one_hundred_thousand_in_five_months()
+                    .add_line(mkdate(9, 3), Line::Deposit(RawAmount::yen("10000")))
+                    .expect_bucket(|ex| BucketThisPeriod {
+                        recommended_or_actual_change: ex.yen("10000"),
+                        current_recommended_deposit: ex.yen("25000"), // This is correct. Even if the target was set for five months, there was no deposit last month
+                        current_actual_deposit: Some(ex.yen("10000")),
+                        total_deposit: ex.yen("10000"),
+                    })
+                    .execute();
+            }
+
+            #[test]
+            fn one_deposit_before_today__over() {
+                Test::default()
+                    .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                    .add_line(mkdate(9, 3), Line::Deposit(RawAmount::yen("30000")))
+                    .expect_bucket(|ex| BucketThisPeriod {
+                        recommended_or_actual_change: ex.yen("30000"),
+                        current_recommended_deposit: ex.yen("25000"),
+                        current_actual_deposit: Some(ex.yen("30000")),
+                        total_deposit: ex.yen("30000"),
+                    })
+                    .execute();
+            }
         }
-        mod last_period {
+        mod before_current_period {
             use super::*;
 
             #[test]
@@ -491,6 +529,50 @@ mod test {
                         current_recommended_deposit: ex.yen("20000"),
                         current_actual_deposit: None,
                         total_deposit: ex.yen("20000"),
+                    })
+                    .execute();
+            }
+
+            #[test]
+            fn two_deposits__partial() {
+                Test::default()
+                    .target_set_last_period_one_hundred_thousand_in_five_months()
+                    .add_line(mkdate(8, 15), Line::Deposit(RawAmount::yen("5000")))
+                    .add_line(mkdate(8, 31), Line::Deposit(RawAmount::yen("5000")))
+                    .expect_bucket(|ex| BucketThisPeriod {
+                        recommended_or_actual_change: ex.yen("22500"),
+                        current_recommended_deposit: ex.yen("22500"),
+                        current_actual_deposit: None,
+                        total_deposit: ex.yen("10000"),
+                    })
+                    .execute();
+            }
+
+            #[test]
+            fn many_periods_ago() {
+                Test::default()
+                    .target_set_many_periods_ago_twelve_hundred_in_twelve_months()
+                    .add_line(mkdate(1, 15), Line::Deposit(RawAmount::yen("100")))
+                    .add_line(mkdate(2, 28), Line::Deposit(RawAmount::yen("100")))
+                    .expect_bucket(|ex| BucketThisPeriod {
+                        recommended_or_actual_change: ex.yen("250"),
+                        current_recommended_deposit: ex.yen("250"),
+                        current_actual_deposit: None,
+                        total_deposit: ex.yen("200"),
+                    })
+                    .execute();
+            }
+
+            #[test]
+            fn one_deposit__over() {
+                Test::default()
+                    .target_set_last_period_one_hundred_thousand_in_five_months()
+                    .add_line(mkdate(8, 31), Line::Deposit(RawAmount::yen("60000")))
+                    .expect_bucket(|ex| BucketThisPeriod {
+                        recommended_or_actual_change: ex.yen("10000"),
+                        current_recommended_deposit: ex.yen("10000"),
+                        current_actual_deposit: None,
+                        total_deposit: ex.yen("60000"),
                     })
                     .execute();
             }
