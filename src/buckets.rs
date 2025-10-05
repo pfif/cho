@@ -40,7 +40,10 @@ pub struct BucketThisPeriod {
     recommended_or_actual_change: Amount,
     current_recommended_deposit: Amount,
     current_actual_deposit: Option<Amount>,
+    current_withdrawal: Option<Amount>,
     total_deposit: Amount,
+    total_withdrawal: Amount,
+    total: Amount
 }
 
 impl Bucket {
@@ -171,8 +174,9 @@ impl Bucket {
 
         let zero = ex.new_amount_from_raw_amount(&RawAmount::zero(&"JPY".to_string()))?;
         let recommended_deposit_figure = Amount::maximum(
-            &target_amount.minus(&Amount::maximum(&deposited_until_period_start, &zero)),
-            &zero)
+                &target_amount.minus(&deposited_until_period_start),
+                &zero
+            )
             .div_decimal(&Decimal::from(number_of_periods));
 
         Ok(BucketThisPeriod {
@@ -181,7 +185,10 @@ impl Bucket {
                 .unwrap_or(recommended_deposit_figure.clone()),
             current_recommended_deposit: recommended_deposit_figure,
             current_actual_deposit: deposited_this_period,
-            total_deposit: deposited,
+            current_withdrawal: None,
+            total_deposit: deposited.clone(),
+            total_withdrawal: ex.new_amount_from_raw_amount(&RawAmount::zero(&"JPY".to_string()))?,
+            total: deposited.clone()
         })
     }
 }
@@ -205,10 +212,10 @@ mod test {
     X amount (different from deposit - there may be withdrawals)
     X Current recommended deposit (does not change if it has been committed or not)
     X Current actual deposit
-    - Current withdrawal
+    X Current withdrawal
     X Total deposit
-    - Total withdrawal
-    - Total
+    X Total withdrawal
+    X Total
     - Target sum
     - Target date
 
@@ -361,7 +368,10 @@ mod test {
                     recommended_or_actual_change: ex.yen("25000"),
                     current_recommended_deposit: ex.yen("25000"),
                     current_actual_deposit: None,
+                    current_withdrawal: None,
                     total_deposit: ex.yen("0"),
+                    total_withdrawal: ex.yen("0"),
+                    total: ex.yen("0")
                 }
             )
         }
@@ -373,7 +383,10 @@ mod test {
                     recommended_or_actual_change: ex.yen("25000"),
                     current_recommended_deposit: ex.yen("25000"),
                     current_actual_deposit: Some(ex.yen("25000")),
+                    current_withdrawal: None,
                     total_deposit: ex.yen("25000"),
+                    total_withdrawal: ex.yen("0"),
+                    total:  ex.yen("25000"),
                 }
             )
         }
@@ -440,7 +453,10 @@ mod test {
                     recommended_or_actual_change: ex.yen("100000"),
                     current_recommended_deposit: ex.yen("100000"),
                     current_actual_deposit: None,
+                    current_withdrawal: None,
                     total_deposit: ex.yen("0"),
+                    total_withdrawal: ex.yen("0"),
+                    total:  ex.yen("0"),
                 })
                 .execute()
         }
@@ -459,7 +475,10 @@ mod test {
                     recommended_or_actual_change: ex.yen("100000"),
                     current_recommended_deposit: ex.yen("100000"),
                     current_actual_deposit: None,
+                    current_withdrawal: None,
                     total_deposit: ex.yen("0"),
+                    total_withdrawal: ex.yen("0"),
+                    total:  ex.yen("0"),
                 })
                 .execute()
         }
@@ -478,7 +497,10 @@ mod test {
                     recommended_or_actual_change: ex.yen("50000"),
                     current_recommended_deposit: ex.yen("50000"),
                     current_actual_deposit: None,
+                    current_withdrawal: None,
                     total_deposit: ex.yen("0"),
+                    total_withdrawal: ex.yen("0"),
+                    total:  ex.yen("0"),
                 })
                 .execute()
         }
@@ -497,7 +519,10 @@ mod test {
                     recommended_or_actual_change: ex.yen("33333.33"),
                     current_recommended_deposit: ex.yen("33333.33"),
                     current_actual_deposit: None,
+                    current_withdrawal: None,
                     total_deposit: ex.yen("0"),
+                    total_withdrawal: ex.yen("0"),
+                    total:  ex.yen("0"),
                 })
                 .execute()
         }
@@ -518,11 +543,14 @@ mod test {
                         recommended_or_actual_change: ex.yen("10000"),
                         current_recommended_deposit: ex.yen("25000"),
                         current_actual_deposit: Some(ex.yen("10000")),
+                        current_withdrawal: None,
                         total_deposit: ex.yen("10000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("10000"),
                     })
                     .execute();
             }
-            
+
             #[test]
             fn one_deposit_today__zero() {
                 Test::default()
@@ -532,7 +560,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("0"),
                         current_recommended_deposit: ex.yen("25000"),
                         current_actual_deposit: Some(ex.yen("0")),
+                        current_withdrawal: None,
                         total_deposit: ex.yen("0"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("0"),
                     })
                     .execute();
             }
@@ -547,7 +578,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("25000"),
                         current_recommended_deposit: ex.yen("25000"),
                         current_actual_deposit: Some(ex.yen("25000")),
+                        current_withdrawal: None,
                         total_deposit: ex.yen("25000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("25000"),
                     })
                     .execute();
             }
@@ -576,7 +610,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("10000"),
                         current_recommended_deposit: ex.yen("25000"),
                         current_actual_deposit: Some(ex.yen("10000")),
+                        current_withdrawal: None,
                         total_deposit: ex.yen("10000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("10000"),
                     })
                     .execute();
             }
@@ -590,7 +627,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("10000"),
                         current_recommended_deposit: ex.yen("25000"), // This is correct. Even if the target was set for five months, there was no deposit last month
                         current_actual_deposit: Some(ex.yen("10000")),
+                        current_withdrawal: None,
                         total_deposit: ex.yen("10000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("10000"),
                     })
                     .execute();
             }
@@ -604,7 +644,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("30000"),
                         current_recommended_deposit: ex.yen("25000"),
                         current_actual_deposit: Some(ex.yen("30000")),
+                        current_withdrawal: None,
                         total_deposit: ex.yen("30000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("30000"),
                     })
                     .execute();
             }
@@ -621,7 +664,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("20000"),
                         current_recommended_deposit: ex.yen("20000"),
                         current_actual_deposit: None,
+                        current_withdrawal: None,
                         total_deposit: ex.yen("20000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("20000"),
                     })
                     .execute();
             }
@@ -636,7 +682,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("22500"),
                         current_recommended_deposit: ex.yen("22500"),
                         current_actual_deposit: None,
+                        current_withdrawal: None,
                         total_deposit: ex.yen("10000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("10000"),
                     })
                     .execute();
             }
@@ -666,7 +715,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("250"),
                         current_recommended_deposit: ex.yen("250"),
                         current_actual_deposit: None,
+                        current_withdrawal: None,
                         total_deposit: ex.yen("200"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("200"),
                     })
                     .execute();
             }
@@ -680,7 +732,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("10000"),
                         current_recommended_deposit: ex.yen("10000"),
                         current_actual_deposit: None,
+                        current_withdrawal: None,
                         total_deposit: ex.yen("60000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("60000"),
                     })
                     .execute();
             }
@@ -694,7 +749,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("0"),
                         current_recommended_deposit: ex.yen("0"),
                         current_actual_deposit: None,
+                        current_withdrawal: None,
                         total_deposit: ex.yen("200000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("200000"),
                     })
                     .execute();
             }
@@ -765,7 +823,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("25000"),
                         current_recommended_deposit: ex.yen("25000"),
                         current_actual_deposit: Some(ex.yen("25000")),
+                        current_withdrawal: None,
                         total_deposit: ex.yen("25000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("25000"),
                     }))
                     .execute();
             }
@@ -786,7 +847,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("250"),
                         current_recommended_deposit: ex.yen("260"),
                         current_actual_deposit: Some(ex.yen("250")),
+                        current_withdrawal: None,
                         total_deposit: ex.yen("410"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("410"),
                     })
                     .execute();
             }
@@ -812,7 +876,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("250"),
                         current_recommended_deposit: ex.yen("260"),
                         current_actual_deposit: Some(ex.yen("250")),
+                        current_withdrawal: None,
                         total_deposit: ex.yen("410"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("410"),
                     })
                     .execute();
             }
@@ -835,7 +902,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("15000"),
                         current_recommended_deposit: ex.yen("25000"),
                         current_actual_deposit: Some(ex.yen("15000")),
+                        current_withdrawal: None,
                         total_deposit: ex.yen("15000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("15000"),
                     })
                     .execute();
             }
@@ -850,7 +920,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("-10000"),
                         current_recommended_deposit: ex.yen("20000"),
                         current_actual_deposit: Some(ex.yen("-10000")),
+                        current_withdrawal: None,
                         total_deposit: ex.yen("10000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("10000"),
                     })
                     .execute();
             }
@@ -866,7 +939,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("-10000"),
                         current_recommended_deposit: ex.yen("20000"),
                         current_actual_deposit: Some(ex.yen("-10000")),
+                        current_withdrawal: None,
                         total_deposit: ex.yen("10000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("10000"),
                     })
                     .execute();
             }
@@ -882,7 +958,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("15000"),
                         current_recommended_deposit: ex.yen("25000"),
                         current_actual_deposit: Some(ex.yen("15000")),
+                        current_withdrawal: None,
                         total_deposit: ex.yen("15000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("15000"),
                     })
                     .execute();
             }
@@ -920,7 +999,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("0"),
                         current_recommended_deposit: ex.yen("25000"),
                         current_actual_deposit: Some(ex.yen("0")),
+                        current_withdrawal: None,
                         total_deposit: ex.yen("0"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("0"),
                     })
                     .execute();
             }
@@ -950,7 +1032,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("22500"),
                         current_recommended_deposit: ex.yen("22500"),
                         current_actual_deposit: None,
+                        current_withdrawal: None,
                         total_deposit: ex.yen("10000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("10000"),
                     })
                     .execute();
             }
@@ -966,7 +1051,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("22500"),
                         current_recommended_deposit: ex.yen("22500"),
                         current_actual_deposit: None,
+                        current_withdrawal: None,
                         total_deposit: ex.yen("10000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("10000"),
                     })
                     .execute();
             }
@@ -1077,7 +1165,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("20000"),
                         current_recommended_deposit: ex.yen("25000"),
                         current_actual_deposit: Some(ex.yen("20000")),
+                        current_withdrawal: None,
                         total_deposit: ex.yen("20000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("20000"),
                     }))
                     .execute();
             }
@@ -1093,7 +1184,10 @@ mod test {
                         recommended_or_actual_change: ex.yen("-10000"),
                         current_recommended_deposit: ex.yen("22500"),
                         current_actual_deposit: Some(ex.yen("-10000")),
+                        current_withdrawal: None,
                         total_deposit: ex.yen("0"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("0"),
                     })
                     .execute();
             }
@@ -1110,30 +1204,15 @@ mod test {
                         recommended_or_actual_change: ex.yen("19000"),
                         current_recommended_deposit: ex.yen("22500"),
                         current_actual_deposit: Some(ex.yen("19000")),
+                        current_withdrawal: None,
                         total_deposit: ex.yen("29000"),
+                        total_withdrawal: ex.yen("0"),
+                        total:  ex.yen("29000"),
                     })
                     .execute();
             }
 
             /*
-            TODO (before merging PR)
-                 This is too hard to implement before we proceed to a big refactor. Implement then
-
-            #[test]
-            fn one_cancels_everything() {
-                Test::default()
-                    .target_set_in_current_period_one_hundred_thousand_in_four_months()
-                    .add_line(mkdate(10, 8), Line::Deposit(RawAmount::yen("25000")))
-                    .add_line(mkdate(10, 15), Line::DepositCancellation(RawAmount::yen("25000")))
-                    .expect_bucket(|ex| BucketThisPeriod {
-                        recommended_or_actual_change: ex.yen("0"),
-                        current_recommended_deposit: ex.yen("25000"),
-                        current_actual_deposit: Some(ex.yen("0")),
-                        total_deposit: ex.yen("0"),
-                    })
-                    .execute();
-            }
-
             #[test]
             fn one_cancellation_too_big_followed_by_one_deposit_that_brings_back_the_bucket_to_positive() {
                 Test::default()
