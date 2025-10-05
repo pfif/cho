@@ -180,7 +180,6 @@ mod test {
     - Target date
 
     Test list:
-    - test__for_period__yen__one_deposit_next_period
     - test__for_period__yen__one_deposit_this_period_after_period
     - test__for_period__yen__one_deposit_this_last_next_period
     - test__for_period__yen__two_deposit_this_last_next_period
@@ -602,6 +601,45 @@ mod test {
                 Test::default()
                     .target_set_in_current_period_one_hundred_thousand_in_four_months()
                     .add_line(mkdate(9, 16), Line::Deposit(RawAmount::yen("25000")))
+                    .expect_bucket_no_commits_one_hundred_thousand_in_four_months()
+                    .execute();
+            }
+
+            #[test]
+            fn one_deposit_this_period_after_tomorrow() {
+                Test::default()
+                    .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                    .add_line(mkdate(9, 17), Line::Deposit(RawAmount::yen("25000")))
+                    .expect_bucket_no_commits_one_hundred_thousand_in_four_months()
+                    .execute();
+            }
+
+            #[test]
+            fn one_deposit_next_period() {
+                Test::default()
+                    .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                    .add_line(mkdate(10, 18), Line::Deposit(RawAmount::yen("25000")))
+                    .expect_bucket_no_commits_one_hundred_thousand_in_four_months()
+                    .execute();
+            }
+
+            #[test]
+            fn one_deposit_many_period_after() {
+                Test::default()
+                    .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                    .add_line(mkdate(12, 18), Line::Deposit(RawAmount::yen("25000")))
+                    .expect_bucket_no_commits_one_hundred_thousand_in_four_months()
+                    .execute();
+            }
+
+            #[test]
+            fn many_deposits() {
+                Test::default()
+                    .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                    .add_line(mkdate(9, 16), Line::Deposit(RawAmount::yen("25000")))
+                    .add_line(mkdate(9, 17), Line::Deposit(RawAmount::yen("25000")))
+                    .add_line(mkdate(10, 18), Line::Deposit(RawAmount::yen("25000")))
+                    .add_line(mkdate(12, 18), Line::Deposit(RawAmount::yen("25000")))
                     .expect_bucket_no_commits_one_hundred_thousand_in_four_months()
                     .execute();
             }
