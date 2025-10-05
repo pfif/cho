@@ -180,9 +180,6 @@ mod test {
     - Target date
 
     Test list:
-    - test__for_period__yen__one_deposit_this_last_next_period
-    - test__for_period__yen__two_deposit_this_last_next_period
-
     - test__for_period__yen__one_deposits_this_period__one_deposit_cencellation_this_period
     - test__for_period__yen__two_deposits_last_period__one_deposit_cencellation_this_period
     - test__for_period__yen__two_deposits_last_period__two_deposit_cencellation_this_period
@@ -458,6 +455,7 @@ mod test {
 
         mod this_period_until_today {
             use super::*;
+            
             #[test]
             fn one_deposit_today__partial() {
                 Test::default()
@@ -655,6 +653,56 @@ mod test {
                         current_actual_deposit: Some(ex.yen("25000")),
                         total_deposit: ex.yen("25000"),
                     }))
+                    .execute();
+            }
+        }
+        mod all_periods_mixed {
+            use super::*;
+
+            #[test]
+            fn all_periods () {
+                Test::default()
+                    .target_set_many_periods_ago_twelve_hundred_in_twelve_months()
+                    .add_line(mkdate(1, 15), Line::Deposit(RawAmount::yen("50")))
+                    .add_line(mkdate(2, 1), Line::Deposit(RawAmount::yen("55")))
+                    .add_line(mkdate(8, 31), Line::Deposit(RawAmount::yen("55")))
+                    .add_line(mkdate(9, 1), Line::Deposit(RawAmount::yen("200")))
+                    .add_line(mkdate(9, 15), Line::Deposit(RawAmount::yen("50")))
+                    .add_line(mkdate(9, 20), Line::Deposit(RawAmount::yen("10")))
+                    .add_line(mkdate(10, 25), Line::Deposit(RawAmount::yen("260")))
+                    .add_line(mkdate(12, 31), Line::Deposit(RawAmount::yen("260")))
+                    .expect_bucket(|ex| BucketThisPeriod {
+                        recommended_or_actual_change: ex.yen("250"),
+                        current_recommended_deposit: ex.yen("260"),
+                        current_actual_deposit: Some(ex.yen("250")),
+                        total_deposit: ex.yen("410"),
+                    })
+                    .execute();
+            }
+
+            #[test]
+            fn all_periods_multiple_deposits () {
+                Test::default()
+                    .target_set_many_periods_ago_twelve_hundred_in_twelve_months()
+                    .add_line(mkdate(1, 15), Line::Deposit(RawAmount::yen("25")))
+                    .add_line(mkdate(1, 16), Line::Deposit(RawAmount::yen("25")))
+                    .add_line(mkdate(2, 1), Line::Deposit(RawAmount::yen("50")))
+                    .add_line(mkdate(2, 2), Line::Deposit(RawAmount::yen("5")))
+                    .add_line(mkdate(8, 30), Line::Deposit(RawAmount::yen("25")))
+                    .add_line(mkdate(8, 31), Line::Deposit(RawAmount::yen("30")))
+                    .add_line(mkdate(9, 1), Line::Deposit(RawAmount::yen("200")))
+                    .add_line(mkdate(9, 15), Line::Deposit(RawAmount::yen("50")))
+                    .add_line(mkdate(9, 20), Line::Deposit(RawAmount::yen("10")))
+                    .add_line(mkdate(10, 25), Line::Deposit(RawAmount::yen("200")))
+                    .add_line(mkdate(10, 26), Line::Deposit(RawAmount::yen("60")))
+                    .add_line(mkdate(12, 30), Line::Deposit(RawAmount::yen("200")))
+                    .add_line(mkdate(12, 31), Line::Deposit(RawAmount::yen("60")))
+                    .expect_bucket(|ex| BucketThisPeriod {
+                        recommended_or_actual_change: ex.yen("250"),
+                        current_recommended_deposit: ex.yen("260"),
+                        current_actual_deposit: Some(ex.yen("250")),
+                        total_deposit: ex.yen("410"),
+                    })
                     .execute();
             }
         }
