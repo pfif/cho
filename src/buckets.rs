@@ -180,7 +180,6 @@ mod test {
     - Target date
 
     Test list:
-    - test__for_period__yen__one_deposit_this_period_after_period
     - test__for_period__yen__one_deposit_this_last_next_period
     - test__for_period__yen__two_deposit_this_last_next_period
 
@@ -641,6 +640,21 @@ mod test {
                     .add_line(mkdate(10, 18), Line::Deposit(RawAmount::yen("25000")))
                     .add_line(mkdate(12, 18), Line::Deposit(RawAmount::yen("25000")))
                     .expect_bucket_no_commits_one_hundred_thousand_in_four_months()
+                    .execute();
+            }
+
+            #[test]
+            fn one_deposit_this_period_next_period() {
+                Test::default()
+                    .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                    .add_line(mkdate(9, 10), Line::Deposit(RawAmount::yen("25000")))
+                    .add_line(mkdate(10, 18), Line::Deposit(RawAmount::yen("25000")))
+                    .expect_bucket((|ex| BucketThisPeriod {
+                        recommended_or_actual_change: ex.yen("25000"),
+                        current_recommended_deposit: ex.yen("25000"),
+                        current_actual_deposit: Some(ex.yen("25000")),
+                        total_deposit: ex.yen("25000"),
+                    }))
                     .execute();
             }
         }
