@@ -214,7 +214,6 @@ mod test {
     Test list:
     - two deposits the same day (no)
 
-    - test__for_period__yen__one_deposit_last_period__one_deposit_cencellation_this_period
     - test__for_period__yen__one_deposit_last_period__two_deposit_cencellation_this_period
     - test__for_period__yen__one_deposit_last_period__one_deposit_cencellation_last_period
     - test__for_period__yen__one_deposit_last_period__two_deposit_cencellation_last_period
@@ -827,6 +826,22 @@ mod test {
                     .target_set_last_period_one_hundred_thousand_in_five_months()
                     .add_line(mkdate(8, 8), Line::Deposit(RawAmount::yen("20000")))
                     .add_line(mkdate(9, 15), Line::DepositCancellation(RawAmount::yen("10000")))
+                    .expect_bucket(|ex| BucketThisPeriod {
+                        recommended_or_actual_change: ex.yen("-10000"),
+                        current_recommended_deposit: ex.yen("20000"),
+                        current_actual_deposit: Some(ex.yen("-10000")),
+                        total_deposit: ex.yen("10000"),
+                    })
+                    .execute();
+            }
+
+            #[test]
+            fn two_this_period_deposit_last_period() {
+                Test::default()
+                    .target_set_last_period_one_hundred_thousand_in_five_months()
+                    .add_line(mkdate(8, 8), Line::Deposit(RawAmount::yen("20000")))
+                    .add_line(mkdate(9, 14), Line::DepositCancellation(RawAmount::yen("5000")))
+                    .add_line(mkdate(9, 15), Line::DepositCancellation(RawAmount::yen("5000")))
                     .expect_bucket(|ex| BucketThisPeriod {
                         recommended_or_actual_change: ex.yen("-10000"),
                         current_recommended_deposit: ex.yen("20000"),
