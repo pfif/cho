@@ -101,6 +101,10 @@ impl Bucket {
                 )?;
         let deposited = ex.new_amount_from_raw_amount(&deposited)?;
 
+        if deposited.negative() {
+            return Err("Error remaining amount in bucket: money not in the bucket was withdrawn".to_string())
+        }
+
         let current_period = period_config.period_for_date(date)?;
 
         let deposited_until_period_start = self.lines.iter().try_fold(
@@ -192,7 +196,6 @@ mod test {
     - Target date
 
     Test list:
-    - test__for_period__yen__one_deposits_this_period__one_deposit_cencellation_this_period__more_than_deposited
     - test__for_period__yen__one_deposits_this_period__one_deposit_cencellation_this_period__same_date
     - test__for_period__yen__one_deposits_this_period__two_deposit_cencellation_this_period
     - test__for_period__yen__one_deposit_last_period__one_deposit_cencellation_this_period
@@ -758,6 +761,16 @@ mod test {
                         current_actual_deposit: Some(ex.yen("15000")),
                         total_deposit: ex.yen("15000"),
                     })
+                    .execute();
+            }
+
+            #[test]
+            fn one_today__too_big() {
+                Test::default()
+                    .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                    .add_line(mkdate(9, 8), Line::Deposit(RawAmount::yen("25000")))
+                    .add_line(mkdate(9, 15), Line::DepositCancellation(RawAmount::yen("30000")))
+                    .expect_error("Error remaining amount in bucket: money not in the bucket was withdrawn")
                     .execute();
             }
 

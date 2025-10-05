@@ -209,6 +209,10 @@ impl Amount {
         }
     }
 
+    pub fn negative(&self) -> bool {
+        self.immutable_amount.figure() < &dec!(0)
+    }
+
     // TODO this (and all the operations) probably need to be made into traits
     pub fn div_decimal(&self, divisor: &Decimal) -> Amount {
         Amount {
