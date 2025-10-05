@@ -23,6 +23,7 @@ pub struct Bucket {
 #[derive(Deserialize)]
 #[serde(tag = "action")]
 enum Line {
+    DepositCancellation(RawAmount),
     Deposit(RawAmount),
     SetTarget {
         amount: RawAmount,
@@ -57,6 +58,11 @@ impl Bucket {
 
     Problem - where should it be tested? At its own level, or at the level of its callers?
     */
+
+    /* TODO (before merging this PR?) idea for a refactor:
+            Isolate the aggregation of Lines for a period (all DepositCancelation this period until today, all Deposits until period start ...)
+            Refactor tests so that they are done in isolation
+     */
     fn for_period(
         &self,
         period_config: &PeriodConfigurationVaultValue,
@@ -85,6 +91,7 @@ impl Bucket {
                         if line_date <= date {
                             match line {
                                 Line::Deposit(amount) => acc.add(amount),
+                                Line::DepositCancellation(amount) => acc.minus(amount),
                                 _ => Ok(acc),
                             }
                         } else {
@@ -121,6 +128,10 @@ impl Bucket {
                         Line::Deposit(amount) => {
                             let acc = acc.unwrap_or(RawAmount::zero(&"JPY".to_string()));
                             acc.add(amount).map(Some)
+                        },
+                        Line::DepositCancellation(amount) => {
+                            let acc = acc.unwrap_or(RawAmount::zero(&"JPY".to_string()));
+                            acc.minus(amount).map(Some)
                         }
                         _ => Ok(acc),
                     }
@@ -181,13 +192,16 @@ mod test {
     - Target date
 
     Test list:
-    - test__for_period__yen__one_deposits_this_period__one_deposit_cencellation_this_period
-    - test__for_period__yen__two_deposits_last_period__one_deposit_cencellation_this_period
-    - test__for_period__yen__two_deposits_last_period__two_deposit_cencellation_this_period
-    - test__for_period__yen__two_deposits_last_period__two_deposit_cencellation_this_period
+    - test__for_period__yen__one_deposits_this_period__one_deposit_cencellation_this_period__more_than_deposited
+    - test__for_period__yen__one_deposits_this_period__one_deposit_cencellation_this_period__same_date
+    - test__for_period__yen__one_deposits_this_period__two_deposit_cencellation_this_period
+    - test__for_period__yen__one_deposit_last_period__one_deposit_cencellation_this_period
+    - test__for_period__yen__one_deposit_last_period__two_deposit_cencellation_this_period
+    - test__for_period__yen__one_deposit_last_period__one_deposit_cencellation_last_period
+    - test__for_period__yen__one_deposit_last_period__two_deposit_cencellation_last_period
     - test__for_period__yen__one_deposits_this_last_period__one_deposit_cencellation_this_last_period
-    - test__for_period__yen__one_deposits_last_period__one_deposit_cencellation_last_period
     - test__for_period__yen__two_deposits_next_period__one_deposit_cencellation_next_period
+    - test__for_period__yen__one_deposits_last_period__deposit_cencellation_all_periods
 
     - test__for_period__yen__one_withdrawal_this_period
     - test__for_period__yen__one_withdrawal_last_period
@@ -208,6 +222,9 @@ mod test {
     - (test if any lines is set to a currency that isn't JPY -> fail)
 
     FUTURE TESTS
+
+    - (forbid any negative amounts - deposits, deposit cancellations, targets, .....)
+
     - test__for_period__yen_euro__one_deposit_this_period
     - test__for_period__yen_euro__one_withdrawal_this_period
 
@@ -720,6 +737,30 @@ mod test {
                     })
                     .execute();
             }
+        }
+    }
+
+    mod deposits_cancellation {
+        use super::*;
+
+        mod this_period_until_today {
+            use super::*;
+
+            #[test]
+            fn one_today() {
+                Test::default()
+                    .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                    .add_line(mkdate(9, 8), Line::Deposit(RawAmount::yen("25000")))
+                    .add_line(mkdate(9, 15), Line::DepositCancellation(RawAmount::yen("10000")))
+                    .expect_bucket(|ex| BucketThisPeriod {
+                        recommended_or_actual_change: ex.yen("15000"),
+                        current_recommended_deposit: ex.yen("25000"),
+                        current_actual_deposit: Some(ex.yen("15000")),
+                        total_deposit: ex.yen("15000"),
+                    })
+                    .execute();
+            }
+
         }
     }
 }

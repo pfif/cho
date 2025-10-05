@@ -2,7 +2,6 @@ use std::cmp::max;
 use std::fmt::{Debug, Display, Formatter};
 use crate::amounts::amount::ImmutableAmount;
 use rust_decimal::Decimal;
-use std::ops;
 use rust_decimal_macros::dec;
 use serde::Deserialize;
 
@@ -164,6 +163,7 @@ impl Amount {
     }
 }
 
+/* TODO (this PR?) Refactor all this below?) */
 impl Amount {
     pub fn add(&self, other_amount: &Amount) -> Amount {
         let other_amount_converted = other_amount.convert(self.immutable_amount.currency());
@@ -237,7 +237,8 @@ impl RawAmount {
             figure: dec!(0)
         }
     }
-    
+
+    /* TODO (this PR?) refactor below */
     pub fn add(&self, other_amount: &RawAmount) -> Result<RawAmount, String> {
         if other_amount.currency != self.currency {
             return Err("Tried to add two raw amounts with different currencies".into())
@@ -245,6 +246,16 @@ impl RawAmount {
         Ok(RawAmount {
             currency: self.currency.clone(),
             figure: self.figure + other_amount.figure,
+        })
+    }
+
+    pub fn minus(&self, other_amount: &RawAmount) -> Result<RawAmount, String> {
+        if other_amount.currency != self.currency {
+            return Err("Tried to subtract two raw amounts with different currencies".into())
+        }
+        Ok(RawAmount {
+            currency: self.currency.clone(),
+            figure: self.figure - other_amount.figure,
         })
     }
 }
