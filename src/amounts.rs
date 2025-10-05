@@ -1,3 +1,4 @@
+use std::cmp::max;
 use std::fmt::{Debug, Display, Formatter};
 use crate::amounts::amount::ImmutableAmount;
 use rust_decimal::Decimal;
@@ -191,6 +192,17 @@ impl Amount {
         let new_immutable_amount = ImmutableAmount::new(
             self.immutable_amount.currency(),
             self.immutable_amount.figure() - other_amount_converted.immutable_amount.figure(),
+        );
+        Amount {
+            immutable_amount: new_immutable_amount,
+        }
+    }
+
+    pub fn maximum(amount_a: &Amount, amount_b: &Amount) -> Amount {
+        let amount_b_converted = amount_b.convert(amount_a.immutable_amount.currency());
+        let new_immutable_amount = ImmutableAmount::new(
+            amount_a.immutable_amount.currency(),
+            max(*amount_a.immutable_amount.figure(), *amount_b_converted.immutable_amount.figure()),
         );
         Amount {
             immutable_amount: new_immutable_amount,

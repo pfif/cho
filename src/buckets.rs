@@ -137,12 +137,13 @@ impl Bucket {
             any => any?,
         };
 
-        let recommended_deposit_figure = target_amount
-            .minus(&deposited_until_period_start)
+        let zero = ex.new_amount_from_raw_amount(&RawAmount::zero(&"JPY".to_string()))?;
+        let recommended_deposit_figure = Amount::maximum(
+            &target_amount.minus(&Amount::maximum(&deposited_until_period_start, &zero)),
+            &zero)
             .div_decimal(&Decimal::from(number_of_periods));
 
         Ok(BucketThisPeriod {
-            // TODO too many clones
             recommended_or_actual_change: deposited_this_period
                 .clone()
                 .unwrap_or(recommended_deposit_figure.clone()),
@@ -455,7 +456,7 @@ mod test {
 
         mod this_period_until_today {
             use super::*;
-            
+
             #[test]
             fn one_deposit_today__partial() {
                 Test::default()
@@ -575,7 +576,7 @@ mod test {
             }
 
             #[test]
-            fn one_deposit__over() {
+            fn one_deposit__over_recommendation() {
                 Test::default()
                     .target_set_last_period_one_hundred_thousand_in_five_months()
                     .add_line(mkdate(8, 31), Line::Deposit(RawAmount::yen("60000")))
@@ -584,6 +585,20 @@ mod test {
                         current_recommended_deposit: ex.yen("10000"),
                         current_actual_deposit: None,
                         total_deposit: ex.yen("60000"),
+                    })
+                    .execute();
+            }
+
+            #[test]
+            fn one_deposit__over_target() {
+                Test::default()
+                    .target_set_last_period_one_hundred_thousand_in_five_months()
+                    .add_line(mkdate(8, 31), Line::Deposit(RawAmount::yen("200000")))
+                    .expect_bucket(|ex| BucketThisPeriod {
+                        recommended_or_actual_change: ex.yen("0"),
+                        current_recommended_deposit: ex.yen("0"),
+                        current_actual_deposit: None,
+                        total_deposit: ex.yen("200000"),
                     })
                     .execute();
             }
