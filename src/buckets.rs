@@ -129,6 +129,7 @@ impl Bucket {
                 if line_date < &current_period.start_date {
                     match line {
                         Line::Deposit(amount) => acc.add(amount),
+                        Line::DepositCancellation(amount) => acc.minus(amount),
                         _ => Ok(acc),
                     }
                 } else {
@@ -898,6 +899,25 @@ mod test {
                     .add_line(mkdate(9, 13), Line::DepositCancellation(RawAmount::yen("30000")))
                     .add_line(mkdate(9, 15), Line::Deposit(RawAmount::yen("30000")))
                     .expect_error("attempt to withdraw more money than the Bucket contains")
+                    .execute();
+            }
+        }
+
+        mod before_current_period {
+            use super::*;
+
+            #[test]
+            fn one_cancellation() {
+                Test::default()
+                    .target_set_last_period_one_hundred_thousand_in_five_months()
+                    .add_line(mkdate(8, 1), Line::Deposit(RawAmount::yen("20000")))
+                    .add_line(mkdate(8, 31), Line::DepositCancellation(RawAmount::yen("10000")))
+                    .expect_bucket(|ex| BucketThisPeriod{
+                        recommended_or_actual_change: ex.yen("22500"),
+                        current_recommended_deposit: ex.yen("22500"),
+                        current_actual_deposit: None,
+                        total_deposit: ex.yen("10000"),
+                    })
                     .execute();
             }
         }
