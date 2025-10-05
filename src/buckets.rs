@@ -21,7 +21,7 @@ pub struct Bucket {
     lines: Vec<(NaiveDate, Line)>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(tag = "action")]
 enum Line {
     DepositCancellation(RawAmount),
@@ -56,6 +56,16 @@ impl Bucket {
     - CalendarEntries in in a period
     - CalendarEntries up until a period
     - All calendar entries
+
+    It verifies if entries are in order
+
+    Another object, the BucketChronoStackWalker is built upon the ChronoStack walker.
+    Features:
+    - it filters what type of lines are passed in
+    - and it fails if it returns two entries for the same date.
+
+    The lines for which it will call visit are also configurable
+
 
     Problem - where should it be tested? At its own level, or at the level of its callers?
     */
@@ -136,13 +146,34 @@ impl Bucket {
             .try_fold(None, |acc, (line_date, line)| {
                 if line_date >= &current_period.start_date && line_date <= date {
                     match line {
+                        // TODO (in this PR) refactor this so that we don't need to match the arms of the match below here
+                        Line::Deposit(_) | Line::DepositCancellation(_) => {
+                            if let Some((last_line_date, _)) = acc.clone() {
+                                if last_line_date == line_date {
+                                    return Err("two deposit operation on the same day".to_string())
+                                }
+                            }
+                        },
+                        _ =>  {}
+                    }
+
+                    // TODO delete code repetition below
+                    match line {
                         Line::Deposit(amount) => {
-                            let acc = acc.unwrap_or(RawAmount::zero(&"JPY".to_string()));
-                            acc.add(amount).map(Some)
+                            let running_total = if let Some((_, running_total)) = acc {
+                                running_total
+                            } else {
+                                RawAmount::zero(&"JPY".to_string())
+                            };
+                            running_total.add(amount).map(|new_amount| Some((line_date, new_amount)))
                         },
                         Line::DepositCancellation(amount) => {
-                            let acc = acc.unwrap_or(RawAmount::zero(&"JPY".to_string()));
-                            acc.minus(amount).map(Some)
+                            let running_total = if let Some((_, running_total)) = acc {
+                                running_total
+                            } else {
+                                RawAmount::zero(&"JPY".to_string())
+                            };
+                            running_total.minus(amount).map(|new_amount| Some((line_date, new_amount)))
                         }
                         _ => Ok(acc),
                     }
@@ -150,7 +181,7 @@ impl Bucket {
                     Ok(acc)
                 }
             })?
-            .map(|raw_amount: RawAmount| ex.new_amount_from_raw_amount(&raw_amount))
+            .map(|(_, raw_amount)| ex.new_amount_from_raw_amount(&raw_amount))
             .transpose()?;
 
         let number_of_periods = match period_config.periods_between(date, target_date) {
@@ -203,6 +234,8 @@ mod test {
     - Target date
 
     Test list:
+    - two deposits the same day (no)
+
     - test__for_period__yen__one_deposits_this_period__one_deposit_cencellation_this_period__same_date
     - test__for_period__yen__one_deposits_this_period__two_deposit_cencellation_this_period
     - test__for_period__yen__one_deposit_last_period__one_deposit_cencellation_this_period
@@ -288,6 +321,7 @@ mod test {
     type ExpectedFn = Box<dyn Fn(&ExchangeRates) -> TestResult>;
 
     struct Test {
+        executed: bool,
         lines: Vec<(NaiveDate, Line)>,
         expected: ExpectedFn,
     }
@@ -295,6 +329,7 @@ mod test {
     impl Default for Test {
         fn default() -> Self {
             Test {
+                executed: false,
                 lines: Vec::new(),
                 expected: Box::new(|_| Err("Please setup the test".to_string())),
             }
@@ -364,18 +399,27 @@ mod test {
     }
 
     impl Test {
-        fn execute(self) -> () {
+        fn execute(&mut self) -> () {
+            self.executed = true;
             let ex = ExchangeRates::for_tests();
             let period_configuration =
                 PeriodConfigurationVaultValue::CalendarMonth(CalendarMonthPeriodConfiguration {});
             let today = mkdate(9, 15);
 
-            let bucket = Bucket { lines: self.lines };
+            let bucket = Bucket { lines: self.lines.clone() };
 
             assert_eq!(
                 bucket.for_period(&period_configuration, &today, &ex),
                 (self.expected)(&ex)
             );
+        }
+    }
+
+    impl Drop for Test {
+        fn drop(&mut self) {
+            if !self.executed {
+                panic!("This test was not executed")
+            }
         }
     }
 
@@ -768,6 +812,16 @@ mod test {
                         current_actual_deposit: Some(ex.yen("15000")),
                         total_deposit: ex.yen("15000"),
                     })
+                    .execute();
+            }
+
+            #[test]
+            fn one_today_deposit_the_same_day() {
+                Test::default()
+                    .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                    .add_line(mkdate(9, 15), Line::Deposit(RawAmount::yen("25000")))
+                    .add_line(mkdate(9, 15), Line::DepositCancellation(RawAmount::yen("10000")))
+                    .expect_error("two deposit operation on the same day")
                     .execute();
             }
 
