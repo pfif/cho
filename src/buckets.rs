@@ -7,7 +7,6 @@ use crate::remaining_operation::core_types::{Operand, OperandBuilder};
 use crate::vault::VaultReadable;
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 use serde::Deserialize;
 use serde_json::value::Index;
 
@@ -32,6 +31,7 @@ enum Line {
 }
 
 /// Amounts to deposit
+// TODO rename to "BucketForDate"
 #[derive(Debug, Eq, PartialEq)]
 pub struct BucketThisPeriod {
     // TODO this name is bad
@@ -81,9 +81,15 @@ impl Bucket {
                 .iter()
                 .try_fold(
                     RawAmount::zero(&"JPY".to_string()),
-                    |acc, (_, line)| match line {
-                        Line::Deposit(amount) => acc.add(amount),
-                        _ => Ok(acc),
+                    |acc, (line_date, line)| {
+                        if line_date <= date {
+                            match line {
+                                Line::Deposit(amount) => acc.add(amount),
+                                _ => Ok(acc),
+                            }
+                        } else {
+                            Ok(acc)
+                        }
                     },
                 )?;
         let deposited = ex.new_amount_from_raw_amount(&deposited)?;
@@ -92,8 +98,8 @@ impl Bucket {
 
         let deposited_until_period_start = self.lines.iter().try_fold(
             RawAmount::zero(&"JPY".to_string()),
-            |acc, (date, line)| {
-                if date < &current_period.start_date {
+            |acc, (line_date, line)| {
+                if line_date < &current_period.start_date {
                     match line {
                         Line::Deposit(amount) => acc.add(amount),
                         _ => Ok(acc),
@@ -109,8 +115,8 @@ impl Bucket {
         let deposited_this_period = self
             .lines
             .iter()
-            .try_fold(None, |acc, (date, line)| {
-                if date >= &current_period.start_date {
+            .try_fold(None, |acc, (line_date, line)| {
+                if line_date >= &current_period.start_date && line_date <= date {
                     match line {
                         Line::Deposit(amount) => {
                             let acc = acc.unwrap_or(RawAmount::zero(&"JPY".to_string()));
@@ -174,8 +180,6 @@ mod test {
     - Target date
 
     Test list:
-    - test__for_period__yen__one_deposit_this_period_period_start__partial
-    - test__for_period__yen__one_deposit_last_period__partial
     - test__for_period__yen__one_deposit_next_period
     - test__for_period__yen__one_deposit_this_period_after_period
     - test__for_period__yen__one_deposit_this_last_next_period
@@ -322,6 +326,17 @@ mod test {
         ) -> Self {
             self.expected = Box::new(move |ex| Ok(bucket_builder(ex)));
             self
+        }
+
+        pub fn expect_bucket_no_commits_one_hundred_thousand_in_four_months(mut self) -> Self {
+            self.expect_bucket(
+                |ex| BucketThisPeriod {
+                    recommended_or_actual_change: ex.yen("25000"),
+                    current_recommended_deposit: ex.yen("25000"),
+                    current_actual_deposit: None,
+                    total_deposit: ex.yen("0"),
+                }
+            )
         }
     }
 
@@ -574,6 +589,20 @@ mod test {
                         current_actual_deposit: None,
                         total_deposit: ex.yen("60000"),
                     })
+                    .execute();
+            }
+        }
+        mod after_current_period {
+            use crate::amounts::RawAmount;
+            use crate::buckets::{BucketThisPeriod, Line};
+            use crate::buckets::test::{mkdate, Test};
+
+            #[test]
+            fn one_deposit_tomorrow() {
+                Test::default()
+                    .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                    .add_line(mkdate(9, 16), Line::Deposit(RawAmount::yen("25000")))
+                    .expect_bucket_no_commits_one_hundred_thousand_in_four_months()
                     .execute();
             }
         }
