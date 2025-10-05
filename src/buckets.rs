@@ -7,6 +7,7 @@ use crate::remaining_operation::core_types::{Operand, OperandBuilder};
 use crate::vault::VaultReadable;
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use serde::Deserialize;
 use serde_json::value::Index;
 
@@ -91,7 +92,17 @@ impl Bucket {
                         if line_date <= date {
                             match line {
                                 Line::Deposit(amount) => acc.add(amount),
-                                Line::DepositCancellation(amount) => acc.minus(amount),
+                                Line::DepositCancellation(amount) => {
+                                    acc
+                                        .minus(amount)
+                                        .and_then(|acc| {
+                                            if acc.figure < dec!(0) {
+                                                Err("attempt to withdraw more money than the Bucket contains".to_string())
+                                            } else {
+                                                Ok(acc)
+                                            }
+                                        })
+                                },
                                 _ => Ok(acc),
                             }
                         } else {
@@ -100,10 +111,6 @@ impl Bucket {
                     },
                 )?;
         let deposited = ex.new_amount_from_raw_amount(&deposited)?;
-
-        if deposited.negative() {
-            return Err("Error remaining amount in bucket: money not in the bucket was withdrawn".to_string())
-        }
 
         let current_period = period_config.period_for_date(date)?;
 
@@ -770,10 +777,20 @@ mod test {
                     .target_set_in_current_period_one_hundred_thousand_in_four_months()
                     .add_line(mkdate(9, 8), Line::Deposit(RawAmount::yen("25000")))
                     .add_line(mkdate(9, 15), Line::DepositCancellation(RawAmount::yen("30000")))
-                    .expect_error("Error remaining amount in bucket: money not in the bucket was withdrawn")
+                    .expect_error("attempt to withdraw more money than the Bucket contains")
                     .execute();
             }
 
+            #[test]
+            fn one_cancellation_too_big_followed_by_one_deposit_that_brings_back_the_bucket_to_positive() {
+                Test::default()
+                    .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                    .add_line(mkdate(9, 8), Line::Deposit(RawAmount::yen("25000")))
+                    .add_line(mkdate(9, 13), Line::DepositCancellation(RawAmount::yen("30000")))
+                    .add_line(mkdate(9, 15), Line::Deposit(RawAmount::yen("30000")))
+                    .expect_error("attempt to withdraw more money than the Bucket contains")
+                    .execute();
+            }
         }
     }
 }
