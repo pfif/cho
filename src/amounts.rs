@@ -224,7 +224,7 @@ impl Amount {
     }
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct RawAmount {
     pub currency: CurrencyIdent,
     pub figure: Figure,
