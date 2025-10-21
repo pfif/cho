@@ -1,3 +1,5 @@
+use std::fmt::{Formatter, Write};
+use std::str::FromStr;
 use crate::amounts::exchange_rates::ExchangeRates;
 use crate::amounts::{Amount, Figure, RawAmount};
 use crate::period::{
@@ -8,7 +10,8 @@ use crate::vault::VaultReadable;
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
+use serde::de::{Error, Visitor};
 use serde_json::value::Index;
 
 pub type BucketsVaultValue = Vec<Bucket>;
@@ -22,8 +25,52 @@ pub struct Bucket {
     lines: Vec<(NaiveDate, Line)>,
 }
 
+/*#[derive(Debug, Eq, PartialEq)]
+struct Line((NaiveDate, LineData));
+
+impl<'de> Deserialize<'de> for Line {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>
+    {
+        struct LineVisitor;
+        impl<'de> Visitor<'de> for LineVisitor {
+            type Value = Line;
+
+            fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+                formatter.write_str("a line")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: Error
+            {
+                let mut line = v.split(" ");
+                let raw_date = line.next().ok_or(Error::custom("Could not find the date"))?;
+                let date = NaiveDate::from_str(raw_date).map_err(Error::custom)?;
+
+                let tag = line.next().ok_or(Error::custom("No tag specified"))?;
+                let line_data  = match tag {
+                    "TARG+" => {
+                        let amount = line.next().ok_or(Error::custom("No amounts specified"))?;
+                        let raw_target_date = line.next().ok_or(Error::custom("No target date specified"))?;
+                        let target_date = NaiveDate::from_str(raw_target_date).map_err(Error::custom)?;
+                        SetTarget {amount, target_date}
+                    }
+                };
+                Ok(Line((date, LineData::Deposit(RawAmount{currency: "YEN".to_string(), figure: dec!(3)}))))
+            }
+        }
+
+        deserializer.deserialize_str(LineVisitor)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum LineData {
+
+ */
 #[derive(Deserialize, Clone, Debug, Eq, PartialEq)]
-#[serde(tag = "action")]
 enum Line {
     Deposit(RawAmount),
     DepositCancellation(RawAmount),
@@ -2182,11 +2229,11 @@ mod test {
                     {
                         "name": "test-bucket",
                         "lines": [
-                            "2025/08/13 TARG+ 3000 2025/10/30",
-                            "2025/08/13 DEPO+ 1100",
-                            "2025/08/20 WITH+ 500",
-                            "2025/08/20 DEPO- 100",
-                            "2025/09/15 DEPO+ 1000"
+                            "2025/08/13 TARG+ ¥3000 2025/10/30",
+                            "2025/08/13 DEPO+ ¥1100",
+                            "2025/08/20 WITH+ ¥500",
+                            "2025/08/20 DEPO- ¥100",
+                            "2025/09/15 DEPO+ ¥1000"
                         ]
                     }
                 ]})
