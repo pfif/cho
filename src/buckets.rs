@@ -16,13 +16,13 @@ impl VaultReadable for BucketsVaultValue {
     const KEY: &'static str = "buckets";
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Eq, PartialEq)]
 pub struct Bucket {
     name: String,
     lines: Vec<(NaiveDate, Line)>,
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "action")]
 enum Line {
     Deposit(RawAmount),
@@ -341,8 +341,15 @@ mod test {
 
      */
     use super::*;
+    use serde_json::Value;
+    use crate::vault::Vault;
     use crate::period::{CalendarMonthPeriodConfiguration};
     use pretty_assertions::assert_eq;
+    use std::fs::File;
+    use std::path::Path;
+    use serde_json::json;
+    use tempfile::tempdir;
+    use crate::vault::VaultImpl;
 
     fn mkdate(month: u32, date: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(2025, month, date).expect("Can create date")
@@ -2147,5 +2154,60 @@ mod test {
                 ]
             }
         )));
+    }
+
+    mod vault_value_parser {
+        use std::io::Write;
+        use super::*;
+        use pretty_assertions::assert_eq;
+        use tempfile::TempDir;
+
+        // TODO move to vault file?
+        fn create_mocked_vault(content: Value) -> (TempDir, VaultImpl) {
+            let directory = tempdir().unwrap();
+            let path = Path::join(directory.path(), "config.json");
+            let mut file = File::create(path).unwrap();
+            file.write_all(&content.to_string().into_bytes()).unwrap();
+
+            let path = directory.path().to_path_buf();
+            (directory, VaultImpl{
+                path
+            })
+        }
+
+        #[test]
+        fn nominal() {
+            let (_dir, vault) = create_mocked_vault(
+                json!({"buckets": [
+                    {
+                        "name": "test-bucket",
+                        "lines": [
+                            "2025/08/13 TARG+ 3000 2025/10/30",
+                            "2025/08/13 DEPO+ 1100",
+                            "2025/08/20 WITH+ 500",
+                            "2025/08/20 DEPO- 100",
+                            "2025/09/15 DEPO+ 1000"
+                        ]
+                    }
+                ]})
+            );
+
+            assert_eq!(
+                BucketsVaultValue::from_vault(&vault),
+                Ok(vec![Bucket{
+                    name: "test-bucket".to_string(),
+                    lines: vec![
+                        (mkdate(8, 13), Line::SetTarget {
+                            amount: RawAmount::yen("3000"),
+                            target_date: mkdate(10, 30)
+                        }),
+                        (mkdate(8, 13), Line::Deposit(RawAmount::yen("1100"))),
+                        (mkdate(8, 20), Line::Withdrawal(RawAmount::yen("500"))),
+                        (mkdate(8, 20), Line::DepositCancellation(RawAmount::yen("100"))),
+                        (mkdate(9, 15), Line::Deposit(RawAmount::yen("1000")))
+                    ]
+                }])
+            );
+        }
     }
 }
