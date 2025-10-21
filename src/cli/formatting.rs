@@ -33,6 +33,7 @@ pub fn format_remaining_operation_screen(screen: &RemainingOperationScreen) -> S
                     .map(|(_, value)| value)
                     .map(|illustration_value| match illustration_value {
                         IllustrationValue::Amount(amount) => amount.to_string(),
+                        IllustrationValue::NullAmount => "-".to_string(),
                         IllustrationValue::Bool(bool) => (if bool { "✅" } else { "" }).into(),
                         IllustrationValue::Date(date) => date.to_string(),
                     });

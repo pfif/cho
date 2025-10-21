@@ -244,8 +244,23 @@ pub mod group {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IllustrationValue {
     Amount(Amount),
+    NullAmount,
     Bool(bool),
     Date(NaiveDate),
+}
+
+impl From<Amount> for IllustrationValue {
+    fn from(value: Amount) -> Self {
+        IllustrationValue::Amount(value)
+    }
+}
+
+impl From<Option<Amount>> for IllustrationValue {
+    fn from(value: Option<Amount>) -> Self {
+       value
+           .map(|amount| amount.into())
+           .unwrap_or(IllustrationValue::NullAmount)
+    }
 }
 
 pub type Illustration = Vec<(String, IllustrationValue)>;

@@ -3,7 +3,7 @@ use crate::amounts::{Amount, Figure, RawAmount};
 use crate::period::{
     ErrorPeriodsBetween, Period, PeriodConfigurationVaultValue, PeriodsConfiguration,
 };
-use crate::remaining_operation::core_types::{Operand, OperandBuilder};
+use crate::remaining_operation::core_types::{IllustrationValue, Operand, OperandBuilder};
 use crate::vault::VaultReadable;
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
@@ -18,6 +18,7 @@ impl VaultReadable for BucketsVaultValue {
 
 #[derive(Deserialize)]
 pub struct Bucket {
+    name: String,
     lines: Vec<(NaiveDate, Line)>,
 }
 
@@ -283,7 +284,19 @@ impl OperandBuilder for Bucket {
         today: &NaiveDate,
         exchange_rates: &ExchangeRates,
     ) -> Result<Option<Operand>, String> {
-        todo!()
+        let period = self.for_period(period_configuration, today, exchange_rates)?;
+        Ok(Some(Operand {
+            name: self.name,
+            amount: period.recommended_or_actual_change,
+            illustration: vec![
+                ("This period - recommended deposit".to_string(), period.current_recommended_deposit.into()),
+                ("This period - actual deposit".to_string(), period.current_actual_deposit.into()),
+                ("This period - actual withdrawal".to_string(), period.current_withdrawal.into()),
+                ("Deposited".to_string(), period.total_deposit.into()),
+                ("Withdrawn".to_string(), period.total_withdrawal.into()),
+                ("Total".to_string(), period.total.into())
+            ],
+        }))
     }
 }
 
@@ -328,7 +341,7 @@ mod test {
 
      */
     use super::*;
-    use crate::period::{CalendarMonthPeriodConfiguration, PeriodsConfiguration};
+    use crate::period::{CalendarMonthPeriodConfiguration};
     use pretty_assertions::assert_eq;
 
     fn mkdate(month: u32, date: u32) -> NaiveDate {
@@ -452,6 +465,7 @@ mod test {
             let today = mkdate(9, 15);
 
             let bucket = Bucket {
+                name: "test bucket inner".to_string(),
                 lines: self.lines.clone(),
             };
 
@@ -2095,5 +2109,43 @@ mod test {
                     .execute();
             }
         }
+    }
+
+    #[test]
+    fn create_operand() -> () {
+        let ex = ExchangeRates::for_tests();
+        let period_configuration =
+            PeriodConfigurationVaultValue::CalendarMonth(CalendarMonthPeriodConfiguration {});
+        let today = mkdate(9, 15);
+
+        let bucket = Bucket {
+            name: "test-bucket".to_string(),
+            lines: vec![
+                (mkdate(8, 13), Line::SetTarget {
+                    amount: RawAmount::yen("3000"),
+                    target_date: mkdate(10, 30)
+                }),
+                (mkdate(8, 13), Line::Deposit(RawAmount::yen("1100"))),
+                (mkdate(8, 20), Line::Withdrawal(RawAmount::yen("500"))),
+                (mkdate(8, 20), Line::DepositCancellation(RawAmount::yen("100"))),
+                (mkdate(9, 15), Line::Deposit(RawAmount::yen("1000")))
+            ]
+        };
+
+        assert_eq!(
+            bucket.build(&period_configuration, &today, &ex),
+            Ok(Some(Operand {
+                name: "test-bucket".to_string(),
+                amount: ex.yen("1000"),
+                illustration: vec![
+                    ("This period - recommended deposit".to_string(), IllustrationValue::Amount(ex.yen("1000"))),
+                    ("This period - actual deposit".to_string(), IllustrationValue::Amount(ex.yen("1000"))),
+                    ("This period - actual withdrawal".to_string(), IllustrationValue::NullAmount),
+                    ("Deposited".to_string(), IllustrationValue::Amount(ex.yen("2000"))),
+                    ("Withdrawn".to_string(), IllustrationValue::Amount(ex.yen("500"))),
+                    ("Total".to_string(), IllustrationValue::Amount(ex.yen("1500")))
+                ]
+            }
+        )));
     }
 }
