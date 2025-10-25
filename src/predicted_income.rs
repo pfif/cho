@@ -3,7 +3,7 @@ use derive_builder::Builder;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use crate::period::{Period, PeriodConfigurationVaultValue};
-use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
+use crate::amounts::exchange_rates::ExchangeRates;
 use crate::remaining_operation::core_types::{GroupBuilder, IllustrationValue, Operand, OperandBuilder};
 use crate::remaining_operation::core_types::group::Group;
 use crate::vault::{Vault, VaultReadable};

@@ -1,7 +1,7 @@
-use crate::period::interface::{Period, PeriodsConfiguration};
+use crate::period::interface::{ErrorPeriodsBetween, Period, PeriodsConfiguration};
 use chrono::{Days, NaiveDate};
 use serde::Deserialize;
-
+use crate::period::interface::ErrorPeriodsBetween::{EndBeforeStart, Miscelaneous};
 use crate::vault::VaultReadable;
 
 pub type PeriodNumber = u16;
@@ -47,9 +47,9 @@ impl PeriodsConfiguration for FixedLengthPeriodConfiguration {
         });
     }
 
-    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<PeriodNumber, String> {
+    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<PeriodNumber, ErrorPeriodsBetween> {
         if start > end {
-            return Err("Start date is after end date".to_string());
+            return Err(EndBeforeStart);
         }
 
         let (start_period_number, end_period_number) = match (
@@ -63,13 +63,13 @@ impl PeriodsConfiguration for FixedLengthPeriodConfiguration {
                 Err(ErrorStartBeforePeriodConfiguration),
                 Err(ErrorStartBeforePeriodConfiguration),
             ) => {
-                return Err("Dates before PeriodsConfiguration's start".to_string());
+                return Err(Miscelaneous("Dates before PeriodsConfiguration's start".to_string()));
             }
             (Err(ErrorStartBeforePeriodConfiguration), _) => {
-                return Err("Start date is before PeriodsConfiguration's start".to_string());
+                return Err(Miscelaneous("Start date is before PeriodsConfiguration's start".to_string()));
             }
             (_, Err(ErrorStartBeforePeriodConfiguration)) => {
-                return Err("End date is before PeriodsConfiguration's start".to_string());
+                return Err(Miscelaneous("End date is before PeriodsConfiguration's start".to_string()));
             }
         };
 
@@ -84,6 +84,7 @@ mod tests {
     use super::{FixedLengthPeriodConfiguration, PeriodsConfiguration};
     use crate::period::Period;
     use chrono::NaiveDate;
+    use crate::period::interface::ErrorPeriodsBetween;
 
     fn date(day_of_month: u32) -> NaiveDate {
         return NaiveDate::from_ymd_opt(2023, 04, day_of_month).unwrap();
@@ -177,7 +178,7 @@ mod tests {
     fn period_between__before_period_config_start__start_date() {
         assert_eq!(
             config().periods_between(&date(9), &date(21)).unwrap_err(),
-            "Start date is before PeriodsConfiguration's start"
+            ErrorPeriodsBetween::Miscelaneous("Start date is before PeriodsConfiguration's start".to_string())
         )
     }
 
@@ -185,7 +186,7 @@ mod tests {
     fn period_between__before_period_config_start__both_date() {
         assert_eq!(
             config().periods_between(&date(7), &date(9)).unwrap_err(),
-            "Dates before PeriodsConfiguration's start"
+            ErrorPeriodsBetween::Miscelaneous("Dates before PeriodsConfiguration's start".to_string())
         )
     }
 
@@ -193,7 +194,7 @@ mod tests {
     fn period_between__start_date_after_end_date() {
         assert_eq!(
             config().periods_between(&date(21), &date(20)).unwrap_err(),
-            "Start date is after end date"
+            ErrorPeriodsBetween::EndBeforeStart
         )
     }
 

@@ -1,7 +1,9 @@
 use serde::de::DeserializeOwned;
 use serde_json::{from_reader, from_value, Value};
 use std::fs::File;
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use tempfile::{tempdir, TempDir};
 
 pub struct VaultImpl {
     pub(crate) path: PathBuf,
@@ -14,6 +16,19 @@ pub trait Vault {
     //        (it does not rely on the "read_from_vault" impl). We will need to correct this if we
     //        ever go into other non-file implementation of Vault
     fn path(&self) -> &PathBuf;
+}
+
+#[cfg(test)]
+impl VaultImpl {
+    pub(crate) fn create_mocked_vault(content: Value) -> (TempDir, VaultImpl) {
+        let directory = tempdir().unwrap();
+        let path = Path::join(directory.path(), "config.json");
+        let mut file = File::create(path).unwrap();
+        file.write_all(&content.to_string().into_bytes()).unwrap();
+
+        let path = directory.path().to_path_buf();
+        (directory, VaultImpl { path })
+    }
 }
 
 impl Vault for VaultImpl {

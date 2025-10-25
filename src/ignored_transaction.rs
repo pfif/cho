@@ -5,7 +5,7 @@ use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::Deserialize;
 use crate::period::{PeriodConfigurationVaultValue, PeriodsConfiguration};
-use crate::remaining_operation::amounts::exchange_rates::ExchangeRates;
+use crate::amounts::exchange_rates::ExchangeRates;
 use crate::remaining_operation::core_types::{GroupBuilder, IllustrationValue, Operand, OperandBuilder};
 use crate::remaining_operation::core_types::group::Group;
 
