@@ -3,7 +3,7 @@ use crate::amounts::{Amount, Figure, RawAmount};
 use crate::period::{
     ErrorPeriodsBetween, Period, PeriodConfigurationVaultValue, PeriodsConfiguration,
 };
-use crate::remaining_operation::core_types::{IllustrationValue, Operand, OperandBuilder};
+use crate::remaining_operation::core_types::{GroupBuilder, IllustrationValue, Operand, OperandBuilder};
 use crate::vault::VaultReadable;
 use chrono::format::parse;
 use chrono::NaiveDate;
@@ -20,11 +20,18 @@ impl VaultReadable for BucketsVaultValue {
     const KEY: &'static str = "buckets";
 }
 
+impl GroupBuilder<Bucket> for BucketsVaultValue {
+    fn build(self) -> Result<(String, Vec<Bucket>), String> {
+        Ok(("Buckets".into(), self.into_iter().collect()))
+    }
+}
+
 #[derive(Deserialize, Debug, Eq, PartialEq)]
 pub struct Bucket {
     name: String,
     lines: Vec<Line>,
 }
+
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 struct Line((NaiveDate, Action));
@@ -89,7 +96,7 @@ impl<'de> Deserialize<'de> for Line {
                             .map_err(|err| {
                                 Error::custom(format!(
                                     "Failed to parse date: {}. Error: {}",
-                                    raw_date, err
+                                    raw_target_date, err
                                 ))
                             })?;
 
@@ -2411,7 +2418,7 @@ mod test {
                     "name": "test-bucket",
                     "lines": [
                         "2025/08/13 TARG ¥3000 2025/10/30",
-                        "2025/08/13 DEPO ¥1100",
+                        "2025/08/13 DEPO ¥1100 #Comment",
                         "2025/08/20 WITH ¥500",
                         "2025/08/20 DEPO- ¥100",
                         "2025/09/15 DEPO ¥1000",

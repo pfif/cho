@@ -1,11 +1,11 @@
 use crate::amounts::exchange_rates::ExchangeRates;
 use crate::amounts::{Amount, CurrencyIdent};
 use crate::period::{Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
-use crate::goals::{GoalVaultValues};
 use chrono::{Local, NaiveDate};
 use group::Group;
 use rust_decimal_macros::dec;
 use crate::accounts::AccountGetter;
+use crate::buckets::BucketsVaultValue;
 use crate::ignored_transaction::IgnoredTransactionsVaultValues;
 use crate::predicted_income::PredictedIncome;
 use crate::vault::{Vault, VaultReadable};
@@ -42,7 +42,7 @@ impl RemainingOperation {
             exchange_rates,
         );
         operation.add_group(AccountGetter::from_vault(vault)?)?;
-        operation.add_group(GoalVaultValues::from_vault(vault)?)?;
+        operation.add_group(BucketsVaultValue::from_vault(vault)?)?;
         operation.add_group(IgnoredTransactionsVaultValues::from_vault(vault)?)?;
         if include_predicted_income {
             operation.add_group(PredictedIncome::from_vault(vault)?)?;
@@ -279,7 +279,7 @@ mod test {
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
     use crate::accounts::{AccountJson};
-    use crate::goals::{GoalBuilder};
+    use crate::buckets::Bucket;
     use crate::ignored_transaction::{IgnoredTransactionBuilder};
     use crate::period::{CalendarMonthPeriodConfiguration, Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
     use crate::predicted_income::{PredictedIncomeBuilder};
@@ -287,6 +287,7 @@ mod test {
     use crate::amounts::exchange_rates::ExchangeRates;
     use crate::remaining_operation::core_types::{GroupBuilder, Operand, OperandBuilder, RemainingOperation, RemainingOperationScreenGroup};
     use pretty_assertions::assert_eq;
+    use serde_json::{from_value, json};
     use crate::remaining_operation::core_types::group::Group;
 
     struct TestGroupBuilder<OB: OperandBuilder> {
@@ -378,34 +379,28 @@ mod test {
         };
         remaining_operation.add_group(accounts).expect("Can add accounts");
 
-        let goal_must_commit = GoalBuilder::default()
-            .name("Goal must commit".to_string())
-            .currency("EUR".to_string())
-            .target(dec!(200))
-            .target_date(mkdate(8, 31))
-            .committed(vec![
-                (mkdate(7, 18), dec!(150)),
-            ])
-            .build()
-            .expect("Can build goal");
+        let bucket_must_commit: Bucket = from_value(json!({
+            "name": "Goal must commit",
+            "lines": [
+                "2023/07/01 TARG ¥200 2023/08/31",
+                "2023/07/18 DEPO ¥150"
+            ]
+        })).expect("Can deserialize bucket");
 
-        let goal_already_committed = GoalBuilder::default()
-            .name("Goal already committed".to_string())
-            .currency("EUR".to_string())
-            .target(dec!(500))
-            .target_date(mkdate(8, 31))
-            .committed(vec![
-                (mkdate(7, 18), dec!(100)),
-                (mkdate(8, 17), dec!(100)),
-            ])
-            .build()
-            .expect("Can build goal");
+        let bucket_already_committed: Bucket = from_value(json!({
+            "name": "Goal already committed",
+            "lines": [
+                "2023/07/01 TARG ¥500 2023/08/31",
+                "2023/07/18 DEPO ¥100",
+                "2023/08/17 DEPO ¥100"
+            ]
+        })).expect("Can deserialize bucket");
 
         let goals = TestGroupBuilder {
-            name: "Goals".into(),
+            name: "Buckets".into(),
             operand_builders: vec![
-                goal_must_commit,
-                goal_already_committed,
+                bucket_must_commit,
+                bucket_already_committed,
             ],
         };
         remaining_operation.add_group(goals).expect("Can add goals");
@@ -473,7 +468,7 @@ mod test {
         assert_eq!(
             result_eur,
             RemainingOperationScreen {
-                remaining: exchange_rates.euro("850.00"),
+                remaining: exchange_rates.euro("925.00"),
                 period: Period {
                     start_date: mkdate(8, 1),
                     end_date: mkdate(8, 31),
@@ -527,29 +522,42 @@ mod test {
                         total: exchange_rates.euro("1000.00")
                     },
                     RemainingOperationScreenGroup {
-                        name: "Goals".into(),
+                        name: "Buckets".into(),
                         operands: vec![
                             Operand {
                                 name: "Goal must commit".to_string(),
-                                amount: exchange_rates.euro("-50"),
+                                amount: exchange_rates.yen("-50"),
                                 illustration: vec![
-                                    ("Committed".into(), IllustrationValue::Amount(exchange_rates.euro("150"))),
-                                    ("Payed in".into(), IllustrationValue::Bool(false)),
-                                    ("Target".into(), IllustrationValue::Amount(exchange_rates.euro("200"))),
+                                    ("This period - recommended deposit".into(), IllustrationValue::Amount(exchange_rates.yen("50"))),
+                                    ("This period - actual deposit".into(), IllustrationValue::NullAmount),
+                                    ("This period - actual withdrawal".into(), IllustrationValue::NullAmount),
+                                    ("Deposited".into(), IllustrationValue::Amount(exchange_rates.yen("150"))),
+                                    ("Withdrawn".into(), IllustrationValue::Amount(exchange_rates.yen("0"))),
+                                    ("Total".into(), IllustrationValue::Amount(exchange_rates.yen("150"))),
                                 ]
                             },
                             Operand {
                                 name: "Goal already committed".to_string(),
-                                amount: exchange_rates.euro("-100"),
+                                amount: exchange_rates.yen("-100"),
                                 illustration: vec![
-                                    ("Committed".into(), IllustrationValue::Amount(exchange_rates.euro("200"))),
-                                    ("Payed in".into(), IllustrationValue::Bool(true)),
-                                    ("Target".into(), IllustrationValue::Amount(exchange_rates.euro("500"))),
+                                    ("This period - recommended deposit".into(), IllustrationValue::Amount(exchange_rates.yen("400"))),
+                                    ("This period - actual deposit".into(), IllustrationValue::Amount(exchange_rates.yen("100"))),
+                                    ("This period - actual withdrawal".into(), IllustrationValue::NullAmount),
+                                    ("Deposited".into(), IllustrationValue::Amount(exchange_rates.yen("200"))),
+                                    ("Withdrawn".into(), IllustrationValue::Amount(exchange_rates.yen("0"))),
+                                    ("Total".into(), IllustrationValue::Amount(exchange_rates.yen("200"))),
                                 ]
                             },
                         ],
-                        illustration_fields: vec!["Committed".into(), "Payed in".into(), "Target".into()],
-                        total: exchange_rates.euro("-150.00")
+                        illustration_fields: vec![
+                            "This period - recommended deposit".into(),
+                            "This period - actual deposit".into(),
+                            "This period - actual withdrawal".into(),
+                            "Deposited".into(),
+                            "Withdrawn".into(),
+                            "Total".into(),
+                        ],
+                        total: exchange_rates.euro("-75.00")
                     },
                     RemainingOperationScreenGroup {
                         name: "Ignored transactions".into(),
@@ -595,14 +603,15 @@ mod test {
                 ],
             }
         );
+
         let result_jpy = remaining_operation.execute(&"JPY".to_string()).expect("Can execute remaining operation for yens");
         assert_eq!(result_jpy.groups.iter().map(|g| g.total.clone()).collect::<Vec<Amount>>(), vec![
             exchange_rates.yen("2000"),
-            exchange_rates.yen("-300"),
+            exchange_rates.yen("-150"),
             exchange_rates.yen("-400"),
             exchange_rates.yen("400")
         ]);
         
-        assert_eq!(result_jpy.remaining, exchange_rates.yen("1700"));
+        assert_eq!(result_jpy.remaining, exchange_rates.yen("1850"));
     }
 }

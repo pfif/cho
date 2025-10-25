@@ -1,6 +1,5 @@
 mod accounts;
 mod cli;
-mod goals;
 mod ignored_transaction;
 mod period;
 mod vault;
