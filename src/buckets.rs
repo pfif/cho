@@ -1,5 +1,3 @@
-use std::fmt::{Formatter, Write};
-use std::str::FromStr;
 use crate::amounts::exchange_rates::ExchangeRates;
 use crate::amounts::{Amount, Figure, RawAmount};
 use crate::period::{
@@ -7,12 +5,15 @@ use crate::period::{
 };
 use crate::remaining_operation::core_types::{IllustrationValue, Operand, OperandBuilder};
 use crate::vault::VaultReadable;
+use chrono::format::parse;
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use serde::{Deserialize, Deserializer};
 use serde::de::{Error, Visitor};
+use serde::{Deserialize, Deserializer};
 use serde_json::value::Index;
+use std::fmt::{Formatter, Write};
+use std::str::{FromStr, Split};
 
 pub type BucketsVaultValue = Vec<Bucket>;
 impl VaultReadable for BucketsVaultValue {
@@ -31,9 +32,31 @@ struct Line((NaiveDate, Action));
 impl<'de> Deserialize<'de> for Line {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>
+        D: Deserializer<'de>,
     {
         struct LineVisitor;
+        impl LineVisitor {
+            fn parse_amount<E: Error>(line: &mut Split<&str>) -> Result<RawAmount, E> {
+                let raw_amount_str = line.next().ok_or(Error::custom("No amounts specified"))?;
+
+                let mut raw_amount_str_itr = raw_amount_str.chars();
+                let sign = raw_amount_str_itr
+                    .next()
+                    .map(|sign| sign.to_string())
+                    .ok_or(Error::custom("amount is too short"))?;
+
+                let figure_raw: String = raw_amount_str_itr.collect();
+                let figure = Decimal::from_str_exact(&figure_raw).map_err(|err| {
+                    Error::custom(format!(
+                        "Error parsing amount: {}. Error: {}",
+                        figure_raw, err
+                    ))
+                })?;
+
+                Ok(RawAmount { sign, figure })
+            }
+        }
+
         impl<'de> Visitor<'de> for LineVisitor {
             type Value = Line;
 
@@ -41,26 +64,52 @@ impl<'de> Deserialize<'de> for Line {
                 formatter.write_str("a line")
             }
 
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: Error
-            {
-                /*
+            fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
+                // TODO rewrite with nom
                 let mut line = v.split(" ");
-                let raw_date = line.next().ok_or(Error::custom("Could not find the date"))?;
-                let date = NaiveDate::from_str(raw_date).map_err(Error::custom)?;
+                let raw_date = line
+                    .next()
+                    .ok_or(Error::custom("Could not find the date"))?;
+                let date = NaiveDate::parse_from_str(raw_date, "%Y/%m/%d").map_err(|err| {
+                    Error::custom(format!(
+                        "Failed to parse date: {}. Error: {}",
+                        raw_date, err
+                    ))
+                })?;
 
                 let tag = line.next().ok_or(Error::custom("No tag specified"))?;
                 let line_data = match tag {
-                    "TARG+" => {
-                        let amount = line.next().ok_or(Error::custom("No amounts specified"))?;
-                        let raw_target_date = line.next().ok_or(Error::custom("No target date specified"))?;
-                        let target_date = NaiveDate::from_str(raw_target_date).map_err(Error::custom)?;
-                        Action::SetTarget {amount, target_date}
+                    "TARG" => {
+                        let raw_amount = LineVisitor::parse_amount(&mut line)?;
+
+                        let raw_target_date = line
+                            .next()
+                            .ok_or(Error::custom("No target date specified"))?;
+                        let target_date = NaiveDate::parse_from_str(raw_target_date, "%Y/%m/%d")
+                            .map_err(|err| {
+                                Error::custom(format!(
+                                    "Failed to parse date: {}. Error: {}",
+                                    raw_date, err
+                                ))
+                            })?;
+
+                        Ok(Action::SetTarget {
+                            amount: raw_amount,
+                            target_date,
+                        })
                     }
-                };
-                 */
-                Ok(Line((NaiveDate::from_ymd_opt(1970, 1, 1).unwrap(), Action::Deposit(RawAmount{sign: "¥".to_string(), figure: dec!(3)}))))
+                    "DEPO" => Ok(Action::Deposit(LineVisitor::parse_amount(&mut line)?)),
+                    "DEPO-" => Ok(Action::DepositCancellation(LineVisitor::parse_amount(
+                        &mut line,
+                    )?)),
+                    "WITH" => Ok(Action::Withdrawal(LineVisitor::parse_amount(&mut line)?)),
+                    "WITH-" => Ok(Action::WithdrawalCancellation(LineVisitor::parse_amount(
+                        &mut line,
+                    )?)),
+                    _ => Err(Error::custom("Unknown tag")),
+                }?;
+
+                Ok(Line((date, line_data)))
             }
         }
 
@@ -148,22 +197,20 @@ impl Bucket {
             |acc, Line((line_date, action))| {
                 if line_date <= date {
                     match action {
-                        Action::Deposit(amount) | Action::WithdrawalCancellation(amount) => {
-                            ex.new_amount_from_raw_amount(amount).map(|parsed_amount| {
-                                acc.add(&parsed_amount)
-                            })
-                        }
-                        Action::DepositCancellation(amount) | Action::Withdrawal(amount) => {
-                            ex.new_amount_from_raw_amount(amount)
-                                .map(|parsed_amount| acc.minus(&parsed_amount))
-                                .and_then(|new_acc| {
+                        Action::Deposit(amount) | Action::WithdrawalCancellation(amount) => ex
+                            .new_amount_from_raw_amount(amount)
+                            .map(|parsed_amount| acc.add(&parsed_amount)),
+                        Action::DepositCancellation(amount) | Action::Withdrawal(amount) => ex
+                            .new_amount_from_raw_amount(amount)
+                            .map(|parsed_amount| acc.minus(&parsed_amount))
+                            .and_then(|new_acc| {
                                 if new_acc.negative() {
-                                    Err("attempt to withdraw more money than the Bucket contains".to_string())
+                                    Err("attempt to withdraw more money than the Bucket contains"
+                                        .to_string())
                                 } else {
                                     Ok(new_acc)
                                 }
-                            })
-                        }
+                            }),
                         _ => Ok(acc),
                     }
                 } else {
@@ -177,8 +224,12 @@ impl Bucket {
             |acc, Line((line_date, action))| {
                 if line_date <= date {
                     match action {
-                        Action::Deposit(amount) => ex.new_amount_from_raw_amount(amount).map(|parsed_amount| acc.add(&parsed_amount)),
-                        Action::DepositCancellation(amount) => ex.new_amount_from_raw_amount(amount).map(|parsed_amount| acc.minus(&parsed_amount)),
+                        Action::Deposit(amount) => ex
+                            .new_amount_from_raw_amount(amount)
+                            .map(|parsed_amount| acc.add(&parsed_amount)),
+                        Action::DepositCancellation(amount) => ex
+                            .new_amount_from_raw_amount(amount)
+                            .map(|parsed_amount| acc.minus(&parsed_amount)),
                         _ => Ok(acc),
                     }
                 } else {
@@ -192,14 +243,20 @@ impl Bucket {
             |acc, Line((line_date, action))| {
                 if line_date <= date {
                     match action {
-                        Action::Withdrawal(amount) => ex.new_amount_from_raw_amount(amount).map(|parsed_amount| acc.add(&parsed_amount)),
-                        Action::WithdrawalCancellation(amount) => ex.new_amount_from_raw_amount(amount).map(|parsed_amount| acc.minus(&parsed_amount)).and_then(|new_acc| {
-                            if new_acc.negative() {
-                                Err("attempt to put back money that was not withdrawn".to_string())
-                            } else {
-                                Ok(new_acc)
-                            }
-                        }),
+                        Action::Withdrawal(amount) => ex
+                            .new_amount_from_raw_amount(amount)
+                            .map(|parsed_amount| acc.add(&parsed_amount)),
+                        Action::WithdrawalCancellation(amount) => ex
+                            .new_amount_from_raw_amount(amount)
+                            .map(|parsed_amount| acc.minus(&parsed_amount))
+                            .and_then(|new_acc| {
+                                if new_acc.negative() {
+                                    Err("attempt to put back money that was not withdrawn"
+                                        .to_string())
+                                } else {
+                                    Ok(new_acc)
+                                }
+                            }),
                         _ => Ok(acc),
                     }
                 } else {
@@ -216,8 +273,12 @@ impl Bucket {
                 if line_date < &current_period.start_date {
                     match action {
                         // Withdrawals should never count toward what was deposited
-                        Action::Deposit(amount) => ex.new_amount_from_raw_amount(amount).map(|parsed_amount| acc.add(&parsed_amount)),
-                        Action::DepositCancellation(amount) => ex.new_amount_from_raw_amount(amount).map(|parsed_amount| acc.minus(&parsed_amount)),
+                        Action::Deposit(amount) => ex
+                            .new_amount_from_raw_amount(amount)
+                            .map(|parsed_amount| acc.add(&parsed_amount)),
+                        Action::DepositCancellation(amount) => ex
+                            .new_amount_from_raw_amount(amount)
+                            .map(|parsed_amount| acc.minus(&parsed_amount)),
                         _ => Ok(acc),
                     }
                 } else {
@@ -226,68 +287,74 @@ impl Bucket {
             },
         )?;
 
-        let total_this_period = self
-            .lines
-            .iter()
-            .try_fold(None, |acc, Line((line_date, action))| {
-                if line_date >= &current_period.start_date && line_date <= date {
-                    match action {
-                        Action::Deposit(amount) | Action::WithdrawalCancellation(amount) => {
-                            let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                            ex.new_amount_from_raw_amount(amount).map(|parsed_amount| Some(acc.add(&parsed_amount)))
+        let total_this_period =
+            self.lines
+                .iter()
+                .try_fold(None, |acc, Line((line_date, action))| {
+                    if line_date >= &current_period.start_date && line_date <= date {
+                        match action {
+                            Action::Deposit(amount) | Action::WithdrawalCancellation(amount) => {
+                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
+                                ex.new_amount_from_raw_amount(amount)
+                                    .map(|parsed_amount| Some(acc.add(&parsed_amount)))
+                            }
+                            Action::DepositCancellation(amount) | Action::Withdrawal(amount) => {
+                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
+                                ex.new_amount_from_raw_amount(amount)
+                                    .map(|parsed_amount| Some(acc.minus(&parsed_amount)))
+                            }
+                            _ => Ok(acc),
                         }
-                        Action::DepositCancellation(amount) | Action::Withdrawal(amount) => {
-                            let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                            ex.new_amount_from_raw_amount(amount).map(|parsed_amount| Some(acc.minus(&parsed_amount)))
-                        }
-                        _ => Ok(acc),
+                    } else {
+                        Ok(acc)
                     }
-                } else {
-                    Ok(acc)
-                }
-            })?;
+                })?;
 
-        let deposited_this_period = self
-            .lines
-            .iter()
-            .try_fold(None, |acc, Line((line_date, action))| {
-                if line_date >= &current_period.start_date && line_date <= date {
-                    match action {
-                        Action::Deposit(amount) => {
-                            let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                            ex.new_amount_from_raw_amount(amount).map(|parsed_amount| Some(acc.add(&parsed_amount)))
+        let deposited_this_period =
+            self.lines
+                .iter()
+                .try_fold(None, |acc, Line((line_date, action))| {
+                    if line_date >= &current_period.start_date && line_date <= date {
+                        match action {
+                            Action::Deposit(amount) => {
+                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
+                                ex.new_amount_from_raw_amount(amount)
+                                    .map(|parsed_amount| Some(acc.add(&parsed_amount)))
+                            }
+                            Action::DepositCancellation(amount) => {
+                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
+                                ex.new_amount_from_raw_amount(amount)
+                                    .map(|parsed_amount| Some(acc.minus(&parsed_amount)))
+                            }
+                            _ => Ok(acc),
                         }
-                        Action::DepositCancellation(amount) => {
-                            let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                            ex.new_amount_from_raw_amount(amount).map(|parsed_amount| Some(acc.minus(&parsed_amount)))
-                        }
-                        _ => Ok(acc),
+                    } else {
+                        Ok(acc)
                     }
-                } else {
-                    Ok(acc)
-                }
-            })?;
+                })?;
 
-        let withdrawned_this_period = self
-            .lines
-            .iter()
-            .try_fold(None, |acc, Line((line_date, action))| {
-                if line_date >= &current_period.start_date && line_date <= date {
-                    match action {
-                        Action::Withdrawal(amount) => {
-                            let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                            ex.new_amount_from_raw_amount(amount).map(|parsed_amount| Some(acc.add(&parsed_amount)))
+        let withdrawned_this_period =
+            self.lines
+                .iter()
+                .try_fold(None, |acc, Line((line_date, action))| {
+                    if line_date >= &current_period.start_date && line_date <= date {
+                        match action {
+                            Action::Withdrawal(amount) => {
+                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
+                                ex.new_amount_from_raw_amount(amount)
+                                    .map(|parsed_amount| Some(acc.add(&parsed_amount)))
+                            }
+                            Action::WithdrawalCancellation(amount) => {
+                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
+                                ex.new_amount_from_raw_amount(amount)
+                                    .map(|parsed_amount| Some(acc.minus(&parsed_amount)))
+                            }
+                            _ => Ok(acc),
                         }
-                        Action::WithdrawalCancellation(amount) => {
-                            let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                            ex.new_amount_from_raw_amount(amount).map(|parsed_amount| Some(acc.minus(&parsed_amount)))
-                        }
-                        _ => Ok(acc),
+                    } else {
+                        Ok(acc)
                     }
-                } else {
-                    Ok(acc)
-                }
-            })?;
+                })?;
 
         let number_of_periods = match period_config.periods_between(date, target_date) {
             Ok(nb) => nb,
@@ -295,9 +362,11 @@ impl Bucket {
             any => any?,
         };
 
-        let recommended_deposit_figure =
-            Amount::maximum(&target_amount.minus(&deposited_until_period_start), &ex.zero(&"JPY".to_string())?)
-                .div_decimal(&Decimal::from(number_of_periods));
+        let recommended_deposit_figure = Amount::maximum(
+            &target_amount.minus(&deposited_until_period_start),
+            &ex.zero(&"JPY".to_string())?,
+        )
+        .div_decimal(&Decimal::from(number_of_periods));
 
         Ok(BucketThisPeriod {
             recommended_or_actual_change: total_this_period
@@ -325,12 +394,21 @@ impl OperandBuilder for Bucket {
             name: self.name,
             amount: period.recommended_or_actual_change,
             illustration: vec![
-                ("This period - recommended deposit".to_string(), period.current_recommended_deposit.into()),
-                ("This period - actual deposit".to_string(), period.current_actual_deposit.into()),
-                ("This period - actual withdrawal".to_string(), period.current_withdrawal.into()),
+                (
+                    "This period - recommended deposit".to_string(),
+                    period.current_recommended_deposit.into(),
+                ),
+                (
+                    "This period - actual deposit".to_string(),
+                    period.current_actual_deposit.into(),
+                ),
+                (
+                    "This period - actual withdrawal".to_string(),
+                    period.current_withdrawal.into(),
+                ),
                 ("Deposited".to_string(), period.total_deposit.into()),
                 ("Withdrawn".to_string(), period.total_withdrawal.into()),
-                ("Total".to_string(), period.total.into())
+                ("Total".to_string(), period.total.into()),
             ],
         }))
     }
@@ -377,15 +455,15 @@ mod test {
 
      */
     use super::*;
-    use serde_json::Value;
+    use crate::period::CalendarMonthPeriodConfiguration;
     use crate::vault::Vault;
-    use crate::period::{CalendarMonthPeriodConfiguration};
+    use crate::vault::VaultImpl;
     use pretty_assertions::assert_eq;
+    use serde_json::json;
+    use serde_json::Value;
     use std::fs::File;
     use std::path::Path;
-    use serde_json::json;
     use tempfile::tempdir;
-    use crate::vault::VaultImpl;
 
     fn mkdate(month: u32, date: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(2025, month, date).expect("Can create date")
@@ -870,7 +948,7 @@ mod test {
         mod after_current_period {
             use crate::amounts::RawAmount;
             use crate::buckets::test::{mkdate, Test};
-            use crate::buckets::{BucketThisPeriod, Action};
+            use crate::buckets::{Action, BucketThisPeriod};
 
             #[test]
             fn one_deposit_tomorrow() {
@@ -2164,15 +2242,21 @@ mod test {
         let bucket = Bucket {
             name: "test-bucket".to_string(),
             lines: vec![
-                Line((mkdate(8, 13), Action::SetTarget {
-                    amount: RawAmount::yen("3000"),
-                    target_date: mkdate(10, 30)
-                })),
+                Line((
+                    mkdate(8, 13),
+                    Action::SetTarget {
+                        amount: RawAmount::yen("3000"),
+                        target_date: mkdate(10, 30),
+                    },
+                )),
                 Line((mkdate(8, 13), Action::Deposit(RawAmount::yen("1100")))),
                 Line((mkdate(8, 20), Action::Withdrawal(RawAmount::yen("500")))),
-                Line((mkdate(8, 20), Action::DepositCancellation(RawAmount::yen("100")))),
-                Line((mkdate(9, 15), Action::Deposit(RawAmount::yen("1000"))))
-            ]
+                Line((
+                    mkdate(8, 20),
+                    Action::DepositCancellation(RawAmount::yen("100")),
+                )),
+                Line((mkdate(9, 15), Action::Deposit(RawAmount::yen("1000")))),
+            ],
         };
 
         assert_eq!(
@@ -2181,21 +2265,39 @@ mod test {
                 name: "test-bucket".to_string(),
                 amount: ex.yen("1000"),
                 illustration: vec![
-                    ("This period - recommended deposit".to_string(), IllustrationValue::Amount(ex.yen("1000"))),
-                    ("This period - actual deposit".to_string(), IllustrationValue::Amount(ex.yen("1000"))),
-                    ("This period - actual withdrawal".to_string(), IllustrationValue::NullAmount),
-                    ("Deposited".to_string(), IllustrationValue::Amount(ex.yen("2000"))),
-                    ("Withdrawn".to_string(), IllustrationValue::Amount(ex.yen("500"))),
-                    ("Total".to_string(), IllustrationValue::Amount(ex.yen("1500")))
+                    (
+                        "This period - recommended deposit".to_string(),
+                        IllustrationValue::Amount(ex.yen("1000"))
+                    ),
+                    (
+                        "This period - actual deposit".to_string(),
+                        IllustrationValue::Amount(ex.yen("1000"))
+                    ),
+                    (
+                        "This period - actual withdrawal".to_string(),
+                        IllustrationValue::NullAmount
+                    ),
+                    (
+                        "Deposited".to_string(),
+                        IllustrationValue::Amount(ex.yen("2000"))
+                    ),
+                    (
+                        "Withdrawn".to_string(),
+                        IllustrationValue::Amount(ex.yen("500"))
+                    ),
+                    (
+                        "Total".to_string(),
+                        IllustrationValue::Amount(ex.yen("1500"))
+                    )
                 ]
-            }
-        )));
+            }))
+        );
     }
 
     mod vault_value_parser {
-        use std::io::Write;
         use super::*;
         use pretty_assertions::assert_eq;
+        use std::io::Write;
         use tempfile::TempDir;
 
         // TODO move to vault file?
@@ -2206,41 +2308,48 @@ mod test {
             file.write_all(&content.to_string().into_bytes()).unwrap();
 
             let path = directory.path().to_path_buf();
-            (directory, VaultImpl{
-                path
-            })
+            (directory, VaultImpl { path })
         }
 
         #[test]
         fn nominal() {
-            let (_dir, vault) = create_mocked_vault(
-                json!({"buckets": [
-                    {
-                        "name": "test-bucket",
-                        "lines": [
-                            "2025/08/13 TARG+ ¥3000 2025/10/30",
-                            "2025/08/13 DEPO+ ¥1100",
-                            "2025/08/20 WITH+ ¥500",
-                            "2025/08/20 DEPO- ¥100",
-                            "2025/09/15 DEPO+ ¥1000"
-                        ]
-                    }
-                ]})
-            );
+            let (_dir, vault) = create_mocked_vault(json!({"buckets": [
+                {
+                    "name": "test-bucket",
+                    "lines": [
+                        "2025/08/13 TARG ¥3000 2025/10/30",
+                        "2025/08/13 DEPO ¥1100",
+                        "2025/08/20 WITH ¥500",
+                        "2025/08/20 DEPO- ¥100",
+                        "2025/09/15 DEPO ¥1000",
+                        "2025/09/15 WITH- ¥50"
+                    ]
+                }
+            ]}));
 
             assert_eq!(
                 BucketsVaultValue::from_vault(&vault),
-                Ok(vec![Bucket{
+                Ok(vec![Bucket {
                     name: "test-bucket".to_string(),
                     lines: vec![
-                        Line((mkdate(8, 13), Action::SetTarget {
-                            amount: RawAmount::yen("3000"),
-                            target_date: mkdate(10, 30)
-                        })),
+                        Line((
+                            mkdate(8, 13),
+                            Action::SetTarget {
+                                amount: RawAmount::yen("3000"),
+                                target_date: mkdate(10, 30)
+                            }
+                        )),
                         Line((mkdate(8, 13), Action::Deposit(RawAmount::yen("1100")))),
                         Line((mkdate(8, 20), Action::Withdrawal(RawAmount::yen("500")))),
-                        Line((mkdate(8, 20), Action::DepositCancellation(RawAmount::yen("100")))),
-                        Line((mkdate(9, 15), Action::Deposit(RawAmount::yen("1000"))))
+                        Line((
+                            mkdate(8, 20),
+                            Action::DepositCancellation(RawAmount::yen("100"))
+                        )),
+                        Line((mkdate(9, 15), Action::Deposit(RawAmount::yen("1000")))),
+                        Line((
+                            mkdate(9, 15),
+                            Action::WithdrawalCancellation(RawAmount::yen("50"))
+                        ))
                     ]
                 }])
             );
