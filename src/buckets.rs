@@ -51,7 +51,7 @@ impl<'de> Deserialize<'de> for Line {
                 let date = NaiveDate::from_str(raw_date).map_err(Error::custom)?;
 
                 let tag = line.next().ok_or(Error::custom("No tag specified"))?;
-                let line_data  = match tag {
+                let line_data = match tag {
                     "TARG+" => {
                         let amount = line.next().ok_or(Error::custom("No amounts specified"))?;
                         let raw_target_date = line.next().ok_or(Error::custom("No target date specified"))?;
@@ -60,7 +60,7 @@ impl<'de> Deserialize<'de> for Line {
                     }
                 };
                  */
-                Ok(Line((NaiveDate::from_ymd_opt(1970, 1, 1).unwrap(), Action::Deposit(RawAmount{currency: "YEN".to_string(), figure: dec!(3)}))))
+                Ok(Line((NaiveDate::from_ymd_opt(1970, 1, 1).unwrap(), Action::Deposit(RawAmount{sign: "¥".to_string(), figure: dec!(3)}))))
             }
         }
 
@@ -144,20 +144,23 @@ impl Bucket {
         let target_amount = ex.new_amount_from_raw_amount(&target_amount)?;
 
         let total = self.lines.iter().try_fold(
-            RawAmount::zero(&"JPY".to_string()),
+            ex.zero(&"JPY".to_string())?,
             |acc, Line((line_date, action))| {
                 if line_date <= date {
                     match action {
                         Action::Deposit(amount) | Action::WithdrawalCancellation(amount) => {
-                            acc.add(amount)
+                            ex.new_amount_from_raw_amount(amount).map(|parsed_amount| {
+                                acc.add(&parsed_amount)
+                            })
                         }
                         Action::DepositCancellation(amount) | Action::Withdrawal(amount) => {
-                            acc.minus(amount).and_then(|acc| {
-                                if acc.figure < dec!(0) {
-                                    Err("attempt to withdraw more money than the Bucket contains"
-                                        .to_string())
+                            ex.new_amount_from_raw_amount(amount)
+                                .map(|parsed_amount| acc.minus(&parsed_amount))
+                                .and_then(|new_acc| {
+                                if new_acc.negative() {
+                                    Err("attempt to withdraw more money than the Bucket contains".to_string())
                                 } else {
-                                    Ok(acc)
+                                    Ok(new_acc)
                                 }
                             })
                         }
@@ -168,15 +171,14 @@ impl Bucket {
                 }
             },
         )?;
-        let total = ex.new_amount_from_raw_amount(&total)?;
 
         let deposited = self.lines.iter().try_fold(
-            RawAmount::zero(&"JPY".to_string()),
+            ex.zero(&"JPY".to_string())?,
             |acc, Line((line_date, action))| {
                 if line_date <= date {
                     match action {
-                        Action::Deposit(amount) => acc.add(amount),
-                        Action::DepositCancellation(amount) => acc.minus(amount),
+                        Action::Deposit(amount) => ex.new_amount_from_raw_amount(amount).map(|parsed_amount| acc.add(&parsed_amount)),
+                        Action::DepositCancellation(amount) => ex.new_amount_from_raw_amount(amount).map(|parsed_amount| acc.minus(&parsed_amount)),
                         _ => Ok(acc),
                     }
                 } else {
@@ -184,19 +186,18 @@ impl Bucket {
                 }
             },
         )?;
-        let deposited = ex.new_amount_from_raw_amount(&deposited)?;
 
         let withdrawn = self.lines.iter().try_fold(
-            RawAmount::zero(&"JPY".to_string()),
+            ex.zero(&"JPY".to_string())?,
             |acc, Line((line_date, action))| {
                 if line_date <= date {
                     match action {
-                        Action::Withdrawal(amount) => acc.add(amount),
-                        Action::WithdrawalCancellation(amount) => acc.minus(amount).and_then(|acc| {
-                            if acc.figure < dec!(0) {
+                        Action::Withdrawal(amount) => ex.new_amount_from_raw_amount(amount).map(|parsed_amount| acc.add(&parsed_amount)),
+                        Action::WithdrawalCancellation(amount) => ex.new_amount_from_raw_amount(amount).map(|parsed_amount| acc.minus(&parsed_amount)).and_then(|new_acc| {
+                            if new_acc.negative() {
                                 Err("attempt to put back money that was not withdrawn".to_string())
                             } else {
-                                Ok(acc)
+                                Ok(new_acc)
                             }
                         }),
                         _ => Ok(acc),
@@ -206,18 +207,17 @@ impl Bucket {
                 }
             },
         )?;
-        let withdrawn = ex.new_amount_from_raw_amount(&withdrawn)?;
 
         let current_period = period_config.period_for_date(date)?;
 
         let deposited_until_period_start = self.lines.iter().try_fold(
-            RawAmount::zero(&"JPY".to_string()),
+            ex.zero(&"JPY".to_string())?,
             |acc, Line((line_date, action))| {
                 if line_date < &current_period.start_date {
                     match action {
                         // Withdrawals should never count toward what was deposited
-                        Action::Deposit(amount) => acc.add(amount),
-                        Action::DepositCancellation(amount) => acc.minus(amount),
+                        Action::Deposit(amount) => ex.new_amount_from_raw_amount(amount).map(|parsed_amount| acc.add(&parsed_amount)),
+                        Action::DepositCancellation(amount) => ex.new_amount_from_raw_amount(amount).map(|parsed_amount| acc.minus(&parsed_amount)),
                         _ => Ok(acc),
                     }
                 } else {
@@ -225,8 +225,6 @@ impl Bucket {
                 }
             },
         )?;
-        let deposited_until_period_start =
-            ex.new_amount_from_raw_amount(&deposited_until_period_start)?;
 
         let total_this_period = self
             .lines
@@ -235,21 +233,19 @@ impl Bucket {
                 if line_date >= &current_period.start_date && line_date <= date {
                     match action {
                         Action::Deposit(amount) | Action::WithdrawalCancellation(amount) => {
-                            let acc = acc.unwrap_or(RawAmount::zero(&"JPY".to_string()));
-                            acc.add(amount).map(Some)
+                            let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
+                            ex.new_amount_from_raw_amount(amount).map(|parsed_amount| Some(acc.add(&parsed_amount)))
                         }
                         Action::DepositCancellation(amount) | Action::Withdrawal(amount) => {
-                            let acc = acc.unwrap_or(RawAmount::zero(&"JPY".to_string()));
-                            acc.minus(amount).map(Some)
+                            let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
+                            ex.new_amount_from_raw_amount(amount).map(|parsed_amount| Some(acc.minus(&parsed_amount)))
                         }
                         _ => Ok(acc),
                     }
                 } else {
                     Ok(acc)
                 }
-            })?
-            .map(|raw_amount: RawAmount| ex.new_amount_from_raw_amount(&raw_amount))
-            .transpose()?;
+            })?;
 
         let deposited_this_period = self
             .lines
@@ -258,21 +254,19 @@ impl Bucket {
                 if line_date >= &current_period.start_date && line_date <= date {
                     match action {
                         Action::Deposit(amount) => {
-                            let acc = acc.unwrap_or(RawAmount::zero(&"JPY".to_string()));
-                            acc.add(amount).map(Some)
+                            let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
+                            ex.new_amount_from_raw_amount(amount).map(|parsed_amount| Some(acc.add(&parsed_amount)))
                         }
                         Action::DepositCancellation(amount) => {
-                            let acc = acc.unwrap_or(RawAmount::zero(&"JPY".to_string()));
-                            acc.minus(amount).map(Some)
+                            let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
+                            ex.new_amount_from_raw_amount(amount).map(|parsed_amount| Some(acc.minus(&parsed_amount)))
                         }
                         _ => Ok(acc),
                     }
                 } else {
                     Ok(acc)
                 }
-            })?
-            .map(|raw_amount: RawAmount| ex.new_amount_from_raw_amount(&raw_amount))
-            .transpose()?;
+            })?;
 
         let withdrawned_this_period = self
             .lines
@@ -281,21 +275,19 @@ impl Bucket {
                 if line_date >= &current_period.start_date && line_date <= date {
                     match action {
                         Action::Withdrawal(amount) => {
-                            let acc = acc.unwrap_or(RawAmount::zero(&"JPY".to_string()));
-                            acc.add(amount).map(Some)
+                            let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
+                            ex.new_amount_from_raw_amount(amount).map(|parsed_amount| Some(acc.add(&parsed_amount)))
                         }
                         Action::WithdrawalCancellation(amount) => {
-                            let acc = acc.unwrap_or(RawAmount::zero(&"JPY".to_string()));
-                            acc.minus(amount).map(Some)
+                            let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
+                            ex.new_amount_from_raw_amount(amount).map(|parsed_amount| Some(acc.minus(&parsed_amount)))
                         }
                         _ => Ok(acc),
                     }
                 } else {
                     Ok(acc)
                 }
-            })?
-            .map(|raw_amount: RawAmount| ex.new_amount_from_raw_amount(&raw_amount))
-            .transpose()?;
+            })?;
 
         let number_of_periods = match period_config.periods_between(date, target_date) {
             Ok(nb) => nb,
@@ -303,9 +295,8 @@ impl Bucket {
             any => any?,
         };
 
-        let zero = ex.new_amount_from_raw_amount(&RawAmount::zero(&"JPY".to_string()))?;
         let recommended_deposit_figure =
-            Amount::maximum(&target_amount.minus(&deposited_until_period_start), &zero)
+            Amount::maximum(&target_amount.minus(&deposited_until_period_start), &ex.zero(&"JPY".to_string())?)
                 .div_decimal(&Decimal::from(number_of_periods));
 
         Ok(BucketThisPeriod {

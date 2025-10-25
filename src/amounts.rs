@@ -7,7 +7,6 @@ use serde::Deserialize;
 
 pub type Figure = Decimal;
 pub type CurrencyIdent = String;
-pub type Sign = String;
 
 // TODO To make this code more efficient, to make sure we keep only one version of the currency in memory and as an exercice for me to understand lifetimes( ??),
 //      remove the clone from here and use lifetimes.
@@ -49,10 +48,14 @@ pub mod exchange_rates {
 
             currencies.map(|rate| ExchangeRates { currencies: rate })
         }
-        pub fn get_currency(&self, ident: &CurrencyIdent) -> Result<&Currency, String> {
+        fn get_currency(&self, ident: &CurrencyIdent) -> Result<&Currency, String> {
             self.currencies
                 .get(ident)
                 .ok_or(format!("Could not find currency ident: {}", ident))
+        }
+
+        fn get_currency_from_sign(&self, sign: &str) -> Result<&Currency, String> {
+            self.currencies.values().find(|c| c.sign == sign).ok_or("Could not find currency".to_string())
         }
 
         pub fn new_amount(
@@ -61,16 +64,28 @@ pub mod exchange_rates {
             figure: Figure,
         ) -> Result<Amount, String> {
             let currency = self.get_currency(currency_ident)?;
+            self.new_amount_from_currency(currency, figure)
+        }
+
+        fn new_amount_from_currency(
+            &self,
+            currency: &Currency,
+            figure: Figure,
+        ) -> Result<Amount, String> {
             Ok(Amount {
-                immutable_amount: ImmutableAmount::new(currency, figure),
+                immutable_amount: ImmutableAmount::new(currency, figure)
             })
         }
-        
+
         pub fn new_amount_from_raw_amount(
             &self,
             raw_amount: &RawAmount,
         ) -> Result<Amount, String>{
-           self.new_amount(&raw_amount.currency, raw_amount.figure)
+           self.new_amount_from_currency(self.get_currency_from_sign(&raw_amount.sign)?, raw_amount.figure)
+        }
+
+        pub fn zero(&self, currency_ident: &CurrencyIdent) -> Result<Amount, String> {
+            self.new_amount(currency_ident, dec!(0))
         }
     }
 
@@ -226,50 +241,15 @@ impl Amount {
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct RawAmount {
-    pub currency: CurrencyIdent,
+    pub sign: String,
     pub figure: Figure,
 }
-
-impl RawAmount {
-    pub fn to_amount(&self, exchange_rates: &exchange_rates::ExchangeRates) -> Result<Amount, String> {
-        exchange_rates.new_amount(&self.currency, self.figure)
-    }
-    
-    pub fn zero(currency: &CurrencyIdent) -> RawAmount {
-        RawAmount {
-            currency: currency.clone(),
-            figure: dec!(0)
-        }
-    }
-
-    /* TODO (this PR?) refactor below */
-    pub fn add(&self, other_amount: &RawAmount) -> Result<RawAmount, String> {
-        if other_amount.currency != self.currency {
-            return Err("Tried to add two raw amounts with different currencies".into())
-        }
-        Ok(RawAmount {
-            currency: self.currency.clone(),
-            figure: self.figure + other_amount.figure,
-        })
-    }
-
-    pub fn minus(&self, other_amount: &RawAmount) -> Result<RawAmount, String> {
-        if other_amount.currency != self.currency {
-            return Err("Tried to subtract two raw amounts with different currencies".into())
-        }
-        Ok(RawAmount {
-            currency: self.currency.clone(),
-            figure: self.figure - other_amount.figure,
-        })
-    }
-}
-
 
 #[cfg(test)]
 impl RawAmount {
     pub fn yen(figure: &str) -> RawAmount {
         RawAmount {
-            currency: "JPY".to_string(),
+            sign: "¥".to_string(),
             figure: Decimal::from_str_exact(figure).expect("can build a decimal from passed string"),
         }
     }
