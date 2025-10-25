@@ -224,8 +224,17 @@ impl Amount {
         }
     }
 
-    pub fn negative(&self) -> bool {
+    pub fn is_negative(&self) -> bool {
         self.immutable_amount.figure() < &dec!(0)
+    }
+    
+    pub fn flip_sign(&self) -> Amount {
+        Amount {
+            immutable_amount: ImmutableAmount::new(
+                self.immutable_amount.currency(),
+                -self.immutable_amount.figure()
+            )
+        }
     }
 
     // TODO this (and all the operations) probably need to be made into traits

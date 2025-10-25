@@ -207,7 +207,7 @@ impl Bucket {
                             .new_amount_from_raw_amount(amount)
                             .map(|parsed_amount| acc.minus(&parsed_amount))
                             .and_then(|new_acc| {
-                                if new_acc.negative() {
+                                if new_acc.is_negative() {
                                     Err("attempt to withdraw more money than the Bucket contains"
                                         .to_string())
                                 } else {
@@ -253,7 +253,7 @@ impl Bucket {
                             .new_amount_from_raw_amount(amount)
                             .map(|parsed_amount| acc.minus(&parsed_amount))
                             .and_then(|new_acc| {
-                                if new_acc.negative() {
+                                if new_acc.is_negative() {
                                     Err("attempt to put back money that was not withdrawn"
                                         .to_string())
                                 } else {
@@ -395,7 +395,7 @@ impl OperandBuilder for Bucket {
         let period = self.for_period(period_configuration, today, exchange_rates)?;
         Ok(Some(Operand {
             name: self.name,
-            amount: period.recommended_or_actual_change,
+            amount: period.recommended_or_actual_change.flip_sign(),
             illustration: vec![
                 (
                     "This period - recommended deposit".to_string(),
@@ -2300,7 +2300,7 @@ mod test {
             bucket.build(&period_configuration, &today, &ex),
             Ok(Some(Operand {
                 name: "test-bucket".to_string(),
-                amount: ex.yen("1000"),
+                amount: ex.yen("-1000"),
                 illustration: vec![
                     (
                         "This period - recommended deposit".to_string(),
@@ -2325,6 +2325,62 @@ mod test {
                     (
                         "Total".to_string(),
                         IllustrationValue::Amount(ex.yen("1500"))
+                    )
+                ]
+            }))
+        );
+    }
+
+    #[test]
+    fn create_operand_withdrawal_only() -> () {
+        let ex = ExchangeRates::for_tests();
+        let period_configuration =
+            PeriodConfigurationVaultValue::CalendarMonth(CalendarMonthPeriodConfiguration {});
+        let today = mkdate(9, 15);
+
+        let bucket = Bucket {
+            name: "test-bucket".to_string(),
+            lines: vec![
+                Line((
+                    mkdate(8, 13),
+                    Action::SetTarget {
+                        amount: RawAmount::yen("3000"),
+                        target_date: mkdate(10, 30),
+                    },
+                )),
+                Line((mkdate(9, 14), Action::Withdrawal(RawAmount::yen("500")))),
+            ],
+        };
+
+        assert_eq!(
+            bucket.build(&period_configuration, &today, &ex),
+            Ok(Some(Operand {
+                name: "test-bucket".to_string(),
+                amount: ex.yen("500"),
+                illustration: vec![
+                    (
+                        "This period - recommended deposit".to_string(),
+                        IllustrationValue::Amount(ex.yen("1500"))
+                    ),
+                    (
+                        "This period - actual deposit".to_string(),
+                        IllustrationValue::NullAmount
+                    ),
+                    (
+                        "This period - actual withdrawal".to_string(),
+                        IllustrationValue::Amount(ex.yen("500"))
+                    ),
+                    (
+                        "Deposited".to_string(),
+                        IllustrationValue::Amount(ex.yen("0"))
+                    ),
+                    (
+                        "Withdrawn".to_string(),
+                        IllustrationValue::Amount(ex.yen("500"))
+                    ),
+                    (
+                        "Total".to_string(),
+                        IllustrationValue::Amount(ex.yen("-500"))
                     )
                 ]
             }))
