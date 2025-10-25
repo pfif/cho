@@ -200,7 +200,10 @@ impl Bucket {
                         Action::Deposit(amount) | Action::WithdrawalCancellation(amount) => ex
                             .new_amount_from_raw_amount(amount)
                             .map(|parsed_amount| acc.add(&parsed_amount)),
-                        Action::DepositCancellation(amount) | Action::Withdrawal(amount) => ex
+                        Action::Withdrawal(amount) => ex
+                            .new_amount_from_raw_amount(amount)
+                            .map(|parsed_amount| acc.minus(&parsed_amount)),
+                        Action::DepositCancellation(amount) => ex
                             .new_amount_from_raw_amount(amount)
                             .map(|parsed_amount| acc.minus(&parsed_amount))
                             .and_then(|new_acc| {
@@ -1608,7 +1611,15 @@ mod test {
                     .target_set_in_current_period_one_hundred_thousand_in_four_months()
                     .add_line(mkdate(9, 15), Action::Withdrawal(RawAmount::yen("10000")))
                     .add_line(mkdate(9, 15), Action::Deposit(RawAmount::yen("25000")))
-                    .expect_error("attempt to withdraw more money than the Bucket contains")
+                    .expect_bucket(|ex| BucketThisPeriod {
+                        recommended_or_actual_change: ex.yen("15000"),
+                        current_recommended_deposit: ex.yen("25000"),
+                        current_actual_deposit: Some(ex.yen("25000")),
+                        current_withdrawal: Some(ex.yen("10000")),
+                        total_deposit: ex.yen("25000"),
+                        total_withdrawal: ex.yen("10000"),
+                        total: ex.yen("15000"),
+                    })
                     .execute();
             }
 
@@ -1618,7 +1629,15 @@ mod test {
                     .target_set_in_current_period_one_hundred_thousand_in_four_months()
                     .add_line(mkdate(9, 8), Action::Deposit(RawAmount::yen("25000")))
                     .add_line(mkdate(9, 15), Action::Withdrawal(RawAmount::yen("30000")))
-                    .expect_error("attempt to withdraw more money than the Bucket contains")
+                    .expect_bucket(|ex| BucketThisPeriod {
+                        recommended_or_actual_change: ex.yen("-5000"),
+                        current_recommended_deposit: ex.yen("25000"),
+                        current_actual_deposit: Some(ex.yen("25000")),
+                        current_withdrawal: Some(ex.yen("30000")),
+                        total_deposit: ex.yen("25000"),
+                        total_withdrawal: ex.yen("30000"),
+                        total: ex.yen("-5000"),
+                    })
                     .execute();
             }
 
@@ -1646,9 +1665,19 @@ mod test {
                 Test::default()
                     .target_set_in_current_period_one_hundred_thousand_in_four_months()
                     .add_line(mkdate(9, 8), Action::Deposit(RawAmount::yen("25000")))
+                    // This is a bit of a dumb scenario - saving 30000 yen and then withdrawing them immediately
+                    // It is however valid
                     .add_line(mkdate(9, 13), Action::Withdrawal(RawAmount::yen("30000")))
                     .add_line(mkdate(9, 15), Action::Deposit(RawAmount::yen("30000")))
-                    .expect_error("attempt to withdraw more money than the Bucket contains")
+                    .expect_bucket(|ex| BucketThisPeriod {
+                        recommended_or_actual_change: ex.yen("25000"),
+                        current_recommended_deposit: ex.yen("25000"),
+                        current_actual_deposit: Some(ex.yen("55000")),
+                        current_withdrawal: Some(ex.yen("30000")),
+                        total_deposit: ex.yen("55000"),
+                        total_withdrawal: ex.yen("30000"),
+                        total: ex.yen("25000")
+                    })
                     .execute();
             }
         }
@@ -1707,12 +1736,20 @@ mod test {
              */
 
             #[test]
-            fn too_withdraw_too_much() {
+            fn withdraw_more_than_deposited() {
                 Test::default()
                     .target_set_in_current_period_one_hundred_thousand_in_four_months()
-                    .add_line(mkdate(8, 8), Action::Deposit(RawAmount::yen("25000")))
+                    .add_line(mkdate(8, 8), Action::Deposit(RawAmount::yen("20000")))
                     .add_line(mkdate(8, 15), Action::Withdrawal(RawAmount::yen("30000")))
-                    .expect_error("attempt to withdraw more money than the Bucket contains")
+                    .expect_bucket(|ex| BucketThisPeriod {
+                        recommended_or_actual_change: ex.yen("20000"),
+                        current_recommended_deposit: ex.yen("20000"),
+                        current_actual_deposit: None,
+                        current_withdrawal: None,
+                        total_deposit: ex.yen("20000"),
+                        total_withdrawal: ex.yen("30000"),
+                        total: ex.yen("-10000"),
+                    })
                     .execute();
             }
 
