@@ -178,9 +178,24 @@ impl Amount {
     }
 }
 
-/* TODO (this PR?) Refactor all this below?) */
-impl Amount {
-    pub fn add(&self, other_amount: &Amount) -> Amount {
+pub trait Add<T> {
+    fn add(&self, other: &T) -> Amount;
+}
+
+pub trait Sub<T> {
+    fn sub(&self, other: &T) -> Amount;
+}
+
+pub trait Minus<T> {
+    fn minus(&self, other: &T) -> Amount;
+}
+
+pub trait Div<T> {
+    fn div(&self, divisor: &T) -> Amount;
+}
+
+impl Add<Amount> for Amount {
+    fn add(&self, other_amount: &Amount) -> Amount {
         let other_amount_converted = other_amount.convert(self.immutable_amount.currency());
         let new_immutable_amount = ImmutableAmount::new(
             self.immutable_amount.currency(),
@@ -190,8 +205,10 @@ impl Amount {
             immutable_amount: new_immutable_amount,
         }
     }
+}
 
-    pub fn sub(&self, other_amount: &Amount) -> Amount {
+impl Sub<Amount> for Amount {
+    fn sub(&self, other_amount: &Amount) -> Amount {
         let other_amount_converted = other_amount.convert(self.immutable_amount.currency());
         let new_immutable_amount = ImmutableAmount::new(
             self.immutable_amount.currency(),
@@ -201,8 +218,10 @@ impl Amount {
             immutable_amount: new_immutable_amount,
         }
     }
-    
-    pub fn minus(&self, other_amount: &Amount) -> Amount {
+}
+
+impl Minus<Amount> for Amount {
+    fn minus(&self, other_amount: &Amount) -> Amount {
         let other_amount_converted = other_amount.convert(self.immutable_amount.currency());
         let new_immutable_amount = ImmutableAmount::new(
             self.immutable_amount.currency(),
@@ -212,7 +231,20 @@ impl Amount {
             immutable_amount: new_immutable_amount,
         }
     }
+}
 
+impl Div<Decimal> for Amount {
+    fn div(&self, divisor: &Decimal) -> Amount {
+        Amount {
+            immutable_amount: ImmutableAmount::new(
+                self.immutable_amount.currency(),
+                self.immutable_amount.figure() / divisor
+            )
+        }
+    }
+}
+
+impl Amount {
     pub fn maximum(amount_a: &Amount, amount_b: &Amount) -> Amount {
         let amount_b_converted = amount_b.convert(amount_a.immutable_amount.currency());
         let new_immutable_amount = ImmutableAmount::new(
@@ -233,16 +265,6 @@ impl Amount {
             immutable_amount: ImmutableAmount::new(
                 self.immutable_amount.currency(),
                 -self.immutable_amount.figure()
-            )
-        }
-    }
-
-    // TODO this (and all the operations) probably need to be made into traits
-    pub fn div_decimal(&self, divisor: &Decimal) -> Amount {
-        Amount {
-            immutable_amount: ImmutableAmount::new(
-                self.immutable_amount.currency(),
-                self.immutable_amount.figure() / divisor
             )
         }
     }

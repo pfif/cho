@@ -1,5 +1,5 @@
 use crate::amounts::exchange_rates::ExchangeRates;
-use crate::amounts::{Amount, CurrencyIdent};
+use crate::amounts::{Add, Amount, CurrencyIdent};
 use crate::period::{Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
 use chrono::{Local, NaiveDate};
 use group::Group;
@@ -135,7 +135,7 @@ pub mod group {
     use chrono::NaiveDate;
     use rust_decimal_macros::dec;
     use crate::period::PeriodConfigurationVaultValue;
-    use crate::amounts::{Amount, Currency, CurrencyIdent};
+    use crate::amounts::{Add, Amount, Currency, CurrencyIdent};
     use crate::amounts::exchange_rates::ExchangeRates;
     use super::{GroupBuilder, Operand, OperandBuilder, RemainingOperationScreenGroup};
 

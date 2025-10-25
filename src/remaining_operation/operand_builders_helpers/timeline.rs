@@ -1,6 +1,6 @@
 use chrono::NaiveDate;
 use crate::period::{Period, PeriodConfigurationVaultValue};
-use crate::amounts::Amount;
+use crate::amounts::{Amount, Sub};
 use crate::amounts::exchange_rates::ExchangeRates;
 use crate::remaining_operation::core_types::{Illustration, IllustrationValue, Operand, OperandBuilder};
 

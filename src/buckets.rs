@@ -1,5 +1,5 @@
 use crate::amounts::exchange_rates::ExchangeRates;
-use crate::amounts::{Amount, Figure, RawAmount};
+use crate::amounts::{Add, Amount, Div, Figure, Minus, RawAmount};
 use crate::period::{
     ErrorPeriodsBetween, Period, PeriodConfigurationVaultValue, PeriodsConfiguration,
 };
@@ -376,7 +376,7 @@ impl Bucket {
             &target_amount.minus(&deposited_until_period_start),
             &ex.zero(&"JPY".to_string())?,
         )
-        .div_decimal(&Decimal::from(number_of_periods));
+        .div(&Decimal::from(number_of_periods));
 
         Ok(BucketThisPeriod {
             recommended_or_actual_change: total_this_period
