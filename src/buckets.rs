@@ -1903,7 +1903,7 @@ mod test {
             use super::*;
 
             #[test]
-            fn one_today() {
+            fn one_today_with_deposit() {
                 Test::default()
                     .target_set_in_current_period_one_hundred_thousand_in_four_months()
                     .add_line(mkdate(9, 8), Action::Deposit(RawAmount::yen("25000")))
@@ -1920,6 +1920,48 @@ mod test {
                         total_deposit: ex.yen("25000"),
                         total_withdrawal: ex.yen("5000"),
                         total: ex.yen("20000"),
+                    })
+                    .execute();
+            }
+
+            #[test]
+            fn one_today() {
+                Test::default()
+                    .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                    .add_line(mkdate(9, 13), Action::Withdrawal(RawAmount::yen("10000")))
+                    .add_line(
+                        mkdate(9, 15),
+                        Action::WithdrawalCancellation(RawAmount::yen("5000")),
+                    )
+                    .expect_bucket(|ex| BucketAtDate {
+                        recommended_or_actual_change: ex.yen("-5000"),
+                        current_recommended_deposit: ex.yen("25000"),
+                        current_actual_deposit: None,
+                        current_withdrawal: Some(ex.yen("5000")),
+                        total_deposit: ex.yen("0"),
+                        total_withdrawal: ex.yen("5000"),
+                        total: ex.yen("-5000"),
+                    })
+                    .execute();
+            }
+
+            #[test]
+            fn one_today_withdrawal_last_period() {
+                Test::default()
+                    .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                    .add_line(mkdate(8, 13), Action::Withdrawal(RawAmount::yen("10000")))
+                    .add_line(
+                        mkdate(9, 15),
+                        Action::WithdrawalCancellation(RawAmount::yen("5000")),
+                    )
+                    .expect_bucket(|ex| BucketAtDate {
+                        recommended_or_actual_change: ex.yen("5000"),
+                        current_recommended_deposit: ex.yen("25000"),
+                        current_actual_deposit: None,
+                        current_withdrawal: Some(ex.yen("-5000")),
+                        total_deposit: ex.yen("0"),
+                        total_withdrawal: ex.yen("5000"),
+                        total: ex.yen("-5000"),
                     })
                     .execute();
             }
