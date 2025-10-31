@@ -428,12 +428,6 @@ impl OperandBuilder for Bucket {
 mod test {
     /*
         Tests to write:
-        - Several goal setting returns the last one
-        // - Copies of some of the tests without a goal that does not error
-        - Two withdrawals
-        - Two withdrawals, one deposit
-        - One deposit
-        - One deposit, one withdrawal
         - Operand conversion without a goal
     */
     use super::*;
@@ -671,6 +665,35 @@ mod test {
         #[test]
         fn next_next_period() {
             Test::default()
+                .add_line(
+                    mkdate(9, 15),
+                    Action::SetTarget {
+                        amount: RawAmount::yen("100000"),
+                        target_date: mkdate(11, 30),
+                    },
+                )
+                .expect_bucket(|ex| BucketAtDate {
+                    recommended_or_actual_change: ex.yen("33333.33"),
+                    current_recommended_deposit: Some(ex.yen("33333.33")),
+                    current_actual_deposit: None,
+                    current_withdrawal: None,
+                    total_deposit: ex.yen("0"),
+                    total_withdrawal: ex.yen("0"),
+                    total: ex.yen("0"),
+                })
+                .execute()
+        }
+
+        #[test]
+        fn two_set() {
+            Test::default()
+                .add_line(
+                    mkdate(9, 13),
+                    Action::SetTarget {
+                        amount: RawAmount::yen("100000"),
+                        target_date: mkdate(10, 31),
+                    },
+                )
                 .add_line(
                     mkdate(9, 15),
                     Action::SetTarget {
@@ -1518,6 +1541,24 @@ mod test {
             use super::*;
 
             #[test]
+            fn two_withdrawals() {
+                Test::default()
+                    .add_line(mkdate(9, 8), Action::Withdrawal(RawAmount::yen("25000")))
+                    .add_line(mkdate(9, 9), Action::Withdrawal(RawAmount::yen("5000")))
+                    .expect_bucket(|ex| BucketAtDate {
+                        recommended_or_actual_change: ex.yen("-30000"),
+                        current_recommended_deposit: None,
+                        current_actual_deposit: None,
+                        current_withdrawal: Some(ex.yen("30000")),
+                        total_deposit: ex.yen("0"),
+                        total_withdrawal: ex.yen("30000"),
+                        total: ex.yen("-30000"),
+                    })
+                    .execute()
+            }
+
+
+            #[test]
             fn one_today() {
                 Test::default()
                     .target_set_in_current_period_one_hundred_thousand_in_four_months()
@@ -2292,6 +2333,24 @@ mod test {
                     })
                     .execute();
             }
+
+            #[test]
+            fn two_withdrawals_one_deposit() {
+                Test::default()
+                    .add_line(mkdate(9, 8), Action::Withdrawal(RawAmount::yen("25000")))
+                    .add_line(mkdate(9, 9), Action::Withdrawal(RawAmount::yen("5000")))
+                    .add_line(mkdate(9, 10), Action::Deposit(RawAmount::yen("30000")))
+                    .expect_bucket(|ex| BucketAtDate {
+                        recommended_or_actual_change: ex.yen("0"),
+                        current_recommended_deposit: None,
+                        current_actual_deposit: Some(ex.yen("30000")),
+                        current_withdrawal: Some(ex.yen("30000")),
+                        total_deposit: ex.yen("30000"),
+                        total_withdrawal: ex.yen("30000"),
+                        total: ex.yen("0"),
+                    })
+                    .execute()
+            }
         }
 
         mod across_periods {
@@ -2436,6 +2495,63 @@ mod test {
                 ]
             }))
         );
+    }
+    
+    #[test]
+    fn create_operand_no_goal() {
+        {
+            let ex = ExchangeRates::for_tests();
+            let period_configuration =
+                PeriodConfigurationVaultValue::CalendarMonth(CalendarMonthPeriodConfiguration {});
+            let today = mkdate(9, 15);
+
+            let bucket = Bucket {
+                name: "test-bucket".to_string(),
+                lines: vec![
+                    Line((mkdate(8, 13), Action::Deposit(RawAmount::yen("1100")))),
+                    Line((mkdate(8, 20), Action::Withdrawal(RawAmount::yen("500")))),
+                    Line((
+                        mkdate(8, 20),
+                        Action::DepositCancellation(RawAmount::yen("100")),
+                    )),
+                    Line((mkdate(9, 15), Action::Deposit(RawAmount::yen("1000")))),
+                ],
+            };
+
+            assert_eq!(
+                bucket.build(&period_configuration, &today, &ex),
+                Ok(Some(Operand {
+                    name: "test-bucket".to_string(),
+                    amount: ex.yen("-1000"),
+                    illustration: vec![
+                        (
+                            "This period - recommended deposit".to_string(),
+                            IllustrationValue::NullAmount
+                        ),
+                        (
+                            "This period - actual deposit".to_string(),
+                            IllustrationValue::Amount(ex.yen("1000"))
+                        ),
+                        (
+                            "This period - actual withdrawal".to_string(),
+                            IllustrationValue::NullAmount
+                        ),
+                        (
+                            "Deposited".to_string(),
+                            IllustrationValue::Amount(ex.yen("2000"))
+                        ),
+                        (
+                            "Withdrawn".to_string(),
+                            IllustrationValue::Amount(ex.yen("500"))
+                        ),
+                        (
+                            "Total".to_string(),
+                            IllustrationValue::Amount(ex.yen("1500"))
+                        )
+                    ]
+                }))
+            );
+        }
     }
 
     mod vault_value_parser {
