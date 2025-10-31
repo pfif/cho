@@ -176,19 +176,6 @@ impl Bucket {
         date: &NaiveDate,
         ex: &ExchangeRates,
     ) -> Result<BucketAtDate, String> {
-        let (target_amount, target_date) = self
-            .lines
-            .iter()
-            .find_map(|Line((_, line))| match line {
-                Action::SetTarget {
-                    amount,
-                    target_date,
-                } => Some((amount, target_date)),
-                _ => None,
-            })
-            .ok_or("No target for bucket".to_string())?;
-        let target_amount = ex.new_amount_from_raw_amount(&target_amount)?;
-
         let total = self.lines.iter().try_fold(
             ex.zero(&"JPY".to_string())?,
             |acc, Line((line_date, action))| {
@@ -356,23 +343,46 @@ impl Bucket {
                     }
                 })?;
 
-        let number_of_periods = match period_config.periods_between(date, target_date) {
-            Ok(nb) => nb,
-            Err(ErrorPeriodsBetween::EndBeforeStart) => 1,
-            any => any?,
+        let target: Option<(Amount, &NaiveDate)> = self
+            .lines
+            .iter()
+            .try_fold(None, |acc, Line((_, line))| match line {
+                Action::SetTarget {
+                    amount,
+                    target_date,
+                } => Ok::<std::option::Option<(Amount, &chrono::NaiveDate)>, String>(Some((
+                    ex.new_amount_from_raw_amount(&amount)?,
+                    target_date
+                ))),
+                _ => Ok(acc)
+            })?;
+
+        let recommended_deposit_figure = if let Some((target_amount, target_date)) = target {
+            let number_of_periods = match period_config.periods_between(date, target_date) {
+                Ok(nb) => nb,
+                Err(ErrorPeriodsBetween::EndBeforeStart) => 1,
+                any => any?,
+            };
+
+            let recommended_deposit_figure = Amount::maximum(
+                &target_amount.minus(&deposited_until_period_start),
+                &ex.zero(&"JPY".to_string())?,
+            ).div(&Decimal::from(number_of_periods));
+
+            Some(recommended_deposit_figure)
+        } else {
+            None
         };
 
-        let recommended_deposit_figure = Amount::maximum(
-            &target_amount.minus(&deposited_until_period_start),
-            &ex.zero(&"JPY".to_string())?,
-        )
-        .div(&Decimal::from(number_of_periods));
 
         Ok(BucketAtDate {
             recommended_or_actual_change: total_this_period
                 .clone()
-                .unwrap_or(recommended_deposit_figure.clone()),
-            current_recommended_deposit: Some(recommended_deposit_figure),
+                .unwrap_or(
+                    recommended_deposit_figure
+                        .clone()
+                        .unwrap_or(ex.zero(&"JPY".to_string())?)),
+            current_recommended_deposit: recommended_deposit_figure,
             current_actual_deposit: deposited_this_period,
             current_withdrawal: withdrawned_this_period,
             total_deposit: deposited,
@@ -418,8 +428,14 @@ impl OperandBuilder for Bucket {
 mod test {
     /*
         Tests to write:
+        - Several goal setting returns the last one
+        // - Copies of some of the tests without a goal that does not error
+        - Two withdrawals
+        - Two withdrawals, one deposit
+        - One deposit
+        - One deposit, one withdrawal
         - Operand conversion without a goal
-     */
+    */
     use super::*;
     use crate::period::CalendarMonthPeriodConfiguration;
     use crate::vault::VaultImpl;
@@ -566,27 +582,25 @@ mod test {
         }
     }
 
-    mod incorrect_configuration {
-        use super::*;
 
-        #[test]
-        fn one_deposit_but_no_target() {
-            Test::default()
-                .add_line(mkdate(9, 15), Action::Deposit(RawAmount::yen("10000")))
-                .expect_error("No target for bucket")
-                .execute()
-        }
+
+    mod target_setting {
+        use super::*;
 
         #[test]
         fn no_lines() {
             Test::default()
-                .expect_error("No target for bucket")
+                .expect_bucket(|ex| BucketAtDate {
+                    recommended_or_actual_change: ex.yen("0"),
+                    current_recommended_deposit: None,
+                    current_actual_deposit: None,
+                    current_withdrawal: None,
+                    total_deposit: ex.yen("0"),
+                    total_withdrawal: ex.yen("0"),
+                    total: ex.yen("0"),
+                })
                 .execute()
         }
-    }
-
-    mod target_setting {
-        use super::*;
 
         #[test]
         fn last_period() {
@@ -682,6 +696,22 @@ mod test {
 
         mod this_period_until_today {
             use super::*;
+
+            #[test]
+            fn one_deposit_today__no_target() {
+                Test::default()
+                    .add_line(mkdate(9, 15), Action::Deposit(RawAmount::yen("10000")))
+                    .expect_bucket(|ex| BucketAtDate {
+                        recommended_or_actual_change: ex.yen("10000"),
+                        current_recommended_deposit: None,
+                        current_actual_deposit: Some(ex.yen("10000")),
+                        current_withdrawal: None,
+                        total_deposit: ex.yen("10000"),
+                        total_withdrawal: ex.yen("0"),
+                        total: ex.yen("10000"),
+                    })
+                    .execute()
+            }
 
             #[test]
             fn one_deposit_today__partial() {
