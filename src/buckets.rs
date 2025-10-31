@@ -139,7 +139,7 @@ enum Action {
 #[derive(Debug, Eq, PartialEq)]
 pub struct BucketAtDate {
     recommended_or_actual_change: Amount,
-    current_recommended_deposit: Amount,
+    current_recommended_deposit: Option<Amount>,
     current_actual_deposit: Option<Amount>,
     current_withdrawal: Option<Amount>,
     total_deposit: Amount,
@@ -372,7 +372,7 @@ impl Bucket {
             recommended_or_actual_change: total_this_period
                 .clone()
                 .unwrap_or(recommended_deposit_figure.clone()),
-            current_recommended_deposit: recommended_deposit_figure,
+            current_recommended_deposit: Some(recommended_deposit_figure),
             current_actual_deposit: deposited_this_period,
             current_withdrawal: withdrawned_this_period,
             total_deposit: deposited,
@@ -416,6 +416,10 @@ impl OperandBuilder for Bucket {
 
 #[cfg(test)]
 mod test {
+    /*
+        Tests to write:
+        - Operand conversion without a goal
+     */
     use super::*;
     use crate::period::CalendarMonthPeriodConfiguration;
     use crate::vault::VaultImpl;
@@ -498,7 +502,7 @@ mod test {
         pub fn expect_bucket_no_commits_one_hundred_thousand_in_four_months(mut self) -> Self {
             self.expect_bucket(|ex| BucketAtDate {
                 recommended_or_actual_change: ex.yen("25000"),
-                current_recommended_deposit: ex.yen("25000"),
+                current_recommended_deposit: Some(ex.yen("25000")),
                 current_actual_deposit: None,
                 current_withdrawal: None,
                 total_deposit: ex.yen("0"),
@@ -510,7 +514,7 @@ mod test {
         pub fn expect_bucket_recommended_commit_one_hundred_thousand_in_four_months(self) -> Self {
             self.expect_bucket(|ex| BucketAtDate {
                 recommended_or_actual_change: ex.yen("25000"),
-                current_recommended_deposit: ex.yen("25000"),
+                current_recommended_deposit: Some(ex.yen("25000")),
                 current_actual_deposit: Some(ex.yen("25000")),
                 current_withdrawal: None,
                 total_deposit: ex.yen("25000"),
@@ -524,7 +528,7 @@ mod test {
         ) -> Self {
             self.expect_bucket(|ex| BucketAtDate {
                 recommended_or_actual_change: ex.yen("20000"),
-                current_recommended_deposit: ex.yen("25000"),
+                current_recommended_deposit: Some(ex.yen("25000")),
                 current_actual_deposit: Some(ex.yen("25000")),
                 current_withdrawal: Some(ex.yen("5000")),
                 total_deposit: ex.yen("25000"),
@@ -596,7 +600,7 @@ mod test {
                 )
                 .expect_bucket(|ex| BucketAtDate {
                     recommended_or_actual_change: ex.yen("100000"),
-                    current_recommended_deposit: ex.yen("100000"),
+                    current_recommended_deposit: Some(ex.yen("100000")),
                     current_actual_deposit: None,
                     current_withdrawal: None,
                     total_deposit: ex.yen("0"),
@@ -618,7 +622,7 @@ mod test {
                 )
                 .expect_bucket(|ex| BucketAtDate {
                     recommended_or_actual_change: ex.yen("100000"),
-                    current_recommended_deposit: ex.yen("100000"),
+                    current_recommended_deposit: Some(ex.yen("100000")),
                     current_actual_deposit: None,
                     current_withdrawal: None,
                     total_deposit: ex.yen("0"),
@@ -640,7 +644,7 @@ mod test {
                 )
                 .expect_bucket(|ex| BucketAtDate {
                     recommended_or_actual_change: ex.yen("50000"),
-                    current_recommended_deposit: ex.yen("50000"),
+                    current_recommended_deposit: Some(ex.yen("50000")),
                     current_actual_deposit: None,
                     current_withdrawal: None,
                     total_deposit: ex.yen("0"),
@@ -662,7 +666,7 @@ mod test {
                 )
                 .expect_bucket(|ex| BucketAtDate {
                     recommended_or_actual_change: ex.yen("33333.33"),
-                    current_recommended_deposit: ex.yen("33333.33"),
+                    current_recommended_deposit: Some(ex.yen("33333.33")),
                     current_actual_deposit: None,
                     current_withdrawal: None,
                     total_deposit: ex.yen("0"),
@@ -686,7 +690,7 @@ mod test {
                     .add_line(mkdate(9, 15), Action::Deposit(RawAmount::yen("10000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("10000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("10000")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("10000"),
@@ -703,7 +707,7 @@ mod test {
                     .add_line(mkdate(9, 15), Action::Deposit(RawAmount::yen("0")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("0"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("0")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("0"),
@@ -721,7 +725,7 @@ mod test {
                     .add_line(mkdate(9, 5), Action::Deposit(RawAmount::yen("15000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("25000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("25000")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("25000"),
@@ -739,7 +743,7 @@ mod test {
                     .add_line(mkdate(9, 5), Action::Deposit(RawAmount::yen("15000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("25000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("25000")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("25000"),
@@ -756,7 +760,7 @@ mod test {
                     .add_line(mkdate(9, 1), Action::Deposit(RawAmount::yen("10000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("10000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("10000")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("10000"),
@@ -773,7 +777,7 @@ mod test {
                     .add_line(mkdate(9, 3), Action::Deposit(RawAmount::yen("10000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("10000"),
-                        current_recommended_deposit: ex.yen("25000"), // This is correct. Even if the target was set for five months, there was no deposit last month
+                        current_recommended_deposit: Some(ex.yen("25000")), // This is correct. Even if the target was set for five months, there was no deposit last month
                         current_actual_deposit: Some(ex.yen("10000")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("10000"),
@@ -790,7 +794,7 @@ mod test {
                     .add_line(mkdate(9, 3), Action::Deposit(RawAmount::yen("30000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("30000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("30000")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("30000"),
@@ -810,7 +814,7 @@ mod test {
                     .add_line(mkdate(8, 31), Action::Deposit(RawAmount::yen("20000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("20000"),
-                        current_recommended_deposit: ex.yen("20000"),
+                        current_recommended_deposit: Some(ex.yen("20000")),
                         current_actual_deposit: None,
                         current_withdrawal: None,
                         total_deposit: ex.yen("20000"),
@@ -828,7 +832,7 @@ mod test {
                     .add_line(mkdate(8, 31), Action::Deposit(RawAmount::yen("5000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("22500"),
-                        current_recommended_deposit: ex.yen("22500"),
+                        current_recommended_deposit: Some(ex.yen("22500")),
                         current_actual_deposit: None,
                         current_withdrawal: None,
                         total_deposit: ex.yen("10000"),
@@ -846,7 +850,7 @@ mod test {
                     .add_line(mkdate(8, 31), Action::Deposit(RawAmount::yen("5000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("22500"),
-                        current_recommended_deposit: ex.yen("22500"),
+                        current_recommended_deposit: Some(ex.yen("22500")),
                         current_actual_deposit: None,
                         current_withdrawal: None,
                         total_deposit: ex.yen("10000"),
@@ -864,7 +868,7 @@ mod test {
                     .add_line(mkdate(2, 28), Action::Deposit(RawAmount::yen("100")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("250"),
-                        current_recommended_deposit: ex.yen("250"),
+                        current_recommended_deposit: Some(ex.yen("250")),
                         current_actual_deposit: None,
                         current_withdrawal: None,
                         total_deposit: ex.yen("200"),
@@ -881,7 +885,7 @@ mod test {
                     .add_line(mkdate(8, 31), Action::Deposit(RawAmount::yen("60000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("10000"),
-                        current_recommended_deposit: ex.yen("10000"),
+                        current_recommended_deposit: Some(ex.yen("10000")),
                         current_actual_deposit: None,
                         current_withdrawal: None,
                         total_deposit: ex.yen("60000"),
@@ -898,7 +902,7 @@ mod test {
                     .add_line(mkdate(8, 31), Action::Deposit(RawAmount::yen("200000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("0"),
-                        current_recommended_deposit: ex.yen("0"),
+                        current_recommended_deposit: Some(ex.yen("0")),
                         current_actual_deposit: None,
                         current_withdrawal: None,
                         total_deposit: ex.yen("200000"),
@@ -973,7 +977,7 @@ mod test {
                     .expect_bucket(
                         (|ex| BucketAtDate {
                             recommended_or_actual_change: ex.yen("25000"),
-                            current_recommended_deposit: ex.yen("25000"),
+                            current_recommended_deposit: Some(ex.yen("25000")),
                             current_actual_deposit: Some(ex.yen("25000")),
                             current_withdrawal: None,
                             total_deposit: ex.yen("25000"),
@@ -998,7 +1002,7 @@ mod test {
                     .add_line(mkdate(12, 31), Action::Deposit(RawAmount::yen("260")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("250"),
-                        current_recommended_deposit: ex.yen("260"),
+                        current_recommended_deposit: Some(ex.yen("260")),
                         current_actual_deposit: Some(ex.yen("250")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("410"),
@@ -1027,7 +1031,7 @@ mod test {
                     .add_line(mkdate(12, 31), Action::Deposit(RawAmount::yen("60")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("250"),
-                        current_recommended_deposit: ex.yen("260"),
+                        current_recommended_deposit: Some(ex.yen("260")),
                         current_actual_deposit: Some(ex.yen("250")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("410"),
@@ -1056,7 +1060,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("15000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("15000")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("15000"),
@@ -1077,7 +1081,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("-10000"),
-                        current_recommended_deposit: ex.yen("20000"),
+                        current_recommended_deposit: Some(ex.yen("20000")),
                         current_actual_deposit: Some(ex.yen("-10000")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("10000"),
@@ -1102,7 +1106,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("-10000"),
-                        current_recommended_deposit: ex.yen("20000"),
+                        current_recommended_deposit: Some(ex.yen("20000")),
                         current_actual_deposit: Some(ex.yen("-10000")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("10000"),
@@ -1127,7 +1131,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("15000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("15000")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("15000"),
@@ -1145,7 +1149,7 @@ mod test {
                     .add_line(mkdate(9, 15), Action::DepositCancellation(RawAmount::yen("10000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("15000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("15000")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("15000"),
@@ -1179,7 +1183,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("0"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("0")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("0"),
@@ -1219,7 +1223,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("22500"),
-                        current_recommended_deposit: ex.yen("22500"),
+                        current_recommended_deposit: Some(ex.yen("22500")),
                         current_actual_deposit: None,
                         current_withdrawal: None,
                         total_deposit: ex.yen("10000"),
@@ -1244,7 +1248,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("22500"),
-                        current_recommended_deposit: ex.yen("22500"),
+                        current_recommended_deposit: Some(ex.yen("22500")),
                         current_actual_deposit: None,
                         current_withdrawal: None,
                         total_deposit: ex.yen("10000"),
@@ -1262,7 +1266,7 @@ mod test {
                     .add_line(mkdate(8, 15), Action::DepositCancellation(RawAmount::yen("10000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("21250"),
-                        current_recommended_deposit: ex.yen("21250"),
+                        current_recommended_deposit: Some(ex.yen("21250")),
                         current_actual_deposit: None,
                         current_withdrawal: None,
                         total_deposit: ex.yen("15000"),
@@ -1413,7 +1417,7 @@ mod test {
                     .expect_bucket(
                         (|ex| BucketAtDate {
                             recommended_or_actual_change: ex.yen("20000"),
-                            current_recommended_deposit: ex.yen("25000"),
+                            current_recommended_deposit: Some(ex.yen("25000")),
                             current_actual_deposit: Some(ex.yen("20000")),
                             current_withdrawal: None,
                             total_deposit: ex.yen("20000"),
@@ -1439,7 +1443,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("-10000"),
-                        current_recommended_deposit: ex.yen("22500"),
+                        current_recommended_deposit: Some(ex.yen("22500")),
                         current_actual_deposit: Some(ex.yen("-10000")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("0"),
@@ -1465,7 +1469,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("19000"),
-                        current_recommended_deposit: ex.yen("22500"),
+                        current_recommended_deposit: Some(ex.yen("22500")),
                         current_actual_deposit: Some(ex.yen("19000")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("29000"),
@@ -1491,7 +1495,7 @@ mod test {
                     .add_line(mkdate(9, 15), Action::Withdrawal(RawAmount::yen("10000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("15000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("25000")),
                         current_withdrawal: Some(ex.yen("10000")),
                         total_deposit: ex.yen("25000"),
@@ -1509,7 +1513,7 @@ mod test {
                     .add_line(mkdate(9, 15), Action::Withdrawal(RawAmount::yen("15000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("-15000"),
-                        current_recommended_deposit: ex.yen("20000"),
+                        current_recommended_deposit: Some(ex.yen("20000")),
                         current_actual_deposit: None,
                         current_withdrawal: Some(ex.yen("15000")),
                         total_deposit: ex.yen("20000"),
@@ -1528,7 +1532,7 @@ mod test {
                     .add_line(mkdate(9, 15), Action::Withdrawal(RawAmount::yen("10000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("-15000"),
-                        current_recommended_deposit: ex.yen("20000"),
+                        current_recommended_deposit: Some(ex.yen("20000")),
                         current_actual_deposit: None,
                         current_withdrawal: Some(ex.yen("15000")),
                         total_deposit: ex.yen("20000"),
@@ -1547,7 +1551,7 @@ mod test {
                     .add_line(mkdate(9, 15), Action::Withdrawal(RawAmount::yen("5000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("15000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("25000")),
                         current_withdrawal: Some(ex.yen("10000")),
                         total_deposit: ex.yen("25000"),
@@ -1565,7 +1569,7 @@ mod test {
                     .add_line(mkdate(9, 15), Action::Withdrawal(RawAmount::yen("10000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("15000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("25000")),
                         current_withdrawal: Some(ex.yen("10000")),
                         total_deposit: ex.yen("25000"),
@@ -1583,7 +1587,7 @@ mod test {
                     .add_line(mkdate(9, 15), Action::Deposit(RawAmount::yen("25000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("15000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("25000")),
                         current_withdrawal: Some(ex.yen("10000")),
                         total_deposit: ex.yen("25000"),
@@ -1601,7 +1605,7 @@ mod test {
                     .add_line(mkdate(9, 15), Action::Withdrawal(RawAmount::yen("30000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("-5000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("25000")),
                         current_withdrawal: Some(ex.yen("30000")),
                         total_deposit: ex.yen("25000"),
@@ -1619,7 +1623,7 @@ mod test {
                     .add_line(mkdate(9, 15), Action::Withdrawal(RawAmount::yen("25000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("0"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("25000")),
                         current_withdrawal: Some(ex.yen("25000")),
                         total_deposit: ex.yen("25000"),
@@ -1641,7 +1645,7 @@ mod test {
                     .add_line(mkdate(9, 15), Action::Deposit(RawAmount::yen("30000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("25000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("55000")),
                         current_withdrawal: Some(ex.yen("30000")),
                         total_deposit: ex.yen("55000"),
@@ -1663,7 +1667,7 @@ mod test {
                     .add_line(mkdate(8, 31), Action::Withdrawal(RawAmount::yen("10000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("20000"),
-                        current_recommended_deposit: ex.yen("20000"),
+                        current_recommended_deposit: Some(ex.yen("20000")),
                         current_actual_deposit: None,
                         current_withdrawal: None,
                         total_deposit: ex.yen("20000"),
@@ -1682,7 +1686,7 @@ mod test {
                     .add_line(mkdate(8, 31), Action::Withdrawal(RawAmount::yen("5000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("20000"),
-                        current_recommended_deposit: ex.yen("20000"),
+                        current_recommended_deposit: Some(ex.yen("20000")),
                         current_actual_deposit: None,
                         current_withdrawal: None,
                         total_deposit: ex.yen("20000"),
@@ -1700,7 +1704,7 @@ mod test {
                     .add_line(mkdate(8, 15), Action::Withdrawal(RawAmount::yen("10000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("20000"),
-                        current_recommended_deposit: ex.yen("20000"),
+                        current_recommended_deposit: Some(ex.yen("20000")),
                         current_actual_deposit: None,
                         current_withdrawal: None,
                         total_deposit: ex.yen("20000"),
@@ -1718,7 +1722,7 @@ mod test {
                     .add_line(mkdate(8, 15), Action::Withdrawal(RawAmount::yen("30000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("20000"),
-                        current_recommended_deposit: ex.yen("20000"),
+                        current_recommended_deposit: Some(ex.yen("20000")),
                         current_actual_deposit: None,
                         current_withdrawal: None,
                         total_deposit: ex.yen("20000"),
@@ -1832,7 +1836,7 @@ mod test {
                     .expect_bucket(
                         (|ex| BucketAtDate {
                             recommended_or_actual_change: ex.yen("20000"),
-                            current_recommended_deposit: ex.yen("25000"),
+                            current_recommended_deposit: Some(ex.yen("25000")),
                             current_actual_deposit: Some(ex.yen("20000")),
                             current_withdrawal: None,
                             total_deposit: ex.yen("20000"),
@@ -1858,7 +1862,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("-10000"),
-                        current_recommended_deposit: ex.yen("22500"),
+                        current_recommended_deposit: Some(ex.yen("22500")),
                         current_actual_deposit: Some(ex.yen("-10000")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("0"),
@@ -1884,7 +1888,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("19000"),
-                        current_recommended_deposit: ex.yen("22500"),
+                        current_recommended_deposit: Some(ex.yen("22500")),
                         current_actual_deposit: Some(ex.yen("19000")),
                         current_withdrawal: None,
                         total_deposit: ex.yen("29000"),
@@ -1914,7 +1918,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("20000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("25000")),
                         current_withdrawal: Some(ex.yen("5000")),
                         total_deposit: ex.yen("25000"),
@@ -1935,7 +1939,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("-5000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: None,
                         current_withdrawal: Some(ex.yen("5000")),
                         total_deposit: ex.yen("0"),
@@ -1956,7 +1960,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("5000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: None,
                         current_withdrawal: Some(ex.yen("-5000")),
                         total_deposit: ex.yen("0"),
@@ -1982,7 +1986,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("20000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("25000")),
                         current_withdrawal: Some(ex.yen("5000")),
                         total_deposit: ex.yen("25000"),
@@ -2004,7 +2008,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("5000"),
-                        current_recommended_deposit: ex.yen("20000"),
+                        current_recommended_deposit: Some(ex.yen("20000")),
                         current_actual_deposit: None,
                         current_withdrawal: Some(ex.yen("-5000")),
                         total_deposit: ex.yen("20000"),
@@ -2030,7 +2034,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("5000"),
-                        current_recommended_deposit: ex.yen("20000"),
+                        current_recommended_deposit: Some(ex.yen("20000")),
                         current_actual_deposit: None,
                         current_withdrawal: Some(ex.yen("-5000")),
                         total_deposit: ex.yen("20000"),
@@ -2084,7 +2088,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("20000"),
-                        current_recommended_deposit: ex.yen("20000"),
+                        current_recommended_deposit: Some(ex.yen("20000")),
                         current_actual_deposit: None,
                         current_withdrawal: None,
                         total_deposit: ex.yen("20000"),
@@ -2109,7 +2113,7 @@ mod test {
                     )
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("20000"),
-                        current_recommended_deposit: ex.yen("20000"),
+                        current_recommended_deposit: Some(ex.yen("20000")),
                         current_actual_deposit: None,
                         current_withdrawal: None,
                         total_deposit: ex.yen("20000"),
@@ -2249,7 +2253,7 @@ mod test {
                     .add_line(mkdate(9, 15), Action::Withdrawal(RawAmount::yen("5000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("15000"),
-                        current_recommended_deposit: ex.yen("25000"),
+                        current_recommended_deposit: Some(ex.yen("25000")),
                         current_actual_deposit: Some(ex.yen("20000")),
                         current_withdrawal: Some(ex.yen("5000")),
                         total_deposit: ex.yen("20000"),
@@ -2274,7 +2278,7 @@ mod test {
                     .add_line(mkdate(9, 5), Action::Withdrawal(RawAmount::yen("3000")))
                     .expect_bucket(|ex| BucketAtDate {
                         recommended_or_actual_change: ex.yen("-3000"),
-                        current_recommended_deposit: ex.yen("22500"),
+                        current_recommended_deposit: Some(ex.yen("22500")),
                         current_actual_deposit: None,
                         current_withdrawal: Some(ex.yen("3000")),
                         total_deposit: ex.yen("10000"),
