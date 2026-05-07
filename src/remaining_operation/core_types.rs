@@ -55,8 +55,7 @@ impl RemainingOperation {
         self.groups.push(group);
         Ok(())
     }
-}
-impl RemainingOperation {
+
     pub fn execute(
         &self,
         target_currency: &CurrencyIdent,
