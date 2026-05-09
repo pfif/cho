@@ -749,14 +749,22 @@ mod test {
                 ]
             })).expect("Can deserialize bucket");
 
+            let bucket_archived_but_affecting_result: Bucket = from_value(json!({
+                "name": "Archived bucket",
+                "lines": [
+                    "2023/08/19 DEPO ¥100"
+                ],
+                "archived_since": "2023-08-20"
+            })).expect("Can deserialize bucket");
+
             let goals = TestGroupBuilder {
                 name: "Buckets".into(),
                 operand_builders: vec![
                     bucket_must_commit,
                     bucket_already_committed,
+                    bucket_archived_but_affecting_result
                 ],
             };
-            // TODO add a goal which is archived and whose amount is NOT zero this period
             remaining_operation.add_group(goals).expect("Can add goals");
 
             let ignored_incoming = IgnoredTransactionBuilder::default()
@@ -822,7 +830,7 @@ mod test {
             assert_eq!(
                 result_eur,
                 RemainingOperationScreen {
-                    remaining: exchange_rates.euro("925.00"),
+                    remaining: exchange_rates.euro("875.00"),
                     period: Period {
                         start_date: mkdate(8, 1),
                         end_date: mkdate(8, 31),
@@ -912,8 +920,8 @@ mod test {
                                 "Withdrawn".into(),
                                 "Total".into(),
                             ],
-                            total: exchange_rates.euro("-75.00"),
-                            archived_operand_with_non_zero_amounts: vec![]
+                            total: exchange_rates.euro("-125.00"),
+                            archived_operand_with_non_zero_amounts: vec!["Archived bucket".to_string()]
                         },
                         RemainingOperationScreenGroup {
                             name: "Ignored transactions".into(),
@@ -965,12 +973,12 @@ mod test {
             let result_jpy = remaining_operation.execute(&"JPY".to_string()).expect("Can execute remaining operation for yens");
             assert_eq!(result_jpy.groups.iter().map(|g| g.total.clone()).collect::<Vec<Amount>>(), vec![
                 exchange_rates.yen("2000"),
-                exchange_rates.yen("-150"),
+                exchange_rates.yen("-250"),
                 exchange_rates.yen("-400"),
                 exchange_rates.yen("400")
             ]);
 
-            assert_eq!(result_jpy.remaining, exchange_rates.yen("1850"));
+            assert_eq!(result_jpy.remaining, exchange_rates.yen("1750"));
         }
     }
 }

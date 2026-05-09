@@ -28,6 +28,8 @@ impl GroupBuilder<Bucket> for BucketsVaultValue {
 pub struct Bucket {
     name: String,
     lines: Vec<Line>,
+    #[serde(default)]
+    archived_since: Option<NaiveDate>,
 }
 
 
@@ -418,7 +420,7 @@ impl OperandBuilder for Bucket {
                 ("Withdrawn".to_string(), period.total_withdrawal.into()),
                 ("Total".to_string(), period.total.into()),
             ],
-            archived_from: None,
+            archived_from: self.archived_since,
         }))
     }
 }
@@ -558,6 +560,7 @@ mod test {
             let bucket = Bucket {
                 name: "test bucket inner".to_string(),
                 lines: self.lines.clone(),
+                archived_since: None
             };
 
             assert_eq!(
@@ -2403,6 +2406,7 @@ mod test {
                 )),
                 Line((mkdate(9, 15), Action::Deposit(RawAmount::yen("1000")))),
             ],
+            archived_since: None
         };
 
         assert_eq!(
@@ -2460,6 +2464,7 @@ mod test {
                 )),
                 Line((mkdate(9, 14), Action::Withdrawal(RawAmount::yen("500")))),
             ],
+            archived_since: None
         };
 
         assert_eq!(
@@ -2517,6 +2522,7 @@ mod test {
                     )),
                     Line((mkdate(9, 15), Action::Deposit(RawAmount::yen("1000")))),
                 ],
+                archived_since: None
             };
 
             assert_eq!(
@@ -2560,11 +2566,31 @@ mod test {
         use super::*;
         use pretty_assertions::assert_eq;
         use std::io::Write;
+        use serde_json::Value;
         use tempfile::TempDir;
 
         #[test]
         fn nominal() {
-            let (_dir, vault) = VaultImpl::create_mocked_vault(json!({"buckets": [
+            let (_dir, vault) = VaultImpl::create_mocked_vault(buckets_json_definition(false));
+
+            assert_eq!(
+                BucketsVaultValue::from_vault(&vault),
+                Ok(expected_buckets(false))
+            );
+        }
+
+        #[test]
+        fn archived() {
+            let (_dir, vault) = VaultImpl::create_mocked_vault(buckets_json_definition(true));
+
+            assert_eq!(
+                BucketsVaultValue::from_vault(&vault),
+                Ok(expected_buckets(true))
+            );
+        }
+
+        fn buckets_json_definition(archived: bool) -> Value {
+            let mut buckets_json_definition = json!({"buckets": [
                 {
                     "name": "test-bucket",
                     "lines": [
@@ -2576,34 +2602,39 @@ mod test {
                         "2025/09/15 WITH- ¥50"
                     ]
                 }
-            ]}));
+            ]});
+            if archived {
+                buckets_json_definition.as_object_mut().expect("can read JSON")["buckets"][0]["archived_since"] = "2025-10-03".into();
+            }
+            buckets_json_definition
+        }
 
-            assert_eq!(
-                BucketsVaultValue::from_vault(&vault),
-                Ok(vec![Bucket {
-                    name: "test-bucket".to_string(),
-                    lines: vec![
-                        Line((
-                            mkdate(8, 13),
-                            Action::SetTarget {
-                                amount: RawAmount::yen("3000"),
-                                target_date: mkdate(10, 30)
-                            }
-                        )),
-                        Line((mkdate(8, 13), Action::Deposit(RawAmount::yen("1100")))),
-                        Line((mkdate(8, 20), Action::Withdrawal(RawAmount::yen("500")))),
-                        Line((
-                            mkdate(8, 20),
-                            Action::DepositCancellation(RawAmount::yen("100"))
-                        )),
-                        Line((mkdate(9, 15), Action::Deposit(RawAmount::yen("1000")))),
-                        Line((
-                            mkdate(9, 15),
-                            Action::WithdrawalCancellation(RawAmount::yen("50"))
-                        ))
-                    ]
-                }])
-            );
+        fn expected_buckets(archived: bool) -> Vec<Bucket> {
+            let expected_bucket = vec![Bucket {
+                name: "test-bucket".to_string(),
+                lines: vec![
+                    Line((
+                        mkdate(8, 13),
+                        Action::SetTarget {
+                            amount: RawAmount::yen("3000"),
+                            target_date: mkdate(10, 30)
+                        }
+                    )),
+                    Line((mkdate(8, 13), Action::Deposit(RawAmount::yen("1100")))),
+                    Line((mkdate(8, 20), Action::Withdrawal(RawAmount::yen("500")))),
+                    Line((
+                        mkdate(8, 20),
+                        Action::DepositCancellation(RawAmount::yen("100"))
+                    )),
+                    Line((mkdate(9, 15), Action::Deposit(RawAmount::yen("1000")))),
+                    Line((
+                        mkdate(9, 15),
+                        Action::WithdrawalCancellation(RawAmount::yen("50"))
+                    ))
+                ],
+                archived_since: if archived{Some(NaiveDate::from_ymd_opt(2025, 10, 3).expect("can create date"))} else { None }
+            }];
+            expected_bucket
         }
     }
 }
