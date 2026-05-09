@@ -125,12 +125,6 @@ pub struct RemainingOperationScreenGroup {
     pub archived_operand_with_non_zero_amounts: Vec<String>,
 }
 
-impl RemainingOperationScreenGroup {
-    pub fn empty(&self) -> bool {
-        self.operands.is_empty()
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RemainingOperationScreenOperand {
     pub name: String,
@@ -712,6 +706,7 @@ mod test {
                 ],
             );
 
+            // TODO add an income which is archived and whose amount is zero this period
 
             let accounts = TestGroupBuilder {
                 name: "Accounts".into(),
@@ -748,6 +743,7 @@ mod test {
                     bucket_already_committed,
                 ],
             };
+            // TODO add a goal which is archived and whose amount is NOT zero this period
             remaining_operation.add_group(goals).expect("Can add goals");
 
             let ignored_incoming = IgnoredTransactionBuilder::default()

@@ -36,13 +36,23 @@ mod format_remaining_operation_screen_tests {
         let date = NaiveDate::from_ymd_opt(2026,5, 9).expect("Can create date");
         let exchange_rates = ExchangeRates::for_tests();
 
-        let empty_group = Group::new("Empty".into(), vec![]).expect("Could make group");
         let empty_group = RemainingOperationScreenGroup {
             name: "Empty".to_string(),
             operands: vec![],
             illustration_fields: vec![],
             total: exchange_rates.zero(&"JPY".to_string()).expect("Could create amount"),
             archived_operand_with_non_zero_amounts: vec![],
+        };
+
+        let empty_group_with_wrongly_archived = RemainingOperationScreenGroup {
+            name: "Empty with wrongly archived".to_string(),
+            operands: vec![],
+            illustration_fields: vec![],
+            total: exchange_rates.zero(&"JPY".to_string()).expect("Could create amount"),
+            archived_operand_with_non_zero_amounts: vec![
+                "LINE".to_string(),
+                "Credit Mutuel".to_string()
+            ],
         };
 
         let normal_group = RemainingOperationScreenGroup{
@@ -54,7 +64,7 @@ mod format_remaining_operation_screen_tests {
                 make_operand(&exchange_rates, "Payment for cat".into(), false, true)
             ],
             illustration_fields: ILLUSTRATION_FIELDS.iter().map(|field| field.to_string()).collect(),
-            archived_operand_with_non_zero_amounts: vec![]
+            archived_operand_with_non_zero_amounts: vec!["Payment for penny-farthing".to_string()]
         };
         
         let extra_column_group = RemainingOperationScreenGroup{
@@ -70,7 +80,7 @@ mod format_remaining_operation_screen_tests {
         };
 
 
-        let groups = vec![empty_group, normal_group, extra_column_group];
+        let groups = vec![empty_group, empty_group_with_wrongly_archived, normal_group, extra_column_group];
         let screen = RemainingOperationScreen{
             groups,
             remaining: exchange_rates.new_amount(&"EUR".to_string(), dec!(100)).expect("Could create amount"),
@@ -88,6 +98,10 @@ Empty
 =====
 No operands for this period
 
+Empty with wrongly archived
+===========================
+⚠ LINE and Credit Mutuel have been archived, but their current amount is not zero and still impact the group's total.
+
 Normal group
 ============
 +-------------------+--------+--------------+---------------+-----------+-----------+
@@ -101,6 +115,7 @@ Normal group
 |-------------------+--------+--------------+---------------+-----------+-----------|
 | Total             | €7.50  |              |               |           |           |
 +-------------------+--------+--------------+---------------+-----------+-----------+
+⚠ Payment for penny-farthing has been archived, but its current amount is not zero and still impact the group's total.
 
 Extra column group
 ==================
