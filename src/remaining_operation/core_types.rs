@@ -677,6 +677,7 @@ mod test {
                     (mkdate(8, 2), 1500),
                     (mkdate(8, 3), 2200),
                 ],
+                None
             );
 
             let account_euro_right = AccountJson::new(
@@ -687,6 +688,7 @@ mod test {
                     (mkdate(8, 2), 500),
                     (mkdate(8, 3), 300),
                 ],
+                None
             );
 
             let account_yen_left = AccountJson::new(
@@ -695,6 +697,7 @@ mod test {
                 vec![
                     (mkdate(7, 31), 500),
                 ],
+                None
             );
 
             let account_yen_right = AccountJson::new(
@@ -704,9 +707,18 @@ mod test {
                     (mkdate(7, 2), 700),
                     (mkdate(8, 15), 700),
                 ],
+                None
             );
 
-            // TODO add an income which is archived and whose amount is zero this period
+            let account_archived = AccountJson::new(
+                "account archived".to_string(),
+                "EUR".to_string(),
+                vec![
+                    (mkdate(5, 20), 1000),
+                    (mkdate(5, 30), 700)
+                ],
+                Some(mkdate(6,1))
+            );
 
             let accounts = TestGroupBuilder {
                 name: "Accounts".into(),
@@ -715,6 +727,7 @@ mod test {
                     account_euro_right,
                     account_yen_left,
                     account_yen_right,
+                    account_archived,
                 ],
             };
             remaining_operation.add_group(accounts).expect("Can add accounts");

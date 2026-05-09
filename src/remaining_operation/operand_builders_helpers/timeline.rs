@@ -13,6 +13,7 @@ pub struct TimelineOperandBuilderHelper {
     pub name: String,
     pub start_amount: Amount,
     pub wrapper_end_amount: TimelineOperandEnd,
+    pub archived_since: Option<NaiveDate>,
 }
 impl TimelineOperandBuilderHelper {
     pub fn build(
@@ -35,7 +36,7 @@ impl TimelineOperandBuilderHelper {
             name: self.name.clone(),
             amount: difference,
             illustration,
-            archived_from: None,
+            archived_from: self.archived_since,
         }))
     }
 }

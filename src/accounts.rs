@@ -168,6 +168,16 @@ mod tests_get_accounts {
 }"#;
         create_account_file(&directory, "account_right.json", raw_account_right);
 
+        let raw_account_with_archival_date = r#"{
+"name": "account_archived",
+"currency": "EUR",
+"amounts": [
+    {"date": "2023-05-16", "amount": 6000}
+],
+"archived_since": "2023-05-16"
+}"#;
+        create_account_file(&directory, "account_archived.json", raw_account_with_archival_date);
+
         let expected_accounts = HashSet::from([
             AccountJson {
                 name: "account_left".to_string(),
@@ -186,6 +196,7 @@ mod tests_get_accounts {
                         amount: 60000,
                     },
                 ],
+                archived_since: None
             },
             AccountJson {
                 name: "account_right".to_string(),
@@ -204,7 +215,19 @@ mod tests_get_accounts {
                         amount: 6000,
                     },
                 ],
+                archived_since: None
             },
+            AccountJson {
+                name: "account_archived".to_string(),
+                currency: String::from("EUR"),
+                amounts: vec![
+                    AmountListItem {
+                        date: NaiveDate::from_ymd_opt(2023, 05, 16).unwrap(),
+                        amount: 6000,
+                    },
+                ],
+                archived_since: Some(NaiveDate::from_ymd_opt(2023, 05, 16).unwrap())
+            }
         ]);
 
         let vault = MockVault {
@@ -224,15 +247,18 @@ pub struct AccountJson {
     name: String,
     currency: String,
     amounts: Vec<AmountListItem>,
+    #[serde(default)]
+    archived_since: Option<NaiveDate>,
 }
 
 #[cfg(test)]
 impl AccountJson {
-    pub(crate) fn new(name: String, currency: String, amounts: Vec<(NaiveDate, Figure)>) -> AccountJson {
+    pub(crate) fn new(name: String, currency: String, amounts: Vec<(NaiveDate, Figure)>, archived_since: Option<NaiveDate>) -> AccountJson {
         AccountJson{
             name,
             currency,
-            amounts: amounts.into_iter().map(|(date, amount)| AmountListItem{date, amount}).collect()
+            amounts: amounts.into_iter().map(|(date, amount)| AmountListItem{date, amount}).collect(),
+            archived_since,
         }
     }
 }
@@ -247,7 +273,8 @@ impl OperandBuilder for AccountJson {
         let builder = TimelineOperandBuilderHelper {
             name: self.name.clone(),
             start_amount,
-            wrapper_end_amount: TimelineOperandEnd::Current(end_amount)
+            wrapper_end_amount: TimelineOperandEnd::Current(end_amount),
+            archived_since: self.archived_since
         };
         builder.build()
     }
@@ -360,11 +387,12 @@ mod tests_accountjson_amount_at {
     }
 
     fn sample_account(list: Vec<AmountListItem>) -> AccountJson {
-        return AccountJson {
+        AccountJson {
             name: "Test account".to_string(),
             currency: String::from("EN"),
             amounts: list,
-        };
+            archived_since: None
+        }
     }
 
     fn assert_correct(day: u32, amount: Figure, estimated: bool) {
