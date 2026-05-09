@@ -70,7 +70,7 @@ impl RemainingOperation {
             .clone()
             .into_iter()
             .map(|group| group.into_remaining_operation_screen_group(
-                &self.exchange_rates, target_currency))
+                &self.exchange_rates, target_currency, &self.date))
             .collect::<Result<Vec<RemainingOperationScreenGroup>, String>>()?;
 
         let remaining = remaining_operation_screen_group.iter().fold(
@@ -115,14 +115,36 @@ pub struct RemainingOperationScreen {
 #[derive(PartialEq, Debug, Eq)]
 pub struct RemainingOperationScreenGroup {
     pub name: String,
-    pub operands: Vec<Operand>,
+    pub operands: Vec<RemainingOperationScreenOperand>,
     pub illustration_fields: Vec<String>,
-    pub total: Amount
+    pub total: Amount,
+    /// The name of Operands marked as archived but whose amount is not zero
+    /// A warning about this should be displayed to the user, specifying that
+    /// its math still affects the amount for the group and thus for the
+    /// remaining operation
+    archived_operand_with_non_zero_amounts: Vec<String>,
 }
 
 impl RemainingOperationScreenGroup {
     pub fn empty(&self) -> bool {
         self.operands.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemainingOperationScreenOperand {
+    pub name: String,
+    pub amount: Amount,
+    pub illustration: Illustration,
+}
+
+impl From<Operand> for RemainingOperationScreenOperand {
+    fn from(original: Operand) -> Self {
+        RemainingOperationScreenOperand{
+            name: original.name,
+            amount: original.amount,
+            illustration: original.illustration
+        }
     }
 }
 
@@ -133,7 +155,7 @@ pub mod group {
     use crate::period::PeriodConfigurationVaultValue;
     use crate::amounts::{Add, Amount, Currency, CurrencyIdent};
     use crate::amounts::exchange_rates::ExchangeRates;
-    use super::{GroupBuilder, Operand, OperandBuilder, RemainingOperationScreenGroup};
+    use super::{GroupBuilder, Operand, OperandBuilder, RemainingOperationScreenGroup, RemainingOperationScreenOperand};
 
     #[derive(Clone, PartialEq, Eq, Debug)]
     pub struct Group {
@@ -205,6 +227,7 @@ pub mod group {
             self,
             exchange_rates: &ExchangeRates,
             target_currency: &CurrencyIdent,
+            date: &NaiveDate,
         ) -> Result<RemainingOperationScreenGroup, String> {
             let total = self.operands
                 .iter()
@@ -212,11 +235,30 @@ pub mod group {
                     acc.add(&operand.amount)
                 });
 
+            let mut operands: Vec<RemainingOperationScreenOperand> = vec![];
+            let mut archived_operand_with_non_zero_amounts = vec![];
+            self.operands.iter().for_each(
+                |o | {
+                    let should_include_operand = match o.archived_from {
+                        | None => true,
+                        | Some(operand_archive_date) if *date < operand_archive_date  => true,
+                        _ => false
+                    };
+                    if should_include_operand {
+                        operands.push(o.clone().into());
+                    } else {
+                        if !o.amount.is_zero() {
+                            archived_operand_with_non_zero_amounts.push(o.name.clone());
+                        }
+                    }
+                });
+
            Ok(RemainingOperationScreenGroup{
                name: self.name,
-               operands: self.operands,
+               operands,
                illustration_fields: self.illustration_fields.unwrap_or(vec![]),
-               total
+               total,
+               archived_operand_with_non_zero_amounts
            })
         }
     }
@@ -251,26 +293,34 @@ pub struct Operand {
     pub name: String,
     pub amount: Amount,
     pub illustration: Illustration,
+    pub archived_from: Option<NaiveDate>
 }
 
 #[cfg(test)]
 mod test {
     mod group_test {
+        use chrono::{Months, NaiveDate};
         use crate::amounts::Add;
         use crate::amounts::exchange_rates::ExchangeRates;
         use crate::remaining_operation::core_types::group::Group;
-        use crate::remaining_operation::core_types::{IllustrationValue, Operand, RemainingOperationScreenGroup};
+        use crate::remaining_operation::core_types::{IllustrationValue, Operand, RemainingOperationScreenGroup, RemainingOperationScreenOperand};
+        use pretty_assertions::assert_eq;
 
         #[test]
         fn one_operand() {
+            let date = NaiveDate::from_ymd_opt(2026,5, 9).expect("Can create date");
             let ex = ExchangeRates::for_tests();
 
+            let name = "foo".to_string();
+            let amount = ex.yen("500").clone();
+            let illustration = vec![
+                ("Default amount".to_string(), IllustrationValue::Amount(ex.yen("300")))
+            ];
             let operand = Operand {
-                name: "foo".to_string(),
-                amount: ex.yen("500").clone(),
-                illustration: vec![
-                    ("Default amount".to_string(), IllustrationValue::Amount(ex.yen("300")))
-                ]
+                name: name.to_string(),
+                amount: amount.clone(),
+                illustration: illustration.clone(),
+                archived_from: None,
             };
 
             let group_name = "bar";
@@ -278,35 +328,47 @@ mod test {
             let group = Group::new(group_name, vec![operand.clone()])
                 .expect("Can create group");
             let result = group
-                .into_remaining_operation_screen_group(&ex, &"JPY".to_string())
+                .into_remaining_operation_screen_group(&ex, &"JPY".to_string(), &date)
                 .expect("can build RemainingOperationScreenGroup");
             let expected = RemainingOperationScreenGroup {
                 name: group_name.to_string(),
                 total: operand.amount.clone(),
-                operands: vec![operand],
-                illustration_fields: vec!["Default amount".to_string()]
+                operands: vec![RemainingOperationScreenOperand{
+                    name, amount, illustration
+                }],
+                illustration_fields: vec!["Default amount".to_string()],
+                archived_operand_with_non_zero_amounts: vec![]
             };
             assert_eq!(result, expected)
         }
 
         #[test]
         fn two_operands() {
+            let date = NaiveDate::from_ymd_opt(2026,5, 9).expect("Can create date");
             let ex = ExchangeRates::for_tests();
 
+            let name_left = "foo".to_string();
+            let amount_left = ex.yen("500").clone();
+            let illustration_left = vec![
+                ("Default amount".to_string(), IllustrationValue::Amount(ex.yen("300")))
+            ];
             let operand_left = Operand {
-                name: "foo".to_string(),
-                amount: ex.yen("500").clone(),
-                illustration: vec![
-                    ("Default amount".to_string(), IllustrationValue::Amount(ex.yen("300")))
-                ]
+                name: name_left.clone(),
+                amount: amount_left.clone(),
+                illustration: illustration_left.clone(),
+                archived_from: None,
             };
 
+            let name_right = "baz".to_string();
+            let amount_right = ex.yen("1000").clone();
+            let illustration_right = vec![
+                ("Default amount".to_string(), IllustrationValue::Amount(ex.yen("1300")))
+            ];
             let operand_right = Operand {
-                name: "baz".to_string(),
-                amount: ex.yen("1000").clone(),
-                illustration: vec![
-                    ("Default amount".to_string(), IllustrationValue::Amount(ex.yen("1300")))
-                ]
+                name: name_right.clone(),
+                amount: amount_right.clone(),
+                illustration: illustration_right.clone(),
+                archived_from: None,
             };
 
             let group_name = "bar";
@@ -314,13 +376,19 @@ mod test {
             let group = Group::new(group_name, vec![operand_left.clone(), operand_right.clone()])
                 .expect("Can create group");
             let result = group
-                .into_remaining_operation_screen_group(&ex, &"JPY".to_string())
+                .into_remaining_operation_screen_group(&ex, &"JPY".to_string(), &date)
                 .expect("can build RemainingOperationScreenGroup");
             let expected = RemainingOperationScreenGroup {
                 name: group_name.to_string(),
                 total: operand_left.amount.add(&operand_right.amount),
-                operands: vec![operand_left, operand_right],
-                illustration_fields: vec!["Default amount".to_string()]
+                operands: vec![
+                    RemainingOperationScreenOperand{
+                        name: name_left, amount: amount_left, illustration: illustration_left},
+                    RemainingOperationScreenOperand{
+                        name: name_right, amount: amount_right, illustration: illustration_right
+                    }],
+                illustration_fields: vec!["Default amount".to_string()],
+                archived_operand_with_non_zero_amounts: vec![]
             };
             assert_eq!(result, expected)
         }
@@ -334,7 +402,8 @@ mod test {
                 amount: ex.yen("500").clone(),
                 illustration: vec![
                     ("Default amount".to_string(), IllustrationValue::Amount(ex.yen("300")))
-                ]
+                ],
+                archived_from: None,
             };
 
             let operand_right = Operand {
@@ -343,7 +412,8 @@ mod test {
                 illustration: vec![
                     ("Default amount".to_string(), IllustrationValue::Amount(ex.yen("1300"))),
                     ("Field that should not be there".to_string(), IllustrationValue::NullAmount)
-                ]
+                ],
+                archived_from: None,
             };
 
             let group_name = "bar";
@@ -352,10 +422,204 @@ mod test {
             let expected = Err("Adding an operand (\"baz\") whose fields ([\"Default amount\", \"Field that should not be there\"]) does not match that of the rest of the operand in this group ([\"Default amount\"])".to_string());
             assert_eq!(result, expected);
         }
+
+        #[test]
+        fn two_operands_archived_later() {
+            let date = NaiveDate::from_ymd_opt(2026,5, 9).expect("Can create date");
+            let ex = ExchangeRates::for_tests();
+
+            let name_left = "foo".to_string();
+            let amount_left = ex.yen("500").clone();
+            let illustration_left = vec![
+                ("Default amount".to_string(), IllustrationValue::Amount(ex.yen("300")))
+            ];
+            let operand_left = Operand {
+                name: name_left.clone(),
+                amount: amount_left.clone(),
+                illustration: illustration_left.clone(),
+                archived_from: Some(
+                    date.checked_add_months(Months::new(1)).expect("can add a month to the date")),
+            };
+
+            let name_right = "baz".to_string();
+            let amount_right = ex.yen("1000").clone();
+            let illustration_right = vec![
+                ("Default amount".to_string(), IllustrationValue::Amount(ex.yen("1300")))
+            ];
+            let operand_right = Operand {
+                name: name_right.clone(),
+                amount: amount_right.clone(),
+                illustration: illustration_right.clone(),
+                archived_from: Some(
+                    date.checked_add_months(Months::new(1)).expect("can add a month to the date")),
+            };
+
+            let group_name = "bar";
+
+            let group = Group::new(group_name, vec![operand_left.clone(), operand_right.clone()])
+                .expect("Can create group");
+            let result = group
+                .into_remaining_operation_screen_group(&ex, &"JPY".to_string(), &date)
+                .expect("can build RemainingOperationScreenGroup");
+            let expected = RemainingOperationScreenGroup {
+                name: group_name.to_string(),
+                total: operand_left.amount.add(&operand_right.amount),
+                operands: vec![
+                    RemainingOperationScreenOperand{
+                        name: name_left, amount: amount_left, illustration: illustration_left},
+                    RemainingOperationScreenOperand{
+                        name: name_right, amount: amount_right, illustration: illustration_right
+                    }],
+                illustration_fields: vec!["Default amount".to_string()],
+                archived_operand_with_non_zero_amounts: vec![]
+            };
+            assert_eq!(result, expected)
+        }
+
+
+        #[test]
+        fn two_operands_one_archived_one_month_ago() {
+            let date = NaiveDate::from_ymd_opt(2026,5, 9).expect("Can create date");
+            let ex = ExchangeRates::for_tests();
+
+            let operand_archived = Operand {
+                name: "foo".to_string().clone(),
+                amount: ex.yen("0").clone().clone(),
+                illustration: vec![
+                    ("Default amount".to_string(), IllustrationValue::Amount(ex.yen("300")))
+                ].clone(),
+                archived_from: Some(
+                    date.checked_sub_months(Months::new(1)).expect("can add a month to the date")),
+            };
+
+            let name = "baz".to_string();
+            let amount = ex.yen("1000").clone();
+            let illustration = vec![
+                ("Default amount".to_string(), IllustrationValue::Amount(ex.yen("1300")))
+            ];
+            let operand = Operand {
+                name: name.clone(),
+                amount: amount.clone(),
+                illustration: illustration.clone(),
+                archived_from: None,
+            };
+
+            let group_name = "bar";
+
+            let group = Group::new(group_name, vec![operand_archived.clone(), operand.clone()])
+                .expect("Can create group");
+            let result = group
+                .into_remaining_operation_screen_group(&ex, &"JPY".to_string(), &date)
+                .expect("can build RemainingOperationScreenGroup");
+            let expected = RemainingOperationScreenGroup {
+                name: group_name.to_string(),
+                total: operand_archived.amount.add(&operand.amount),
+                operands: vec![
+                    RemainingOperationScreenOperand{
+                        name, amount, illustration
+                    }],
+                illustration_fields: vec!["Default amount".to_string()],
+                archived_operand_with_non_zero_amounts: vec![]
+            };
+            assert_eq!(result, expected)
+        }
+
+        #[test]
+        fn two_operands_one_archived_today() {
+            let date = NaiveDate::from_ymd_opt(2026,5, 9).expect("Can create date");
+            let ex = ExchangeRates::for_tests();
+
+            let operand_archived = Operand {
+                name: "foo".to_string().clone(),
+                amount: ex.yen("0").clone().clone(),
+                illustration: vec![
+                    ("Default amount".to_string(), IllustrationValue::Amount(ex.yen("300")))
+                ].clone(),
+                archived_from: Some(date.clone())
+            };
+
+            let name = "baz".to_string();
+            let amount = ex.yen("1000").clone();
+            let illustration = vec![
+                ("Default amount".to_string(), IllustrationValue::Amount(ex.yen("1300")))
+            ];
+            let operand = Operand {
+                name: name.clone(),
+                amount: amount.clone(),
+                illustration: illustration.clone(),
+                archived_from: None,
+            };
+
+            let group_name = "bar";
+
+            let group = Group::new(group_name, vec![operand_archived.clone(), operand.clone()])
+                .expect("Can create group");
+            let result = group
+                .into_remaining_operation_screen_group(&ex, &"JPY".to_string(), &date)
+                .expect("can build RemainingOperationScreenGroup");
+            let expected = RemainingOperationScreenGroup {
+                name: group_name.to_string(),
+                total: operand_archived.amount.add(&operand.amount),
+                operands: vec![
+                    RemainingOperationScreenOperand{
+                        name, amount, illustration
+                    }],
+                illustration_fields: vec!["Default amount".to_string()],
+                archived_operand_with_non_zero_amounts: vec![]
+            };
+            assert_eq!(result, expected)
+        }
+
+        #[test]
+        fn two_operands_one_archived_today__non_zero_amount() {
+            let date = NaiveDate::from_ymd_opt(2026,5, 9).expect("Can create date");
+            let ex = ExchangeRates::for_tests();
+
+            let archive_operator_name = "foo".to_string().clone();
+            let operand_archived = Operand {
+                name: archive_operator_name.clone(),
+                amount: ex.yen("500").clone().clone(),
+                illustration: vec![
+                    ("Default amount".to_string(), IllustrationValue::Amount(ex.yen("300")))
+                ].clone(),
+                archived_from: Some(date.clone())
+            };
+
+            let name = "baz".to_string();
+            let amount = ex.yen("1000").clone();
+            let illustration = vec![
+                ("Default amount".to_string(), IllustrationValue::Amount(ex.yen("1300")))
+            ];
+            let operand = Operand {
+                name: name.clone(),
+                amount: amount.clone(),
+                illustration: illustration.clone(),
+                archived_from: None,
+            };
+
+            let group_name = "bar";
+
+            let group = Group::new(group_name, vec![operand_archived.clone(), operand.clone()])
+                .expect("Can create group");
+            let result = group
+                .into_remaining_operation_screen_group(&ex, &"JPY".to_string(), &date)
+                .expect("can build RemainingOperationScreenGroup");
+            let expected = RemainingOperationScreenGroup {
+                name: group_name.to_string(),
+                total: operand_archived.amount.add(&operand.amount),
+                operands: vec![
+                    RemainingOperationScreenOperand{
+                        name, amount, illustration
+                    }],
+                illustration_fields: vec!["Default amount".to_string()],
+                archived_operand_with_non_zero_amounts: vec![archive_operator_name]
+            };
+            assert_eq!(result, expected)
+        }
     }
 
     mod integration_test {
-        use crate::remaining_operation::core_types::{IllustrationValue, RemainingOperationScreen};
+        use crate::remaining_operation::core_types::{IllustrationValue, RemainingOperationScreen, RemainingOperationScreenOperand};
         use chrono::NaiveDate;
         use rust_decimal::Decimal;
         use rust_decimal_macros::dec;
@@ -558,7 +822,7 @@ mod test {
                         RemainingOperationScreenGroup {
                             name: "Accounts".into(),
                             operands: vec![
-                                Operand {
+                                RemainingOperationScreenOperand {
                                     name: "account in euros left".to_string(),
                                     amount: exchange_rates.euro("1200"),
                                     illustration: vec![
@@ -568,7 +832,7 @@ mod test {
                                         ("Difference".into(), IllustrationValue::Amount(exchange_rates.euro("1200"))),
                                     ],
                                 },
-                                Operand {
+                                RemainingOperationScreenOperand {
                                     name: "account in euros right".to_string(),
                                     amount: exchange_rates.euro("-200"),
                                     illustration: vec![
@@ -578,7 +842,7 @@ mod test {
                                         ("Difference".into(), IllustrationValue::Amount(exchange_rates.euro("-200"))),
                                     ],
                                 },
-                                Operand {
+                                RemainingOperationScreenOperand {
                                     name: "account in yen left".to_string(),
                                     amount: exchange_rates.yen("0"),
                                     illustration: vec![
@@ -588,7 +852,7 @@ mod test {
                                         ("Difference".into(), IllustrationValue::Amount(exchange_rates.yen("0"))),
                                     ],
                                 },
-                                Operand {
+                                RemainingOperationScreenOperand {
                                     name: "account in yen right".to_string(),
                                     amount: exchange_rates.yen("0"),
                                     illustration: vec![
@@ -600,12 +864,13 @@ mod test {
                                 },
                             ],
                             illustration_fields: vec!["Period start amount".into(), "Period end amount".into(), "Committed".into(), "Difference".into()],
-                            total: exchange_rates.euro("1000.00")
+                            total: exchange_rates.euro("1000.00"),
+                            archived_operand_with_non_zero_amounts: vec![]
                         },
                         RemainingOperationScreenGroup {
                             name: "Buckets".into(),
                             operands: vec![
-                                Operand {
+                                RemainingOperationScreenOperand {
                                     name: "Goal must commit".to_string(),
                                     amount: exchange_rates.yen("-50"),
                                     illustration: vec![
@@ -617,7 +882,7 @@ mod test {
                                         ("Total".into(), IllustrationValue::Amount(exchange_rates.yen("150"))),
                                     ]
                                 },
-                                Operand {
+                                RemainingOperationScreenOperand {
                                     name: "Goal already committed".to_string(),
                                     amount: exchange_rates.yen("-100"),
                                     illustration: vec![
@@ -638,12 +903,13 @@ mod test {
                                 "Withdrawn".into(),
                                 "Total".into(),
                             ],
-                            total: exchange_rates.euro("-75.00")
+                            total: exchange_rates.euro("-75.00"),
+                            archived_operand_with_non_zero_amounts: vec![]
                         },
                         RemainingOperationScreenGroup {
                             name: "Ignored transactions".into(),
                             operands: vec![
-                                Operand {
+                                RemainingOperationScreenOperand {
                                     name: "Ignored incoming".to_string(),
                                     amount: exchange_rates.euro("200"),
                                     illustration: vec![
@@ -651,7 +917,7 @@ mod test {
                                         ("Date".to_string(), IllustrationValue::Date(mkdate(8, 15)))
                                     ]
                                 },
-                                Operand {
+                                RemainingOperationScreenOperand {
                                     name: "Ignored outgoing".to_string(),
                                     amount: exchange_rates.yen("-800"),
                                     illustration: vec![
@@ -659,7 +925,7 @@ mod test {
                                         ("Date".to_string(), IllustrationValue::Date(mkdate(8, 14)))
                                     ]
                                 },
-                                Operand {
+                                RemainingOperationScreenOperand {
                                     name: "Ignored later this month".to_string(),
                                     amount: exchange_rates.euro("0"),
                                     illustration: vec![
@@ -669,17 +935,19 @@ mod test {
                                 },
                             ],
                             illustration_fields: vec!["Included".into(), "Date".into()],
-                            total: exchange_rates.euro("-200.00")
+                            total: exchange_rates.euro("-200.00"),
+                            archived_operand_with_non_zero_amounts: vec![]
                         },
                         RemainingOperationScreenGroup {
                             name: "Predicted Income".into(),
-                            operands: vec![Operand {
+                            operands: vec![RemainingOperationScreenOperand {
                                 name: "Predicted Income".to_string(),
                                 amount: exchange_rates.yen("400"),
                                 illustration: vec![],
                             }],
                             illustration_fields: vec![],
-                            total: exchange_rates.euro("200.00")
+                            total: exchange_rates.euro("200.00"),
+                            archived_operand_with_non_zero_amounts: vec![]
                         }
                     ],
                 }

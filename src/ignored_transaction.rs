@@ -41,7 +41,8 @@ impl OperandBuilder for IgnoredTransaction {
             illustration: vec![
                 ("Included".to_string(), IllustrationValue::Bool(included)),
                 ("Date".to_string(), IllustrationValue::Date(self.date.clone()))
-            ]
+            ],
+            archived_from: None,
         }))
     }
 }

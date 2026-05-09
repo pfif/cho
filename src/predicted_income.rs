@@ -28,6 +28,7 @@ impl OperandBuilder for PredictedIncome {
             name: "Predicted Income".to_string(),
             amount,
             illustration: Vec::new(),
+            archived_from: None,
         }))
     }
 }

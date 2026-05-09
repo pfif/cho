@@ -420,6 +420,7 @@ impl OperandBuilder for Bucket {
                 ("Withdrawn".to_string(), period.total_withdrawal.into()),
                 ("Total".to_string(), period.total.into()),
             ],
+            archived_from: None,
         }))
     }
 }
@@ -2436,7 +2437,8 @@ mod test {
                         "Total".to_string(),
                         IllustrationValue::Amount(ex.yen("1500"))
                     )
-                ]
+                ],
+                archived_from: None,
             }))
         );
     }
@@ -2492,7 +2494,8 @@ mod test {
                         "Total".to_string(),
                         IllustrationValue::Amount(ex.yen("-500"))
                     )
-                ]
+                ],
+                archived_from: None,
             }))
         );
     }
@@ -2548,7 +2551,8 @@ mod test {
                             "Total".to_string(),
                             IllustrationValue::Amount(ex.yen("1500"))
                         )
-                    ]
+                    ],
+                    archived_from: None,
                 }))
             );
         }

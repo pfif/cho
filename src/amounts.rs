@@ -268,6 +268,10 @@ impl Amount {
             )
         }
     }
+
+   pub fn is_zero(&self) -> bool {
+        self.immutable_amount.figure().is_zero()
+    }
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]

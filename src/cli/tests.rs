@@ -28,7 +28,8 @@ mod format_remaining_operation_screen_tests {
             name,
             amount: five.clone(),
             illustration,
-            
+
+            archived_from: None,
         }
     }
 
@@ -41,12 +42,13 @@ mod format_remaining_operation_screen_tests {
     }
     impl TestTable {
         fn test(self) {
+            let date = NaiveDate::from_ymd_opt(2026,5, 9).expect("Can create date");
             let exchange_rates = ExchangeRates::for_tests();
 
             let mut groups = vec![];
             if self.include_empty_group {
                 let empty_group = Group::new("Empty".into(), vec![]).expect("Could make group");
-                groups.push(empty_group.into_remaining_operation_screen_group(&exchange_rates, &"EUR".to_string()).expect("Could make group"));
+                groups.push(empty_group.into_remaining_operation_screen_group(&exchange_rates, &"EUR".to_string(), &date).expect("Could make group"));
             }
              
             if self.include_normal_group {
@@ -55,7 +57,7 @@ mod format_remaining_operation_screen_tests {
                     make_operand(&exchange_rates, "Payment for dog".into(), false, false),
                     make_operand(&exchange_rates, "Payment for cat".into(), false, true)
                 ]).expect("Could make group");
-                groups.push(normal_group.into_remaining_operation_screen_group(&exchange_rates, &"EUR".to_string()).expect("Could make group"));
+                groups.push(normal_group.into_remaining_operation_screen_group(&exchange_rates, &"EUR".to_string(), &date).expect("Could make group"));
             }
             
             if self.include_extra_column_group {
@@ -65,7 +67,7 @@ mod format_remaining_operation_screen_tests {
                 make_operand(&exchange_rates, "Payment for Katherine".into(), true, false)
                 ]).expect("Could make group");
 
-                groups.push(extra_column_group.into_remaining_operation_screen_group(&exchange_rates, &"EUR".to_string()).expect("Could make group"));
+                groups.push(extra_column_group.into_remaining_operation_screen_group(&exchange_rates, &"EUR".to_string(), &date).expect("Could make group"));
             }
             
             let screen = RemainingOperationScreen{

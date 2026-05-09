@@ -35,6 +35,7 @@ impl TimelineOperandBuilderHelper {
             name: self.name.clone(),
             amount: difference,
             illustration,
+            archived_from: None,
         }))
     }
 }
