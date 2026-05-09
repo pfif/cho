@@ -7,9 +7,11 @@ mod format_remaining_operation_screen_tests {
     use pretty_assertions::assert_eq;
     use crate::amounts::exchange_rates::ExchangeRates;
     use crate::remaining_operation::core_types::group::Group;
-    use crate::remaining_operation::core_types::{Illustration, IllustrationValue, Operand, RemainingOperationScreen};
+    use crate::remaining_operation::core_types::{Illustration, IllustrationValue, Operand, RemainingOperationScreen, RemainingOperationScreenGroup, RemainingOperationScreenOperand};
+    const ILLUSTRATION_FIELDS : &[&str] = &["First amount", "Second amount", "Is enough", "Is luxury"];
+    const ILLUSTRATION_FIELDS_WITH_EXTRA : &[&str] = &["First amount", "Second amount", "Is enough", "Is luxury", "Extra column"];
     
-    fn make_operand(exchange_rates: &ExchangeRates, name: String, extra_column: bool, null_amount: bool) -> Operand {
+    fn make_operand(exchange_rates: &ExchangeRates, name: String, extra_column: bool, null_amount: bool) -> RemainingOperationScreenOperand {
         let five = exchange_rates.new_amount(&"JPY".to_string(), dec!(5)).expect("Could create amount");
         let six = exchange_rates.new_amount(&"EUR".to_string(), dec!(6)).expect("Could create amount");
         
@@ -21,13 +23,11 @@ mod format_remaining_operation_screen_tests {
         if extra_column {
            illustration.push(("Extra column".into(), IllustrationValue::Bool(true))); 
         }
-        
-        Operand{
+
+        RemainingOperationScreenOperand{
             name,
             amount: five.clone(),
             illustration,
-
-            archived_from: None,
         }
     }
 
@@ -36,26 +36,41 @@ mod format_remaining_operation_screen_tests {
         let date = NaiveDate::from_ymd_opt(2026,5, 9).expect("Can create date");
         let exchange_rates = ExchangeRates::for_tests();
 
-        let mut groups = vec![];
         let empty_group = Group::new("Empty".into(), vec![]).expect("Could make group");
-        groups.push(empty_group.into_remaining_operation_screen_group(&exchange_rates, &"EUR".to_string(), &date).expect("Could make group"));
-         
-        let normal_group = Group::new("Normal group".into(), vec![
-            make_operand(&exchange_rates, "Payment for house".into(), false, false),
-            make_operand(&exchange_rates, "Payment for dog".into(), false, false),
-            make_operand(&exchange_rates, "Payment for cat".into(), false, true)
-        ]).expect("Could make group");
-        groups.push(normal_group.into_remaining_operation_screen_group(&exchange_rates, &"EUR".to_string(), &date).expect("Could make group"));
-        
-        let extra_column_group = Group::new("Extra column group".into(), vec![
-        make_operand(&exchange_rates, "Payment for Mr Spock".into(), true, false),
-        make_operand(&exchange_rates, "Payment for Jean Luc".into(), true, false),
-        make_operand(&exchange_rates, "Payment for Katherine".into(), true, false)
-        ]).expect("Could make group");
+        let empty_group = RemainingOperationScreenGroup {
+            name: "Empty".to_string(),
+            operands: vec![],
+            illustration_fields: vec![],
+            total: exchange_rates.zero(&"JPY".to_string()).expect("Could create amount"),
+            archived_operand_with_non_zero_amounts: vec![],
+        };
 
-        groups.push(extra_column_group.into_remaining_operation_screen_group(&exchange_rates, &"EUR".to_string(), &date).expect("Could make group"));
+        let normal_group = RemainingOperationScreenGroup{
+            name: "Normal group".to_string(),
+            total: exchange_rates.new_amount(&"EUR".to_string(), dec!(7.50)).expect("Could create amount"),
+            operands: vec![
+                make_operand(&exchange_rates, "Payment for house".into(), false, false),
+                make_operand(&exchange_rates, "Payment for dog".into(), false, false),
+                make_operand(&exchange_rates, "Payment for cat".into(), false, true)
+            ],
+            illustration_fields: ILLUSTRATION_FIELDS.iter().map(|field| field.to_string()).collect(),
+            archived_operand_with_non_zero_amounts: vec![]
+        };
         
-        
+        let extra_column_group = RemainingOperationScreenGroup{
+            name: "Extra column group".to_string(),
+            total: exchange_rates.new_amount(&"EUR".to_string(), dec!(7.50)).expect("Could create amount"),
+            operands: vec![
+                make_operand(&exchange_rates, "Payment for Mr Spock".into(), true, false),
+                make_operand(&exchange_rates, "Payment for Jean Luc".into(), true, false),
+                make_operand(&exchange_rates, "Payment for Katherine".into(), true, false)
+            ],
+            illustration_fields: ILLUSTRATION_FIELDS_WITH_EXTRA.iter().map(|field| field.to_string()).collect(),
+            archived_operand_with_non_zero_amounts: vec![]
+        };
+
+
+        let groups = vec![empty_group, normal_group, extra_column_group];
         let screen = RemainingOperationScreen{
             groups,
             remaining: exchange_rates.new_amount(&"EUR".to_string(), dec!(100)).expect("Could create amount"),

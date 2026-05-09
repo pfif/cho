@@ -122,7 +122,7 @@ pub struct RemainingOperationScreenGroup {
     /// A warning about this should be displayed to the user, specifying that
     /// its math still affects the amount for the group and thus for the
     /// remaining operation
-    archived_operand_with_non_zero_amounts: Vec<String>,
+    pub archived_operand_with_non_zero_amounts: Vec<String>,
 }
 
 impl RemainingOperationScreenGroup {
