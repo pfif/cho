@@ -90,10 +90,6 @@ fn title(string: &str) -> String {
     string.to_string() + "\n" + &"=".repeat(string_length)
 }
 
-fn human_readable_list(list: &[String]) -> String {
-    "".to_string()
-}
-
 fn render_archive_operand_with_non_zero_amounts_warning(
     operand_names: &Vec<String>
 ) -> String {
