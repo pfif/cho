@@ -22,7 +22,7 @@ pub fn format_remaining_operation_screen(screen: &RemainingOperationScreen) -> S
 
     components.push(format!("Release: {}", env!("RELEASE")));
 
-    components.join("\n\n")
+    format!("{}\n", components.join("\n\n"))
 }
 
 fn render_group(group: &RemainingOperationScreenGroup) -> String {

@@ -134,6 +134,7 @@ Extra column group
 Remaining this period: €100
 =============================
 
-Release: Development build"#.to_string())
+Release: Development build
+"#.to_string())
     }
 }
