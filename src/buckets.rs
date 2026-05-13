@@ -1,5 +1,5 @@
 use crate::amounts::exchange_rates::ExchangeRates;
-use crate::amounts::{Add, Amount, Div, Figure, Minus, RawAmount};
+use crate::amounts::{Add, Amount, Div, Figure, Sub, RawAmount};
 use crate::period::{
     ErrorPeriodsBetween, Period, PeriodConfigurationVaultValue, PeriodsConfiguration,
 };
@@ -186,10 +186,10 @@ impl Bucket {
                             .map(|parsed_amount| acc.add(&parsed_amount)),
                         Action::Withdrawal(amount) => ex
                             .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.minus(&parsed_amount)),
+                            .map(|parsed_amount| acc.sub(&parsed_amount)),
                         Action::DepositCancellation(amount) => ex
                             .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.minus(&parsed_amount))
+                            .map(|parsed_amount| acc.sub(&parsed_amount))
                             .and_then(|new_acc| {
                                 if new_acc.is_negative() {
                                     Err("attempt to withdraw more money than the Bucket contains"
@@ -216,7 +216,7 @@ impl Bucket {
                             .map(|parsed_amount| acc.add(&parsed_amount)),
                         Action::DepositCancellation(amount) => ex
                             .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.minus(&parsed_amount)),
+                            .map(|parsed_amount| acc.sub(&parsed_amount)),
                         _ => Ok(acc),
                     }
                 } else {
@@ -235,7 +235,7 @@ impl Bucket {
                             .map(|parsed_amount| acc.add(&parsed_amount)),
                         Action::WithdrawalCancellation(amount) => ex
                             .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.minus(&parsed_amount))
+                            .map(|parsed_amount| acc.sub(&parsed_amount))
                             .and_then(|new_acc| {
                                 if new_acc.is_negative() {
                                     Err("attempt to put back money that was not withdrawn"
@@ -252,7 +252,6 @@ impl Bucket {
             },
         )?;
 
-        let current_period = period_config.period_for_date(date)?;
 
         let deposited_until_period_start = self.lines.iter().try_fold(
             ex.zero(&"JPY".to_string())?,
@@ -265,7 +264,7 @@ impl Bucket {
                             .map(|parsed_amount| acc.add(&parsed_amount)),
                         Action::DepositCancellation(amount) => ex
                             .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.minus(&parsed_amount)),
+                            .map(|parsed_amount| acc.sub(&parsed_amount)),
                         _ => Ok(acc),
                     }
                 } else {
@@ -288,7 +287,7 @@ impl Bucket {
                             Action::DepositCancellation(amount) | Action::Withdrawal(amount) => {
                                 let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
                                 ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc.minus(&parsed_amount)))
+                                    .map(|parsed_amount| Some(acc.sub(&parsed_amount)))
                             }
                             _ => Ok(acc),
                         }
@@ -311,7 +310,7 @@ impl Bucket {
                             Action::DepositCancellation(amount) => {
                                 let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
                                 ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc.minus(&parsed_amount)))
+                                    .map(|parsed_amount| Some(acc.sub(&parsed_amount)))
                             }
                             _ => Ok(acc),
                         }
@@ -334,7 +333,7 @@ impl Bucket {
                             Action::WithdrawalCancellation(amount) => {
                                 let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
                                 ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc.minus(&parsed_amount)))
+                                    .map(|parsed_amount| Some(acc.sub(&parsed_amount)))
                             }
                             _ => Ok(acc),
                         }
@@ -365,7 +364,7 @@ impl Bucket {
             };
 
             let recommended_deposit_figure = Amount::maximum(
-                &target_amount.minus(&deposited_until_period_start),
+                &target_amount.sub(&deposited_until_period_start),
                 &ex.zero(&"JPY".to_string())?,
             ).div(&Decimal::from(number_of_periods));
 

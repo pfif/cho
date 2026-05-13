@@ -186,10 +186,6 @@ pub trait Sub<T> {
     fn sub(&self, other: &T) -> Amount;
 }
 
-pub trait Minus<T> {
-    fn minus(&self, other: &T) -> Amount;
-}
-
 pub trait Div<T> {
     fn div(&self, divisor: &T) -> Amount;
 }
@@ -209,19 +205,6 @@ impl Add<Amount> for Amount {
 
 impl Sub<Amount> for Amount {
     fn sub(&self, other_amount: &Amount) -> Amount {
-        let other_amount_converted = other_amount.convert(self.immutable_amount.currency());
-        let new_immutable_amount = ImmutableAmount::new(
-            self.immutable_amount.currency(),
-            self.immutable_amount.figure() - other_amount_converted.immutable_amount.figure(),
-        );
-        Amount {
-            immutable_amount: new_immutable_amount,
-        }
-    }
-}
-
-impl Minus<Amount> for Amount {
-    fn minus(&self, other_amount: &Amount) -> Amount {
         let other_amount_converted = other_amount.convert(self.immutable_amount.currency());
         let new_immutable_amount = ImmutableAmount::new(
             self.immutable_amount.currency(),
