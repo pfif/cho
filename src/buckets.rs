@@ -176,6 +176,7 @@ impl Bucket {
         date: &NaiveDate,
         ex: &ExchangeRates,
     ) -> Result<BucketAtDate, String> {
+        let current_period = period_config.period_for_date(date)?;
         let total = self.lines.iter().try_fold(
             ex.zero(&"JPY".to_string())?,
             |acc, Line((line_date, action))| {
