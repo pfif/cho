@@ -40,7 +40,7 @@ impl OperandBuilder for IgnoredTransaction {
             amount: operand_amount, 
             illustration: vec![
                 ("Included".to_string(), IllustrationValue::Bool(included)),
-                ("Date".to_string(), IllustrationValue::Date(self.date.clone()))
+                ("Date".to_string(), self.date.into())
             ],
             archived_from: None,
         }))

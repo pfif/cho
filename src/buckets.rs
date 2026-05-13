@@ -2425,7 +2425,7 @@ mod test {
                     ),
                     (
                         "This period - actual withdrawal".to_string(),
-                        IllustrationValue::NullAmount
+                        IllustrationValue::Null
                     ),
                     (
                         "Deposited".to_string(),
@@ -2479,7 +2479,7 @@ mod test {
                     ),
                     (
                         "This period - actual deposit".to_string(),
-                        IllustrationValue::NullAmount
+                        IllustrationValue::Null
                     ),
                     (
                         "This period - actual withdrawal".to_string(),
@@ -2533,7 +2533,7 @@ mod test {
                     illustration: vec![
                         (
                             "This period - recommended deposit".to_string(),
-                            IllustrationValue::NullAmount
+                            IllustrationValue::Null
                         ),
                         (
                             "This period - actual deposit".to_string(),
@@ -2541,7 +2541,7 @@ mod test {
                         ),
                         (
                             "This period - actual withdrawal".to_string(),
-                            IllustrationValue::NullAmount
+                            IllustrationValue::Null
                         ),
                         (
                             "Deposited".to_string(),

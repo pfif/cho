@@ -261,7 +261,7 @@ pub mod group {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IllustrationValue {
     Amount(Amount),
-    NullAmount,
+    Null,
     Bool(bool),
     Date(NaiveDate),
 }
@@ -272,11 +272,17 @@ impl From<Amount> for IllustrationValue {
     }
 }
 
-impl From<Option<Amount>> for IllustrationValue {
-    fn from(value: Option<Amount>) -> Self {
+impl From<NaiveDate> for IllustrationValue {
+    fn from(value: NaiveDate) -> Self {
+        IllustrationValue::Date(value)
+    }
+}
+
+impl<T: Into<IllustrationValue>> From<Option<T>> for IllustrationValue {
+    fn from(value: Option<T>) -> Self {
        value
-           .map(|amount| amount.into())
-           .unwrap_or(IllustrationValue::NullAmount)
+           .map(|value| value.into())
+           .unwrap_or(IllustrationValue::Null)
     }
 }
 
@@ -405,7 +411,7 @@ mod test {
                 amount: ex.yen("1000").clone(),
                 illustration: vec![
                     ("Default amount".to_string(), IllustrationValue::Amount(ex.yen("1300"))),
-                    ("Field that should not be there".to_string(), IllustrationValue::NullAmount)
+                    ("Field that should not be there".to_string(), IllustrationValue::Null)
                 ],
                 archived_from: None,
             };
@@ -892,8 +898,8 @@ mod test {
                                     amount: exchange_rates.yen("-50"),
                                     illustration: vec![
                                         ("This period - recommended deposit".into(), IllustrationValue::Amount(exchange_rates.yen("50"))),
-                                        ("This period - actual deposit".into(), IllustrationValue::NullAmount),
-                                        ("This period - actual withdrawal".into(), IllustrationValue::NullAmount),
+                                        ("This period - actual deposit".into(), IllustrationValue::Null),
+                                        ("This period - actual withdrawal".into(), IllustrationValue::Null),
                                         ("Deposited".into(), IllustrationValue::Amount(exchange_rates.yen("150"))),
                                         ("Withdrawn".into(), IllustrationValue::Amount(exchange_rates.yen("0"))),
                                         ("Total".into(), IllustrationValue::Amount(exchange_rates.yen("150"))),
@@ -905,7 +911,7 @@ mod test {
                                     illustration: vec![
                                         ("This period - recommended deposit".into(), IllustrationValue::Amount(exchange_rates.yen("400"))),
                                         ("This period - actual deposit".into(), IllustrationValue::Amount(exchange_rates.yen("100"))),
-                                        ("This period - actual withdrawal".into(), IllustrationValue::NullAmount),
+                                        ("This period - actual withdrawal".into(), IllustrationValue::Null),
                                         ("Deposited".into(), IllustrationValue::Amount(exchange_rates.yen("200"))),
                                         ("Withdrawn".into(), IllustrationValue::Amount(exchange_rates.yen("0"))),
                                         ("Total".into(), IllustrationValue::Amount(exchange_rates.yen("200"))),

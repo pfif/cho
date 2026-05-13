@@ -17,7 +17,7 @@ mod format_remaining_operation_screen_tests {
         
         let mut illustration: Illustration = Vec::new();
         illustration.push(("First amount".into(), IllustrationValue::Amount(five.clone())));
-        illustration.push(("Second amount".into(), if !null_amount {IllustrationValue::Amount(six.clone())} else {IllustrationValue::NullAmount}));
+        illustration.push(("Second amount".into(), if !null_amount {IllustrationValue::Amount(six.clone())} else {IllustrationValue::Null }));
         illustration.push(("Is enough".into(), IllustrationValue::Bool(true)));
         illustration.push(("Is luxury".into(), IllustrationValue::Bool(false)));
         if extra_column {

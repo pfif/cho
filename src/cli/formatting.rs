@@ -68,7 +68,7 @@ fn render_group_table(group: &RemainingOperationScreenGroup) -> String {
             .map(|(_, value)| value)
             .map(|illustration_value| match illustration_value {
                 IllustrationValue::Amount(amount) => amount.to_string(),
-                IllustrationValue::NullAmount => "-".to_string(),
+                IllustrationValue::Null => "-".to_string(),
                 IllustrationValue::Bool(bool) => (if bool { "✅" } else { "" }).into(),
                 IllustrationValue::Date(date) => date.to_string(),
             });
