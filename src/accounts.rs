@@ -104,142 +104,6 @@ impl GroupBuilder<AccountJson> for AccountGetter {
     }
 }
 
-#[allow(non_snake_case)]
-#[cfg(test)]
-mod tests_get_accounts {
-    use chrono::NaiveDate;
-    use std::collections::HashSet;
-    use std::fs::{create_dir, File};
-    use std::io::prelude::*;
-    use std::path::{Path, PathBuf};
-    use tempfile::{tempdir, TempDir};
-
-    use crate::accounts::{AccountGetter, AccountJson, AmountListItem, ACCOUNT_DIR};
-    use crate::vault::Vault;
-
-    struct MockVault {
-        path: PathBuf,
-    }
-
-    impl Vault for MockVault {
-        fn path(&self) -> &PathBuf {
-            return &self.path;
-        }
-
-        fn read_vault_values<T: serde::de::DeserializeOwned>(
-            &self,
-            _name: String,
-        ) -> Result<T, String> {
-            todo!()
-        }
-    }
-
-    fn create_account_file(directory: &TempDir, name: &str, content: &str) {
-        let path = Path::join(&Path::join(directory.path(), ACCOUNT_DIR), name);
-        let mut file = File::create(path).unwrap();
-        file.write_all(content.as_bytes()).unwrap();
-    }
-
-    #[test]
-    fn parse_accounts__nominal() {
-        let directory = tempdir().unwrap();
-
-        create_dir(Path::join(directory.path(), ACCOUNT_DIR)).unwrap();
-
-        let raw_account_left = r#"{
-"name": "account_left",
-"currency": "JPY",
-"amounts": [
-    {"date": "2023-04-08", "amount": 55000},
-    {"date": "2023-04-10", "amount": 53000},
-    {"date": "2023-04-12", "amount": 60000}
-]
-}"#;
-        create_account_file(&directory, "account_left.json", raw_account_left);
-
-        let raw_account_right = r#"{
-"name": "account_right",
-"currency": "EUR",
-"amounts": [
-    {"date": "2023-02-03", "amount": 5000},
-    {"date": "2023-03-13", "amount": 5200},
-    {"date": "2023-05-16", "amount": 6000}
-]
-}"#;
-        create_account_file(&directory, "account_right.json", raw_account_right);
-
-        let raw_account_with_archival_date = r#"{
-"name": "account_archived",
-"currency": "EUR",
-"amounts": [
-    {"date": "2023-05-16", "amount": 6000}
-],
-"archived_since": "2023-05-16"
-}"#;
-        create_account_file(&directory, "account_archived.json", raw_account_with_archival_date);
-
-        let expected_accounts = HashSet::from([
-            AccountJson {
-                name: "account_left".to_string(),
-                currency: String::from("JPY"),
-                amounts: vec![
-                    AmountListItem {
-                        date: NaiveDate::from_ymd_opt(2023, 04, 08).unwrap(),
-                        amount: 55000,
-                    },
-                    AmountListItem {
-                        date: NaiveDate::from_ymd_opt(2023, 04, 10).unwrap(),
-                        amount: 53000,
-                    },
-                    AmountListItem {
-                        date: NaiveDate::from_ymd_opt(2023, 04, 12).unwrap(),
-                        amount: 60000,
-                    },
-                ],
-                archived_since: None
-            },
-            AccountJson {
-                name: "account_right".to_string(),
-                currency: String::from("EUR"),
-                amounts: vec![
-                    AmountListItem {
-                        date: NaiveDate::from_ymd_opt(2023, 02, 03).unwrap(),
-                        amount: 5000,
-                    },
-                    AmountListItem {
-                        date: NaiveDate::from_ymd_opt(2023, 03, 13).unwrap(),
-                        amount: 5200,
-                    },
-                    AmountListItem {
-                        date: NaiveDate::from_ymd_opt(2023, 05, 16).unwrap(),
-                        amount: 6000,
-                    },
-                ],
-                archived_since: None
-            },
-            AccountJson {
-                name: "account_archived".to_string(),
-                currency: String::from("EUR"),
-                amounts: vec![
-                    AmountListItem {
-                        date: NaiveDate::from_ymd_opt(2023, 05, 16).unwrap(),
-                        amount: 6000,
-                    },
-                ],
-                archived_since: Some(NaiveDate::from_ymd_opt(2023, 05, 16).unwrap())
-            }
-        ]);
-
-        let vault = MockVault {
-            path: directory.path().to_path_buf(),
-        };
-
-        assert_eq!(
-            HashSet::from_iter(AccountGetter::from_vault(&vault).unwrap().accounts),
-            expected_accounts
-        )
-    }
-}
 
 // JSON implementation
 #[derive(Deserialize, Hash, Eq, PartialEq, Debug, Clone)]
@@ -448,5 +312,142 @@ mod tests_accountjson_amount_at {
     #[test]
     fn error_list_out_of_order_later_date() {
         assert_out_of_order(22);
+    }
+}
+
+#[allow(non_snake_case)]
+#[cfg(test)]
+mod tests_get_accounts {
+    use chrono::NaiveDate;
+    use std::collections::HashSet;
+    use std::fs::{create_dir, File};
+    use std::io::prelude::*;
+    use std::path::{Path, PathBuf};
+    use tempfile::{tempdir, TempDir};
+
+    use crate::accounts::{AccountGetter, AccountJson, AmountListItem, ACCOUNT_DIR};
+    use crate::vault::Vault;
+
+    struct MockVault {
+        path: PathBuf,
+    }
+
+    impl Vault for MockVault {
+        fn path(&self) -> &PathBuf {
+            return &self.path;
+        }
+
+        fn read_vault_values<T: serde::de::DeserializeOwned>(
+            &self,
+            _name: String,
+        ) -> Result<T, String> {
+            todo!()
+        }
+    }
+
+    fn create_account_file(directory: &TempDir, name: &str, content: &str) {
+        let path = Path::join(&Path::join(directory.path(), ACCOUNT_DIR), name);
+        let mut file = File::create(path).unwrap();
+        file.write_all(content.as_bytes()).unwrap();
+    }
+
+    #[test]
+    fn parse_accounts__nominal() {
+        let directory = tempdir().unwrap();
+
+        create_dir(Path::join(directory.path(), ACCOUNT_DIR)).unwrap();
+
+        let raw_account_left = r#"{
+"name": "account_left",
+"currency": "JPY",
+"amounts": [
+    {"date": "2023-04-08", "amount": 55000},
+    {"date": "2023-04-10", "amount": 53000},
+    {"date": "2023-04-12", "amount": 60000}
+]
+}"#;
+        create_account_file(&directory, "account_left.json", raw_account_left);
+
+        let raw_account_right = r#"{
+"name": "account_right",
+"currency": "EUR",
+"amounts": [
+    {"date": "2023-02-03", "amount": 5000},
+    {"date": "2023-03-13", "amount": 5200},
+    {"date": "2023-05-16", "amount": 6000}
+]
+}"#;
+        create_account_file(&directory, "account_right.json", raw_account_right);
+
+        let raw_account_with_archival_date = r#"{
+"name": "account_archived",
+"currency": "EUR",
+"amounts": [
+    {"date": "2023-05-16", "amount": 6000}
+],
+"archived_since": "2023-05-16"
+}"#;
+        create_account_file(&directory, "account_archived.json", raw_account_with_archival_date);
+
+        let expected_accounts = HashSet::from([
+            AccountJson {
+                name: "account_left".to_string(),
+                currency: String::from("JPY"),
+                amounts: vec![
+                    AmountListItem {
+                        date: NaiveDate::from_ymd_opt(2023, 04, 08).unwrap(),
+                        amount: 55000,
+                    },
+                    AmountListItem {
+                        date: NaiveDate::from_ymd_opt(2023, 04, 10).unwrap(),
+                        amount: 53000,
+                    },
+                    AmountListItem {
+                        date: NaiveDate::from_ymd_opt(2023, 04, 12).unwrap(),
+                        amount: 60000,
+                    },
+                ],
+                archived_since: None
+            },
+            AccountJson {
+                name: "account_right".to_string(),
+                currency: String::from("EUR"),
+                amounts: vec![
+                    AmountListItem {
+                        date: NaiveDate::from_ymd_opt(2023, 02, 03).unwrap(),
+                        amount: 5000,
+                    },
+                    AmountListItem {
+                        date: NaiveDate::from_ymd_opt(2023, 03, 13).unwrap(),
+                        amount: 5200,
+                    },
+                    AmountListItem {
+                        date: NaiveDate::from_ymd_opt(2023, 05, 16).unwrap(),
+                        amount: 6000,
+                    },
+                ],
+                archived_since: None
+            },
+            AccountJson {
+                name: "account_archived".to_string(),
+                currency: String::from("EUR"),
+                amounts: vec![
+                    AmountListItem {
+                        date: NaiveDate::from_ymd_opt(2023, 05, 16).unwrap(),
+                        amount: 6000,
+                    },
+                ],
+                archived_since: Some(NaiveDate::from_ymd_opt(2023, 05, 16).unwrap())
+            }
+        ]);
+
+        let vault = MockVault {
+            path: directory.path().to_path_buf(),
+        };
+
+        assert_eq!(
+            HashSet::from_iter(AccountGetter::from_vault(&vault).unwrap().accounts),
+            expected_accounts
+        )
     }
 }
