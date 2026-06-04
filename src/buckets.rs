@@ -402,46 +402,53 @@ impl Bucket {
     }
 }
 
-struct ComputeTotals {
+#[derive(Clone)]
+struct TotalsComputer {
     total: Amount,
     deposited: Amount,
     withdrawn: Amount,
 
     exchange_rates: ExchangeRates,
-    date: NaiveDate
 }
 
-impl ComputeTotals {
-    fn new(exchange_rates: &ExchangeRates, date: NaiveDate) -> Result<Self, String> {
+impl TotalsComputer {
+    fn new(exchange_rates: &ExchangeRates) -> Result<Self, String> {
         let zero_yen = exchange_rates.zero(&"JPY".to_string())?;
-        Ok(ComputeTotals{
+        Ok(TotalsComputer{
             total: zero_yen.clone(),
             withdrawn: zero_yen.clone(),
             deposited: zero_yen.clone(),
 
             exchange_rates: exchange_rates.clone(),
-            date
         })
     }
 }
 
-impl ChronoStackWalker<Action, ComputeTotals> for ComputeTotals {
-    fn try_visit(&mut self, date: &NaiveDate, action: &Action) -> Result<(), String> {
-        if date <= &self.date {
-            match action {
-                Action::Deposit(amount) => {
-                    let amount = self.exchange_rates.new_amount_from_raw_amount(amount)?;
-                    self.total = self.total.add(&amount);
-                    self.deposited = self.deposited.add(&amount);
+impl TotalsComputer {
+    fn apply(&mut self, action: &Action) -> Result<(), String> {
+        match action {
+            Action::Deposit(amount) => {
+                let amount = self.exchange_rates.new_amount_from_raw_amount(amount)?;
+                self.total = self.total.add(&amount);
+                self.deposited = self.deposited.add(&amount);
+            }
+            Action::DepositCancellation(amount) => {
+                let amount = self.exchange_rates.new_amount_from_raw_amount(amount)?;
+                let new_deposited = self.deposited.sub(&amount);
+                if new_deposited.is_negative() {
+                    return Err("attempt to remove more than was deposited".to_string());
                 }
-                _ => {}
-            };
-        }
+                self.deposited = new_deposited;
+                self.total = self.total.sub(&amount);
+            },
+            Action::Withdrawal(amount) => {
+                let amount = self.exchange_rates.new_amount_from_raw_amount(amount)?;
+                self.withdrawn = self.withdrawn.add(&amount);
+                self.total = self.total.sub(&amount);
+            }
+            _ => {}
+        };
         Ok(())
-    }
-
-    fn into_output(self) -> ComputeTotals {
-        self
     }
 }
 
@@ -486,63 +493,114 @@ mod test {
         NaiveDate::from_ymd_opt(2025, month, date).expect("Can create date")
     }
 
-    mod action {
-        #[test]
-        fn apply_deposit() {
-
-        }
-    }
-
-    mod compute_totals {
+    mod totals_computer {
         use chrono::Days;
         use super::*;
 
         #[test]
         fn totals() {
-            struct TestTable {
-                action: Action,
-
-                expected_total: Amount,
-                expected_deposited: Amount,
-                expected_withdrawn: Amount,
-            }
             let ex = ExchangeRates::for_tests();
 
-            let table = TestTable{
-                action: Action::Deposit(RawAmount::yen("5")),
+            let base_state = TotalsComputer {
+                total: ex.yen("100"),
+                withdrawn: ex.yen("500"),
+                deposited: ex.yen("400"),
 
-                expected_total: ex.yen("5"),
-                expected_deposited: ex.yen("5"),
-                expected_withdrawn: ex.yen("0"),
+                exchange_rates: ex.clone(),
             };
 
-            for test in vec![table] {
-                let today = mkdate(1, 5);
-                let yesterday = today.checked_sub_days(Days::new(1)).expect("Can compute yesterday");
-                let tomorrow = today.checked_add_days(Days::new(1)).expect("Can compute tomorrow");
+            struct TestTable {
+                name: String,
+                action: Action,
 
-                for date in vec![today, yesterday] {
-                    let mut state = ComputeTotals::new(&ex, today).expect("Can create state");
-                    state.try_visit(
-                        &date,
-                        &test.action
-                    ).expect("Can visit");
+                expected_result: ExpectedResult,
+            }
+            ;
 
-                    assert_eq!(state.total, test.expected_total);
-                    assert_eq!(state.deposited, test.expected_deposited);
-                    assert_eq!(state.withdrawn, test.expected_withdrawn);
+            enum ExpectedResult {
+                Success {
+                    expected_total: Amount,
+                    expected_deposited: Amount,
+                    expected_withdrawn: Amount,
+                },
+                Failure {
+                    error: String,
+                },
+            }
+
+            let tests = vec![
+                TestTable {
+                    name: "Deposit".to_string(),
+                    action: Action::Deposit(RawAmount::yen("5")),
+
+                    expected_result: ExpectedResult::Success {
+                        expected_total: base_state.total.add(&ex.yen("5")),
+                        expected_deposited: base_state.deposited.add(&ex.yen("5")),
+                        expected_withdrawn: base_state.withdrawn.clone()
+                    }
+                },
+                TestTable {
+                    name: "DepositCancellation - small".to_string(),
+                    action: Action::DepositCancellation(RawAmount::yen("5")),
+
+                    expected_result: ExpectedResult::Success {
+                        expected_total: base_state.total.sub(&ex.yen("5")),
+                        expected_deposited: base_state.deposited.sub(&ex.yen("5")),
+                        expected_withdrawn: base_state.withdrawn.clone()
+                    }
+                },
+                TestTable {
+                    name: "DepositCancellation - cancels everything".to_string(),
+                    action: Action::DepositCancellation(RawAmount::from(&base_state.deposited)),
+
+                    expected_result: ExpectedResult::Success {
+                        expected_total: base_state.total.sub(&base_state.deposited),
+                        expected_deposited: ex.yen("0"),
+                        expected_withdrawn: base_state.withdrawn.clone()
+                    }
+                },
+                TestTable {
+                    name: "DepositCancellation - cancels more than exists".to_string(),
+                    action: Action::DepositCancellation(
+                        RawAmount::from(
+                            &base_state.deposited.add(&ex.yen("100")
+                            )
+                        )
+                    ),
+
+                    expected_result: ExpectedResult::Failure { error: "attempt to remove more than was deposited".to_string() }
+                },
+                TestTable {
+                    name: "Withdraw".to_string(),
+                    action: Action::Withdrawal(RawAmount::yen("5")
+                    ),
+
+                    expected_result: ExpectedResult::Success {
+                        expected_total: base_state.total.sub(&ex.yen("5")),
+                        expected_deposited: base_state.deposited.clone(),
+                        expected_withdrawn: base_state.withdrawn.add(&ex.yen("5"))
+                    }
                 }
+            ];
 
-                let mut state = ComputeTotals::new(&ex, today).expect("Can create state");
-                state.try_visit(
-                    &tomorrow,
+            for test in tests {
+                let mut state = base_state.clone();
+                let result = state.apply(
                     &test.action
-                ).expect("Can visit");
+                );
 
-                assert_eq!(state.total, ex.yen("0"));
-                assert_eq!(state.deposited, ex.yen("0"));
-                assert_eq!(state.withdrawn, ex.yen("0"));
+                match test.expected_result {
+                    ExpectedResult::Success { expected_total, expected_deposited, expected_withdrawn } => {
+                        result.expect("did succeed");
 
+                        assert_eq!(state.total, expected_total, "{}", test.name);
+                        assert_eq!(state.deposited, expected_deposited, "{}", test.name);
+                        assert_eq!(state.withdrawn, expected_withdrawn, "{}", test.name);
+                    },
+                    ExpectedResult::Failure { error } => {
+                        assert_eq!(result, Err(error))
+                    }
+                }
             }
         }
     }

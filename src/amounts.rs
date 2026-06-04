@@ -272,3 +272,13 @@ impl RawAmount {
         }
     }
 }
+
+#[cfg(test)]
+impl From<&Amount> for RawAmount {
+    fn from(value: &Amount) -> Self {
+        RawAmount{
+            sign: value.immutable_amount.currency().sign.clone(),
+            figure: value.immutable_amount.figure().clone(),
+        }
+    }
+}
