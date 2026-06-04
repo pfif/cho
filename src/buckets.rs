@@ -452,7 +452,11 @@ impl TotalsComputer {
                 self.withdrawn = self.withdrawn.add(&amount);
             },
             Action::WithdrawalCancellation(_) => {
-                self.withdrawn = self.withdrawn.sub(&amount);
+                let new_withdrawn = self.withdrawn.sub(&amount);
+                if new_withdrawn.is_negative() {
+                    return Err("attempt to remove more than was withdrawn".to_string());
+                }
+                self.withdrawn = new_withdrawn;
             }
             _ => {}
         };
@@ -653,6 +657,17 @@ mod test {
                         expected_total: base_state.total.add(&base_state.withdrawn),
                         expected_deposited: base_state.deposited.clone(),
                         expected_withdrawn: ex.yen("0"),
+                    }
+                },
+                TestTable {
+                    name: "Withdraw cancellation - cancels too much".to_string(),
+                    action: Action::WithdrawalCancellation(
+                        RawAmount::from(&base_state.withdrawn.add(&ex.yen("100")))
+
+                    ),
+
+                    expected_result: ExpectedResult::Failure {
+                        error: "attempt to remove more than was withdrawn".to_string()
                     }
                 }
             ];
