@@ -641,6 +641,19 @@ mod test {
                         expected_deposited: base_state.deposited.clone(),
                         expected_withdrawn: base_state.withdrawn.sub(&ex.yen("5")),
                     }
+                },
+                TestTable {
+                    name: "Withdraw cancellation - cancels everything".to_string(),
+                    action: Action::WithdrawalCancellation(
+                        RawAmount::from(&base_state.withdrawn)
+
+                    ),
+
+                    expected_result: ExpectedResult::Success {
+                        expected_total: base_state.total.add(&base_state.withdrawn),
+                        expected_deposited: base_state.deposited.clone(),
+                        expected_withdrawn: ex.yen("0"),
+                    }
                 }
             ];
 
