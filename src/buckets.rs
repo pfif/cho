@@ -12,6 +12,7 @@ use serde::{Deserialize, Deserializer};
 use serde_json::value::Index;
 use std::fmt::{Formatter, Write};
 use std::str::{FromStr, Split};
+use crate::chrono_stack::ChronoStackWalker;
 
 pub type BucketsVaultValue = Vec<Bucket>;
 impl VaultReadable for BucketsVaultValue {
@@ -176,7 +177,16 @@ impl Bucket {
         date: &NaiveDate,
         ex: &ExchangeRates,
     ) -> Result<BucketAtDate, String> {
+        /*let stack = ChronoStack::new(self.lines);
+        let (total, deposited, withdrawn) = stack.walk(ComputeTotals::new(date));
+
+
         let current_period = period_config.period_for_date(date)?;
+        let deposited_until_period_start = stack.walk(ComputeDepositedUntilPeriodStart::new(current_period));
+        let (total_this_period, deposited_this_period, withdrawn_this_period) = stack.walk(ComputeTotalsForThisPeriod::new(current_period, date));
+        let target = stack.walk(SelectTarget::new(date);*/
+        let current_period = period_config.period_for_date(date)?;
+
         let total = self.lines.iter().try_fold(
             ex.zero(&"JPY".to_string())?,
             |acc, Line((line_date, action))| {
@@ -392,6 +402,49 @@ impl Bucket {
     }
 }
 
+struct ComputeTotals {
+    total: Amount,
+    deposited: Amount,
+    withdrawn: Amount,
+
+    exchange_rates: ExchangeRates,
+    date: NaiveDate
+}
+
+impl ComputeTotals {
+    fn new(exchange_rates: &ExchangeRates, date: NaiveDate) -> Result<Self, String> {
+        let zero_yen = exchange_rates.zero(&"JPY".to_string())?;
+        Ok(ComputeTotals{
+            total: zero_yen.clone(),
+            withdrawn: zero_yen.clone(),
+            deposited: zero_yen.clone(),
+
+            exchange_rates: exchange_rates.clone(),
+            date
+        })
+    }
+}
+
+impl ChronoStackWalker<Action, ComputeTotals> for ComputeTotals {
+    fn try_visit(&mut self, date: &NaiveDate, action: &Action) -> Result<(), String> {
+        if date <= &self.date {
+            match action {
+                Action::Deposit(amount) => {
+                    let amount = self.exchange_rates.new_amount_from_raw_amount(amount)?;
+                    self.total = self.total.add(&amount);
+                    self.deposited = self.deposited.add(&amount);
+                }
+                _ => {}
+            };
+        }
+        Ok(())
+    }
+
+    fn into_output(self) -> ComputeTotals {
+        self
+    }
+}
+
 impl OperandBuilder for Bucket {
     fn build(
         self,
@@ -431,6 +484,67 @@ mod test {
     use super::*;
     fn mkdate(month: u32, date: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(2025, month, date).expect("Can create date")
+    }
+
+    mod action {
+        #[test]
+        fn apply_deposit() {
+
+        }
+    }
+
+    mod compute_totals {
+        use chrono::Days;
+        use super::*;
+
+        #[test]
+        fn totals() {
+            struct TestTable {
+                action: Action,
+
+                expected_total: Amount,
+                expected_deposited: Amount,
+                expected_withdrawn: Amount,
+            }
+            let ex = ExchangeRates::for_tests();
+
+            let table = TestTable{
+                action: Action::Deposit(RawAmount::yen("5")),
+
+                expected_total: ex.yen("5"),
+                expected_deposited: ex.yen("5"),
+                expected_withdrawn: ex.yen("0"),
+            };
+
+            for test in vec![table] {
+                let today = mkdate(1, 5);
+                let yesterday = today.checked_sub_days(Days::new(1)).expect("Can compute yesterday");
+                let tomorrow = today.checked_add_days(Days::new(1)).expect("Can compute tomorrow");
+
+                for date in vec![today, yesterday] {
+                    let mut state = ComputeTotals::new(&ex, today).expect("Can create state");
+                    state.try_visit(
+                        &date,
+                        &test.action
+                    ).expect("Can visit");
+
+                    assert_eq!(state.total, test.expected_total);
+                    assert_eq!(state.deposited, test.expected_deposited);
+                    assert_eq!(state.withdrawn, test.expected_withdrawn);
+                }
+
+                let mut state = ComputeTotals::new(&ex, today).expect("Can create state");
+                state.try_visit(
+                    &tomorrow,
+                    &test.action
+                ).expect("Can visit");
+
+                assert_eq!(state.total, ex.yen("0"));
+                assert_eq!(state.deposited, ex.yen("0"));
+                assert_eq!(state.withdrawn, ex.yen("0"));
+
+            }
+        }
     }
     mod for_period {
         use super::*;
