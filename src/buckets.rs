@@ -426,28 +426,42 @@ impl TotalsComputer {
 
 impl TotalsComputer {
     fn apply(&mut self, action: &Action) -> Result<(), String> {
+        debug_assert!(self.total == self.deposited.sub(&self.withdrawn), "Total is always equal to deposited - withdrawn.");
+        let amount = match action {
+            | Action::Deposit(amount)
+            | Action::DepositCancellation(amount)
+            | Action::Withdrawal(amount) => {
+                self.exchange_rates.new_amount_from_raw_amount(amount)?
+            },
+            _ => return Ok(())
+        };
+
         match action {
-            Action::Deposit(amount) => {
-                let amount = self.exchange_rates.new_amount_from_raw_amount(amount)?;
-                self.total = self.total.add(&amount);
+            Action::Deposit(_) => {
                 self.deposited = self.deposited.add(&amount);
             }
-            Action::DepositCancellation(amount) => {
-                let amount = self.exchange_rates.new_amount_from_raw_amount(amount)?;
+            Action::DepositCancellation(_) => {
                 let new_deposited = self.deposited.sub(&amount);
                 if new_deposited.is_negative() {
                     return Err("attempt to remove more than was deposited".to_string());
                 }
                 self.deposited = new_deposited;
-                self.total = self.total.sub(&amount);
             },
-            Action::Withdrawal(amount) => {
-                let amount = self.exchange_rates.new_amount_from_raw_amount(amount)?;
+            Action::Withdrawal(_) => {
                 self.withdrawn = self.withdrawn.add(&amount);
-                self.total = self.total.sub(&amount);
             }
             _ => {}
         };
+
+        match action {
+            Action::Deposit(_) => {
+               self.total = self.total.add(&amount);
+            },
+            Action::Withdrawal(_) | Action::DepositCancellation(_) => {
+                self.total = self.total.sub(&amount);
+            },
+            _ => {}
+        }
         Ok(())
     }
 }
@@ -503,8 +517,8 @@ mod test {
 
             let base_state = TotalsComputer {
                 total: ex.yen("100"),
-                withdrawn: ex.yen("500"),
-                deposited: ex.yen("400"),
+                deposited: ex.yen("500"),
+                withdrawn: ex.yen("400"),
 
                 exchange_rates: ex.clone(),
             };
@@ -579,6 +593,36 @@ mod test {
                         expected_total: base_state.total.sub(&ex.yen("5")),
                         expected_deposited: base_state.deposited.clone(),
                         expected_withdrawn: base_state.withdrawn.add(&ex.yen("5"))
+                    }
+                },
+                TestTable {
+                    name: "Withdraw remaining".to_string(),
+                    action: Action::Withdrawal(
+                        RawAmount::from(
+                            // Withdraw what has been deposited but not yet withdrawn, which is the
+                            // total
+                            &base_state.total)
+                    ),
+
+                    expected_result: ExpectedResult::Success {
+                        expected_total: ex.yen("0"),
+                        expected_deposited: base_state.deposited.clone(),
+                        expected_withdrawn: base_state.deposited.clone(),
+                    }
+                },
+                TestTable {
+                    name: "Withdraw more than was deposited".to_string(),
+                    action: Action::Withdrawal(
+                        RawAmount::from(
+                            // Withdraw the remaining amount that has not yet been withdrawn (total)
+                            // and some more (100 yens)
+                            &base_state.total.add(&ex.yen("100")))
+                    ),
+
+                    expected_result: ExpectedResult::Success {
+                        expected_total: ex.yen("-100"),
+                        expected_deposited: base_state.deposited.clone(),
+                        expected_withdrawn: base_state.withdrawn.add(&base_state.total).add(&ex.yen("100")),
                     }
                 }
             ];
