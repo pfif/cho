@@ -430,7 +430,8 @@ impl TotalsComputer {
         let amount = match action {
             | Action::Deposit(amount)
             | Action::DepositCancellation(amount)
-            | Action::Withdrawal(amount) => {
+            | Action::Withdrawal(amount)
+            | Action::WithdrawalCancellation(amount) => {
                 self.exchange_rates.new_amount_from_raw_amount(amount)?
             },
             _ => return Ok(())
@@ -449,12 +450,15 @@ impl TotalsComputer {
             },
             Action::Withdrawal(_) => {
                 self.withdrawn = self.withdrawn.add(&amount);
+            },
+            Action::WithdrawalCancellation(_) => {
+                self.withdrawn = self.withdrawn.sub(&amount);
             }
             _ => {}
         };
 
         match action {
-            Action::Deposit(_) => {
+            Action::Deposit(_) | Action::WithdrawalCancellation(_) => {
                self.total = self.total.add(&amount);
             },
             Action::Withdrawal(_) | Action::DepositCancellation(_) => {
@@ -623,6 +627,19 @@ mod test {
                         expected_total: ex.yen("-100"),
                         expected_deposited: base_state.deposited.clone(),
                         expected_withdrawn: base_state.withdrawn.add(&base_state.total).add(&ex.yen("100")),
+                    }
+                },
+                TestTable {
+                    name: "Withdraw cancellation".to_string(),
+                    action: Action::WithdrawalCancellation(
+                        RawAmount::yen("5")
+
+                    ),
+
+                    expected_result: ExpectedResult::Success {
+                        expected_total: base_state.total.add(&ex.yen("5")),
+                        expected_deposited: base_state.deposited.clone(),
+                        expected_withdrawn: base_state.withdrawn.sub(&ex.yen("5")),
                     }
                 }
             ];
