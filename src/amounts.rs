@@ -1,6 +1,6 @@
 use std::cmp::max;
 use std::fmt::{Debug, Display, Formatter};
-use std::ops::{Add, Sub};
+use std::ops::{Add, Div, DivAssign, Sub};
 use crate::amounts::amount::ImmutableAmount;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -179,10 +179,6 @@ impl Amount {
     }
 }
 
-pub trait Div<T> {
-    fn div(&self, divisor: &T) -> Amount;
-}
-
 // Given that the creation of a new Amount (for any operation) always involves in the Addition of an amount (the
 // convert call is clone-like memory-wise), we want to make the memory cost explicit. Therefore, we do not implement AddAssign.
 //
@@ -225,7 +221,9 @@ impl Sub<Amount> for Amount {
 }
 
 impl Div<Decimal> for Amount {
-    fn div(&self, divisor: &Decimal) -> Amount {
+    type Output = Amount;
+
+    fn div(self, divisor: Decimal) -> Amount {
         Amount {
             immutable_amount: ImmutableAmount::new(
                 self.immutable_amount.currency(),

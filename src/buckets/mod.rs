@@ -2,7 +2,7 @@ pub mod aggregated_amounts;
 mod compute_aggregated_amounts;
 
 use crate::amounts::exchange_rates::ExchangeRates;
-use crate::amounts::{Amount, Div, Figure, RawAmount};
+use crate::amounts::{Amount, Figure, RawAmount};
 use crate::period::{
     ErrorPeriodsBetween, Period, PeriodConfigurationVaultValue, PeriodsConfiguration,
 };
@@ -313,7 +313,7 @@ impl Bucket {
             let recommended_deposit_figure = Amount::maximum(
                 &(target_amount - deposited_until_period_start),
                 &ex.zero(&"JPY".to_string())?,
-            ).div(&Decimal::from(number_of_periods));
+            ).clone() / Decimal::from(number_of_periods);
 
             Some(recommended_deposit_figure)
         } else {
