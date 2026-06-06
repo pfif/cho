@@ -191,7 +191,7 @@ pub trait Div<T> {
 // If I choose that in the future, automated linter could spot the now useless clones
 //
 // Another approach may be to revisit the fact that the convert call is clone-like. I think I'll get to that when I address the fact that currencies
-// are cloned all over the place.
+// are cloned all over the place. That would allow me to implement honest to god operations that add references (without cloning them)
 //
 // I am still very much learning Rust
 impl Add for Amount {
