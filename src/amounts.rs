@@ -1,4 +1,4 @@
-use std::cmp::max;
+use std::cmp::{max, Ordering};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, Div, DivAssign, Sub};
 use crate::amounts::amount::ImmutableAmount;
@@ -233,16 +233,22 @@ impl Div<Decimal> for Amount {
     }
 }
 
-impl Amount {
-    pub fn maximum<'a>(amount_a: &'a Amount, amount_b: &'a Amount) -> &'a Amount {
-        let amount_b_converted = amount_b.convert(amount_a.immutable_amount.currency());
-        if amount_a.immutable_amount.figure() > amount_b_converted.immutable_amount.figure() {
-            amount_a
-        } else {
-            amount_b
-        }
+impl PartialOrd for Amount {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
+}
 
+impl Ord for Amount {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Performance smell - has to construct another amount in order to do the conversion.
+        // We could simply be doing the math for the figure and compare
+        let other_converted = other.convert(self.immutable_amount.currency());
+        self.immutable_amount.figure().cmp(&other_converted.immutable_amount.figure())
+    }
+}
+
+impl Amount {
     pub fn is_negative(&self) -> bool {
         self.immutable_amount.figure() < &dec!(0)
     }
@@ -258,7 +264,7 @@ impl Amount {
 
    pub fn is_zero(&self) -> bool {
         self.immutable_amount.figure().is_zero()
-    }
+   }
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
