@@ -1,5 +1,5 @@
 use std::ops::Add;
-use crate::amounts::{Amount, Sub};
+use crate::amounts::{Amount};
 use crate::amounts::exchange_rates::ExchangeRates;
 use crate::buckets::Action;
 
@@ -25,7 +25,7 @@ impl AggregatedAmounts {
     }
 
     pub fn apply(&mut self, action: &Action) -> Result<(), String> {
-        debug_assert!(self.total == self.deposited.sub(&self.withdrawn), "Total is always equal to deposited - withdrawn.");
+        debug_assert!(self.total == self.deposited.clone() - self.withdrawn.clone(), "Total is always equal to deposited - withdrawn.");
         let amount = match action {
             | Action::Deposit(amount)
             | Action::DepositCancellation(amount)
@@ -41,7 +41,7 @@ impl AggregatedAmounts {
                 self.deposited = self.deposited.clone() + amount.clone();
             }
             Action::DepositCancellation(_) => {
-                let new_deposited = self.deposited.sub(&amount);
+                let new_deposited = self.deposited.clone() - amount.clone();
                 if new_deposited.is_negative() {
                     return Err("attempt to remove more than was deposited".to_string());
                 }
@@ -51,7 +51,7 @@ impl AggregatedAmounts {
                 self.withdrawn = self.withdrawn.clone() + amount.clone();
             },
             Action::WithdrawalCancellation(_) => {
-                let new_withdrawn = self.withdrawn.sub(&amount);
+                let new_withdrawn = self.withdrawn.clone() - amount.clone();
                 if new_withdrawn.is_negative() {
                     return Err("attempt to put back money that was not withdrawn".to_string());
                 }
@@ -65,7 +65,7 @@ impl AggregatedAmounts {
                 self.total = self.total.clone() + amount.clone();
             },
             Action::Withdrawal(_) | Action::DepositCancellation(_) => {
-                self.total = self.total.sub(&amount);
+                self.total = self.total.clone() - amount;
             },
             _ => {}
         }
@@ -129,8 +129,8 @@ mod tests {
                 action: Action::DepositCancellation(RawAmount::yen("5")),
 
                 expected_result: ExpectedResult::Success {
-                    expected_total: base_state.total.sub(&ex.yen("5")),
-                    expected_deposited: base_state.clone().deposited.sub(&ex.yen("5")),
+                    expected_total: base_state.total.clone() - ex.yen("5"),
+                    expected_deposited: base_state.clone().deposited - ex.yen("5"),
                     expected_withdrawn: base_state.withdrawn.clone()
                 }
             },
@@ -139,7 +139,7 @@ mod tests {
                 action: Action::DepositCancellation(RawAmount::from(base_state.deposited.clone())),
 
                 expected_result: ExpectedResult::Success {
-                    expected_total: base_state.total.sub(&base_state.deposited),
+                    expected_total: base_state.total.clone() - base_state.deposited.clone(),
                     expected_deposited: ex.yen("0"),
                     expected_withdrawn: base_state.withdrawn.clone()
                 }
@@ -160,7 +160,7 @@ mod tests {
                 ),
 
                 expected_result: ExpectedResult::Success {
-                    expected_total: base_state.total.sub(&ex.yen("5")),
+                    expected_total: base_state.total.clone() - ex.yen("5"),
                     expected_deposited: base_state.deposited.clone(),
                     expected_withdrawn: base_state.withdrawn.clone() + ex.yen("5")
                 }
@@ -205,7 +205,7 @@ mod tests {
                 expected_result: ExpectedResult::Success {
                     expected_total: base_state.total.clone() + ex.yen("5"),
                     expected_deposited: base_state.deposited.clone(),
-                    expected_withdrawn: base_state.withdrawn.sub(&ex.yen("5")),
+                    expected_withdrawn: base_state.withdrawn.clone() - ex.yen("5"),
                 }
             },
             TestTable {

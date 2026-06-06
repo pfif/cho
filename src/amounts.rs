@@ -1,6 +1,6 @@
 use std::cmp::max;
 use std::fmt::{Debug, Display, Formatter};
-use std::ops::{Add};
+use std::ops::{Add, Sub};
 use crate::amounts::amount::ImmutableAmount;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -179,10 +179,6 @@ impl Amount {
     }
 }
 
-pub trait Sub<T> {
-    fn sub(&self, other: &T) -> Amount;
-}
-
 pub trait Div<T> {
     fn div(&self, divisor: &T) -> Amount;
 }
@@ -214,7 +210,9 @@ impl Add for Amount {
 }
 
 impl Sub<Amount> for Amount {
-    fn sub(&self, other_amount: &Amount) -> Amount {
+    type Output = Amount;
+
+    fn sub(self, other_amount: Amount) -> Amount {
         let other_amount_converted = other_amount.convert(self.immutable_amount.currency());
         let new_immutable_amount = ImmutableAmount::new(
             self.immutable_amount.currency(),
@@ -238,14 +236,12 @@ impl Div<Decimal> for Amount {
 }
 
 impl Amount {
-    pub fn maximum(amount_a: &Amount, amount_b: &Amount) -> Amount {
+    pub fn maximum<'a>(amount_a: &'a Amount, amount_b: &'a Amount) -> &'a Amount {
         let amount_b_converted = amount_b.convert(amount_a.immutable_amount.currency());
-        let new_immutable_amount = ImmutableAmount::new(
-            amount_a.immutable_amount.currency(),
-            max(*amount_a.immutable_amount.figure(), *amount_b_converted.immutable_amount.figure()),
-        );
-        Amount {
-            immutable_amount: new_immutable_amount,
+        if amount_a.immutable_amount.figure() > amount_b_converted.immutable_amount.figure() {
+            amount_a
+        } else {
+            amount_b
         }
     }
 

@@ -2,7 +2,7 @@ pub mod aggregated_amounts;
 mod compute_aggregated_amounts;
 
 use crate::amounts::exchange_rates::ExchangeRates;
-use crate::amounts::{Amount, Div, Figure, RawAmount, Sub};
+use crate::amounts::{Amount, Div, Figure, RawAmount};
 use crate::period::{
     ErrorPeriodsBetween, Period, PeriodConfigurationVaultValue, PeriodsConfiguration,
 };
@@ -211,7 +211,7 @@ impl Bucket {
                             .map(|parsed_amount| acc + parsed_amount),
                         Action::DepositCancellation(amount) => ex
                             .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.sub(&parsed_amount)),
+                            .map(|parsed_amount| acc - parsed_amount),
                         _ => Ok(acc),
                     }
                 } else {
@@ -234,7 +234,7 @@ impl Bucket {
                             Action::DepositCancellation(amount) | Action::Withdrawal(amount) => {
                                 let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
                                 ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc.sub(&parsed_amount)))
+                                    .map(|parsed_amount| Some(acc - parsed_amount))
                             }
                             _ => Ok(acc),
                         }
@@ -257,7 +257,7 @@ impl Bucket {
                             Action::DepositCancellation(amount) => {
                                 let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
                                 ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc.sub(&parsed_amount)))
+                                    .map(|parsed_amount| Some(acc - parsed_amount))
                             }
                             _ => Ok(acc),
                         }
@@ -280,7 +280,7 @@ impl Bucket {
                             Action::WithdrawalCancellation(amount) => {
                                 let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
                                 ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc.sub(&parsed_amount)))
+                                    .map(|parsed_amount| Some(acc - parsed_amount))
                             }
                             _ => Ok(acc),
                         }
@@ -311,7 +311,7 @@ impl Bucket {
             };
 
             let recommended_deposit_figure = Amount::maximum(
-                &target_amount.sub(&deposited_until_period_start),
+                &(target_amount - deposited_until_period_start),
                 &ex.zero(&"JPY".to_string())?,
             ).div(&Decimal::from(number_of_periods));
 
