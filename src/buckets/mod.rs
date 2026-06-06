@@ -17,8 +17,8 @@ use serde_json::value::Index;
 use std::fmt::{Formatter, Write};
 use std::ops::Add;
 use std::str::{FromStr, Split};
-use rand::distributions::Slice;
-use crate::buckets::compute_aggregated_amounts::{ComputeAggregatedAmounts, UntilDateGate};
+use crate::buckets::aggregated_amounts::AggregatedAmounts;
+use crate::buckets::compute_aggregated_amounts::ComputeAggregatedAmountsInitializer;
 use crate::chrono_stack::{ChronoStack, ChronoStackWalker};
 
 pub type BucketsVaultValue = Vec<Bucket>;
@@ -191,7 +191,9 @@ impl Bucket {
             .map(|line| line.0)
             .collect::<Vec<_>>()
         )?;
-        let aggregated_amounts = stack.try_walk(ComputeAggregatedAmounts::new(ex, UntilDateGate::new(date))?)?;
+        let aggregated_amounts = stack.try_initialize_and_walk(
+            ComputeAggregatedAmountsInitializer::new(date.clone(), ex.clone())
+        )?;
 
 
         let current_period = period_config.period_for_date(date)?;

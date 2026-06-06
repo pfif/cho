@@ -11,6 +11,16 @@ impl<E: Clone> ChronoStack<E> {
         Ok(ChronoStack{items: items.to_vec()})
     }
 
+    pub fn try_initialize_and_walk<O, W: ChronoStackWalker<E, O>>(&self, initializer: impl IntoChronoStackWalker<E, O, W>) -> Result<O, String> {
+        let mut iterator = self.items.iter();
+        let (first_date, first_element) = iterator.next().ok_or("ChronoStackWalker initialized without an element")?;
+        let mut walker: W = initializer.into_chrono_stack_walker(first_date, first_element)?;
+        iterator
+            .map(|(date, element)| walker.try_visit(date, element))
+            .collect::<Result<(), String>>()?;
+        Ok(walker.into_output())
+    }
+
     pub fn try_walk<O>(&self, walker: impl ChronoStackWalker<E, O>) -> Result<O, String> {
         let mut walker  = walker;
         self.items
@@ -21,6 +31,10 @@ impl<E: Clone> ChronoStack<E> {
     }
 }
 
+pub trait IntoChronoStackWalker<E, O, R: ChronoStackWalker<E, O>> {
+    fn into_chrono_stack_walker(self, date: &NaiveDate, element: &E) -> Result<R, String>;
+}
+
 pub trait ChronoStackWalker<E, O> {
     fn try_visit(&mut self, date: &NaiveDate, element: &E) -> Result<(), String>;
     fn into_output(self) -> O;
@@ -29,14 +43,17 @@ pub trait ChronoStackWalker<E, O> {
 #[cfg(test)]
 mod tests {
     mod chronological_test {
-        // TODO
+        #[test]
+        fn todo() {
+            todo!()
+        }
     }
     mod integration_test{
         use chrono::{Datelike, Days, NaiveDate};
         use crate::chrono_stack::{ChronoStack, ChronoStackWalker};
 
         #[test]
-        fn test() {
+        fn test_chrono_stack_walker() {
             struct ComputeTotalCharacterLength {
                 day_of_month_total: u32,
                 running_total: usize
@@ -77,6 +94,10 @@ mod tests {
                     word.len() + word.len()
                 )
             );
+        }
+
+        fn test_chrono_stack_walker_with_initializer() {
+            todo!()
         }
     }
 }
