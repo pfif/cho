@@ -1,3 +1,6 @@
+pub mod aggregated_amounts;
+mod compute_aggregated_amounts;
+
 use crate::amounts::exchange_rates::ExchangeRates;
 use crate::amounts::{Add, Amount, Div, Figure, Sub, RawAmount};
 use crate::period::{
@@ -12,7 +15,9 @@ use serde::{Deserialize, Deserializer};
 use serde_json::value::Index;
 use std::fmt::{Formatter, Write};
 use std::str::{FromStr, Split};
-use crate::chrono_stack::ChronoStackWalker;
+use rand::distributions::Slice;
+use crate::buckets::compute_aggregated_amounts::{ComputeAggregatedAmounts, UntilDateGate};
+use crate::chrono_stack::{ChronoStack, ChronoStackWalker};
 
 pub type BucketsVaultValue = Vec<Bucket>;
 impl VaultReadable for BucketsVaultValue {
@@ -177,91 +182,21 @@ impl Bucket {
         date: &NaiveDate,
         ex: &ExchangeRates,
     ) -> Result<BucketAtDate, String> {
-        /*let stack = ChronoStack::new(self.lines);
-        let (total, deposited, withdrawn) = stack.walk(ComputeTotals::new(date));
+        let stack = ChronoStack::new(&self
+            .lines
+            .clone()
+            .into_iter()
+            .map(|line| line.0)
+            .collect::<Vec<_>>()
+        )?;
+        let aggregated_amounts = stack.try_walk(ComputeAggregatedAmounts::new(ex, UntilDateGate::new(date))?)?;
 
 
         let current_period = period_config.period_for_date(date)?;
-        let deposited_until_period_start = stack.walk(ComputeDepositedUntilPeriodStart::new(current_period));
+        /*let deposited_until_period_start = stack.walk(ComputeDepositedUntilPeriodStart::new(current_period));
         let (total_this_period, deposited_this_period, withdrawn_this_period) = stack.walk(ComputeTotalsForThisPeriod::new(current_period, date));
         let target = stack.walk(SelectTarget::new(date);*/
         let current_period = period_config.period_for_date(date)?;
-
-        let total = self.lines.iter().try_fold(
-            ex.zero(&"JPY".to_string())?,
-            |acc, Line((line_date, action))| {
-                if line_date <= date {
-                    match action {
-                        Action::Deposit(amount) | Action::WithdrawalCancellation(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.add(&parsed_amount)),
-                        Action::Withdrawal(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.sub(&parsed_amount)),
-                        Action::DepositCancellation(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.sub(&parsed_amount))
-                            .and_then(|new_acc| {
-                                if new_acc.is_negative() {
-                                    Err("attempt to withdraw more money than the Bucket contains"
-                                        .to_string())
-                                } else {
-                                    Ok(new_acc)
-                                }
-                            }),
-                        _ => Ok(acc),
-                    }
-                } else {
-                    Ok(acc)
-                }
-            },
-        )?;
-
-        let deposited = self.lines.iter().try_fold(
-            ex.zero(&"JPY".to_string())?,
-            |acc, Line((line_date, action))| {
-                if line_date <= date {
-                    match action {
-                        Action::Deposit(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.add(&parsed_amount)),
-                        Action::DepositCancellation(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.sub(&parsed_amount)),
-                        _ => Ok(acc),
-                    }
-                } else {
-                    Ok(acc)
-                }
-            },
-        )?;
-
-        let withdrawn = self.lines.iter().try_fold(
-            ex.zero(&"JPY".to_string())?,
-            |acc, Line((line_date, action))| {
-                if line_date <= date {
-                    match action {
-                        Action::Withdrawal(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.add(&parsed_amount)),
-                        Action::WithdrawalCancellation(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.sub(&parsed_amount))
-                            .and_then(|new_acc| {
-                                if new_acc.is_negative() {
-                                    Err("attempt to put back money that was not withdrawn"
-                                        .to_string())
-                                } else {
-                                    Ok(new_acc)
-                                }
-                            }),
-                        _ => Ok(acc),
-                    }
-                } else {
-                    Ok(acc)
-                }
-            },
-        )?;
 
 
         let deposited_until_period_start = self.lines.iter().try_fold(
@@ -395,84 +330,13 @@ impl Bucket {
             current_recommended_deposit: recommended_deposit_figure,
             current_actual_deposit: deposited_this_period,
             current_withdrawal: withdrawned_this_period,
-            total_deposit: deposited,
-            total_withdrawal: withdrawn,
-            total,
+            total_deposit: aggregated_amounts.deposited(),
+            total_withdrawal: aggregated_amounts.withdrawn(),
+            total: aggregated_amounts.total(),
         })
     }
 }
 
-#[derive(Clone)]
-struct TotalsComputer {
-    total: Amount,
-    deposited: Amount,
-    withdrawn: Amount,
-
-    exchange_rates: ExchangeRates,
-}
-
-impl TotalsComputer {
-    fn new(exchange_rates: &ExchangeRates) -> Result<Self, String> {
-        let zero_yen = exchange_rates.zero(&"JPY".to_string())?;
-        Ok(TotalsComputer{
-            total: zero_yen.clone(),
-            withdrawn: zero_yen.clone(),
-            deposited: zero_yen.clone(),
-
-            exchange_rates: exchange_rates.clone(),
-        })
-    }
-}
-
-impl TotalsComputer {
-    fn apply(&mut self, action: &Action) -> Result<(), String> {
-        debug_assert!(self.total == self.deposited.sub(&self.withdrawn), "Total is always equal to deposited - withdrawn.");
-        let amount = match action {
-            | Action::Deposit(amount)
-            | Action::DepositCancellation(amount)
-            | Action::Withdrawal(amount)
-            | Action::WithdrawalCancellation(amount) => {
-                self.exchange_rates.new_amount_from_raw_amount(amount)?
-            },
-            _ => return Ok(())
-        };
-
-        match action {
-            Action::Deposit(_) => {
-                self.deposited = self.deposited.add(&amount);
-            }
-            Action::DepositCancellation(_) => {
-                let new_deposited = self.deposited.sub(&amount);
-                if new_deposited.is_negative() {
-                    return Err("attempt to remove more than was deposited".to_string());
-                }
-                self.deposited = new_deposited;
-            },
-            Action::Withdrawal(_) => {
-                self.withdrawn = self.withdrawn.add(&amount);
-            },
-            Action::WithdrawalCancellation(_) => {
-                let new_withdrawn = self.withdrawn.sub(&amount);
-                if new_withdrawn.is_negative() {
-                    return Err("attempt to remove more than was withdrawn".to_string());
-                }
-                self.withdrawn = new_withdrawn;
-            }
-            _ => {}
-        };
-
-        match action {
-            Action::Deposit(_) | Action::WithdrawalCancellation(_) => {
-               self.total = self.total.add(&amount);
-            },
-            Action::Withdrawal(_) | Action::DepositCancellation(_) => {
-                self.total = self.total.sub(&amount);
-            },
-            _ => {}
-        }
-        Ok(())
-    }
-}
 
 impl OperandBuilder for Bucket {
     fn build(
@@ -515,184 +379,6 @@ mod test {
         NaiveDate::from_ymd_opt(2025, month, date).expect("Can create date")
     }
 
-    mod totals_computer {
-        use chrono::Days;
-        use super::*;
-
-        #[test]
-        fn totals() {
-            let ex = ExchangeRates::for_tests();
-
-            let base_state = TotalsComputer {
-                total: ex.yen("100"),
-                deposited: ex.yen("500"),
-                withdrawn: ex.yen("400"),
-
-                exchange_rates: ex.clone(),
-            };
-
-            struct TestTable {
-                name: String,
-                action: Action,
-
-                expected_result: ExpectedResult,
-            }
-            ;
-
-            enum ExpectedResult {
-                Success {
-                    expected_total: Amount,
-                    expected_deposited: Amount,
-                    expected_withdrawn: Amount,
-                },
-                Failure {
-                    error: String,
-                },
-            }
-
-            let tests = vec![
-                TestTable {
-                    name: "Deposit".to_string(),
-                    action: Action::Deposit(RawAmount::yen("5")),
-
-                    expected_result: ExpectedResult::Success {
-                        expected_total: base_state.total.add(&ex.yen("5")),
-                        expected_deposited: base_state.deposited.add(&ex.yen("5")),
-                        expected_withdrawn: base_state.withdrawn.clone()
-                    }
-                },
-                TestTable {
-                    name: "DepositCancellation - small".to_string(),
-                    action: Action::DepositCancellation(RawAmount::yen("5")),
-
-                    expected_result: ExpectedResult::Success {
-                        expected_total: base_state.total.sub(&ex.yen("5")),
-                        expected_deposited: base_state.deposited.sub(&ex.yen("5")),
-                        expected_withdrawn: base_state.withdrawn.clone()
-                    }
-                },
-                TestTable {
-                    name: "DepositCancellation - cancels everything".to_string(),
-                    action: Action::DepositCancellation(RawAmount::from(&base_state.deposited)),
-
-                    expected_result: ExpectedResult::Success {
-                        expected_total: base_state.total.sub(&base_state.deposited),
-                        expected_deposited: ex.yen("0"),
-                        expected_withdrawn: base_state.withdrawn.clone()
-                    }
-                },
-                TestTable {
-                    name: "DepositCancellation - cancels more than exists".to_string(),
-                    action: Action::DepositCancellation(
-                        RawAmount::from(
-                            &base_state.deposited.add(&ex.yen("100")
-                            )
-                        )
-                    ),
-
-                    expected_result: ExpectedResult::Failure { error: "attempt to remove more than was deposited".to_string() }
-                },
-                TestTable {
-                    name: "Withdraw".to_string(),
-                    action: Action::Withdrawal(RawAmount::yen("5")
-                    ),
-
-                    expected_result: ExpectedResult::Success {
-                        expected_total: base_state.total.sub(&ex.yen("5")),
-                        expected_deposited: base_state.deposited.clone(),
-                        expected_withdrawn: base_state.withdrawn.add(&ex.yen("5"))
-                    }
-                },
-                TestTable {
-                    name: "Withdraw remaining".to_string(),
-                    action: Action::Withdrawal(
-                        RawAmount::from(
-                            // Withdraw what has been deposited but not yet withdrawn, which is the
-                            // total
-                            &base_state.total)
-                    ),
-
-                    expected_result: ExpectedResult::Success {
-                        expected_total: ex.yen("0"),
-                        expected_deposited: base_state.deposited.clone(),
-                        expected_withdrawn: base_state.deposited.clone(),
-                    }
-                },
-                TestTable {
-                    name: "Withdraw more than was deposited".to_string(),
-                    action: Action::Withdrawal(
-                        RawAmount::from(
-                            // Withdraw the remaining amount that has not yet been withdrawn (total)
-                            // and some more (100 yens)
-                            &base_state.total.add(&ex.yen("100")))
-                    ),
-
-                    expected_result: ExpectedResult::Success {
-                        expected_total: ex.yen("-100"),
-                        expected_deposited: base_state.deposited.clone(),
-                        expected_withdrawn: base_state.withdrawn.add(&base_state.total).add(&ex.yen("100")),
-                    }
-                },
-                TestTable {
-                    name: "Withdraw cancellation".to_string(),
-                    action: Action::WithdrawalCancellation(
-                        RawAmount::yen("5")
-
-                    ),
-
-                    expected_result: ExpectedResult::Success {
-                        expected_total: base_state.total.add(&ex.yen("5")),
-                        expected_deposited: base_state.deposited.clone(),
-                        expected_withdrawn: base_state.withdrawn.sub(&ex.yen("5")),
-                    }
-                },
-                TestTable {
-                    name: "Withdraw cancellation - cancels everything".to_string(),
-                    action: Action::WithdrawalCancellation(
-                        RawAmount::from(&base_state.withdrawn)
-
-                    ),
-
-                    expected_result: ExpectedResult::Success {
-                        expected_total: base_state.total.add(&base_state.withdrawn),
-                        expected_deposited: base_state.deposited.clone(),
-                        expected_withdrawn: ex.yen("0"),
-                    }
-                },
-                TestTable {
-                    name: "Withdraw cancellation - cancels too much".to_string(),
-                    action: Action::WithdrawalCancellation(
-                        RawAmount::from(&base_state.withdrawn.add(&ex.yen("100")))
-
-                    ),
-
-                    expected_result: ExpectedResult::Failure {
-                        error: "attempt to remove more than was withdrawn".to_string()
-                    }
-                }
-            ];
-
-            for test in tests {
-                let mut state = base_state.clone();
-                let result = state.apply(
-                    &test.action
-                );
-
-                match test.expected_result {
-                    ExpectedResult::Success { expected_total, expected_deposited, expected_withdrawn } => {
-                        result.expect("did succeed");
-
-                        assert_eq!(state.total, expected_total, "{}", test.name);
-                        assert_eq!(state.deposited, expected_deposited, "{}", test.name);
-                        assert_eq!(state.withdrawn, expected_withdrawn, "{}", test.name);
-                    },
-                    ExpectedResult::Failure { error } => {
-                        assert_eq!(result, Err(error))
-                    }
-                }
-            }
-        }
-    }
     mod for_period {
         use super::*;
         use crate::period::CalendarMonthPeriodConfiguration;
@@ -1480,7 +1166,7 @@ mod test {
                             mkdate(9, 15),
                             Action::DepositCancellation(RawAmount::yen("30000")),
                         )
-                        .expect_error("attempt to withdraw more money than the Bucket contains")
+                        .expect_error("attempt to remove more than was deposited")
                         .execute();
                 }
 
@@ -1515,7 +1201,7 @@ mod test {
                             Action::DepositCancellation(RawAmount::yen("30000")),
                         )
                         .add_line(mkdate(9, 15), Action::Deposit(RawAmount::yen("30000")))
-                        .expect_error("attempt to withdraw more money than the Bucket contains")
+                        .expect_error("attempt to remove more than was deposited")
                         .execute();
                 }
             }
@@ -1596,7 +1282,7 @@ mod test {
                             mkdate(8, 15),
                             Action::DepositCancellation(RawAmount::yen("30000")),
                         )
-                        .expect_error("attempt to withdraw more money than the Bucket contains")
+                        .expect_error("attempt to remove more than was deposited")
                         .execute();
                 }
 
@@ -1610,7 +1296,7 @@ mod test {
                             Action::DepositCancellation(RawAmount::yen("30000")),
                         )
                         .add_line(mkdate(8, 15), Action::Deposit(RawAmount::yen("30000")))
-                        .expect_error("attempt to withdraw more money than the Bucket contains")
+                        .expect_error("attempt to remove more than was deposited")
                         .execute();
                 }
             }
@@ -2069,7 +1755,7 @@ mod test {
                             Action::DepositCancellation(RawAmount::yen("30000")),
                         )
                         .add_line(mkdate(8, 15), Action::Deposit(RawAmount::yen("30000")))
-                        .expect_error("attempt to withdraw more money than the Bucket contains")
+                        .expect_error("attempt to remove more than was deposited")
                         .execute();
                 }
             }
