@@ -1,4 +1,5 @@
-use crate::amounts::{Add, Amount, Sub};
+use std::ops::Add;
+use crate::amounts::{Amount, Sub};
 use crate::amounts::exchange_rates::ExchangeRates;
 use crate::buckets::Action;
 
@@ -37,7 +38,7 @@ impl AggregatedAmounts {
 
         match action {
             Action::Deposit(_) => {
-                self.deposited = self.deposited.add(&amount);
+                self.deposited = self.deposited.clone() + amount.clone();
             }
             Action::DepositCancellation(_) => {
                 let new_deposited = self.deposited.sub(&amount);
@@ -47,7 +48,7 @@ impl AggregatedAmounts {
                 self.deposited = new_deposited;
             },
             Action::Withdrawal(_) => {
-                self.withdrawn = self.withdrawn.add(&amount);
+                self.withdrawn = self.withdrawn.clone() + amount.clone();
             },
             Action::WithdrawalCancellation(_) => {
                 let new_withdrawn = self.withdrawn.sub(&amount);
@@ -61,7 +62,7 @@ impl AggregatedAmounts {
 
         match action {
             Action::Deposit(_) | Action::WithdrawalCancellation(_) => {
-                self.total = self.total.add(&amount);
+                self.total = self.total.clone() + amount.clone();
             },
             Action::Withdrawal(_) | Action::DepositCancellation(_) => {
                 self.total = self.total.sub(&amount);
@@ -78,7 +79,7 @@ impl AggregatedAmounts {
 
 mod tests {
     use chrono::Days;
-    use crate::amounts::{Add, RawAmount, Sub};
+    use crate::amounts::{RawAmount};
     use super::*;
 
     #[test]
@@ -118,8 +119,8 @@ mod tests {
                 action: Action::Deposit(RawAmount::yen("5")),
 
                 expected_result: ExpectedResult::Success {
-                    expected_total: base_state.total.add(&ex.yen("5")),
-                    expected_deposited: base_state.deposited.add(&ex.yen("5")),
+                    expected_total: base_state.total.clone() + ex.yen("5"),
+                    expected_deposited: base_state.deposited.clone() + ex.yen("5"),
                     expected_withdrawn: base_state.withdrawn.clone()
                 }
             },
@@ -129,13 +130,13 @@ mod tests {
 
                 expected_result: ExpectedResult::Success {
                     expected_total: base_state.total.sub(&ex.yen("5")),
-                    expected_deposited: base_state.deposited.sub(&ex.yen("5")),
+                    expected_deposited: base_state.clone().deposited.sub(&ex.yen("5")),
                     expected_withdrawn: base_state.withdrawn.clone()
                 }
             },
             TestTable {
                 name: "DepositCancellation - cancels everything".to_string(),
-                action: Action::DepositCancellation(RawAmount::from(&base_state.deposited)),
+                action: Action::DepositCancellation(RawAmount::from(base_state.deposited.clone())),
 
                 expected_result: ExpectedResult::Success {
                     expected_total: base_state.total.sub(&base_state.deposited),
@@ -147,8 +148,7 @@ mod tests {
                 name: "DepositCancellation - cancels more than exists".to_string(),
                 action: Action::DepositCancellation(
                     RawAmount::from(
-                        &base_state.deposited.add(&ex.yen("100")
-                        )
+                        base_state.deposited.clone() + ex.yen("100" )
                     )
                 ),
 
@@ -162,7 +162,7 @@ mod tests {
                 expected_result: ExpectedResult::Success {
                     expected_total: base_state.total.sub(&ex.yen("5")),
                     expected_deposited: base_state.deposited.clone(),
-                    expected_withdrawn: base_state.withdrawn.add(&ex.yen("5"))
+                    expected_withdrawn: base_state.withdrawn.clone() + ex.yen("5")
                 }
             },
             TestTable {
@@ -171,7 +171,7 @@ mod tests {
                     RawAmount::from(
                         // Withdraw what has been deposited but not yet withdrawn, which is the
                         // total
-                        &base_state.total)
+                        base_state.total.clone())
                 ),
 
                 expected_result: ExpectedResult::Success {
@@ -186,13 +186,13 @@ mod tests {
                     RawAmount::from(
                         // Withdraw the remaining amount that has not yet been withdrawn (total)
                         // and some more (100 yens)
-                        &base_state.total.add(&ex.yen("100")))
+                        base_state.total.clone() + ex.yen("100"))
                 ),
 
                 expected_result: ExpectedResult::Success {
                     expected_total: ex.yen("-100"),
                     expected_deposited: base_state.deposited.clone(),
-                    expected_withdrawn: base_state.withdrawn.add(&base_state.total).add(&ex.yen("100")),
+                    expected_withdrawn: base_state.withdrawn.clone() + base_state.total.clone() + ex.yen("100"),
                 }
             },
             TestTable {
@@ -203,7 +203,7 @@ mod tests {
                 ),
 
                 expected_result: ExpectedResult::Success {
-                    expected_total: base_state.total.add(&ex.yen("5")),
+                    expected_total: base_state.total.clone() + ex.yen("5"),
                     expected_deposited: base_state.deposited.clone(),
                     expected_withdrawn: base_state.withdrawn.sub(&ex.yen("5")),
                 }
@@ -211,12 +211,12 @@ mod tests {
             TestTable {
                 name: "Withdraw cancellation - cancels everything".to_string(),
                 action: Action::WithdrawalCancellation(
-                    RawAmount::from(&base_state.withdrawn)
+                    RawAmount::from(base_state.withdrawn.clone())
 
                 ),
 
                 expected_result: ExpectedResult::Success {
-                    expected_total: base_state.total.add(&base_state.withdrawn),
+                    expected_total: base_state.total.clone() + base_state.withdrawn.clone(),
                     expected_deposited: base_state.deposited.clone(),
                     expected_withdrawn: ex.yen("0"),
                 }
@@ -224,7 +224,7 @@ mod tests {
             TestTable {
                 name: "Withdraw cancellation - cancels too much".to_string(),
                 action: Action::WithdrawalCancellation(
-                    RawAmount::from(&base_state.withdrawn.add(&ex.yen("100")))
+                    RawAmount::from(base_state.withdrawn.clone() + ex.yen("100"))
 
                 ),
 

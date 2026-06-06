@@ -1,5 +1,6 @@
 use std::cmp::max;
 use std::fmt::{Debug, Display, Formatter};
+use std::ops::{Add};
 use crate::amounts::amount::ImmutableAmount;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -178,10 +179,6 @@ impl Amount {
     }
 }
 
-pub trait Add<T> {
-    fn add(&self, other: &T) -> Amount;
-}
-
 pub trait Sub<T> {
     fn sub(&self, other: &T) -> Amount;
 }
@@ -190,14 +187,27 @@ pub trait Div<T> {
     fn div(&self, divisor: &T) -> Amount;
 }
 
-impl Add<Amount> for Amount {
-    fn add(&self, other_amount: &Amount) -> Amount {
+// Given that the creation of a new Amount (for any operation) always involves in the Addition of an amount (the
+// convert call is clone-like memory-wise), we want to make the memory cost explicit. Therefore, we do not implement AddAssign.
+//
+// Going with this approach for now, I can always revisit if I feel like there are too many clones calls in the code.
+// The memory cost could semantically be implied in the operation (even when references are manipulated, we implicitly know a clone is done).
+// If I choose that in the future, automated linter could spot the now useless clones
+//
+// Another approach may be to revisit the fact that the convert call is clone-like. I think I'll get to that when I address the fact that currencies
+// are cloned all over the place.
+//
+// I am still very much learning Rust
+impl Add for Amount {
+    type Output = Amount;
+
+    fn add(self, other_amount: Amount) -> Amount {
         let other_amount_converted = other_amount.convert(self.immutable_amount.currency());
         let new_immutable_amount = ImmutableAmount::new(
             self.immutable_amount.currency(),
             self.immutable_amount.figure() + other_amount_converted.immutable_amount.figure(),
         );
-        Amount {
+        Amount{
             immutable_amount: new_immutable_amount,
         }
     }
@@ -274,10 +284,10 @@ impl RawAmount {
 }
 
 #[cfg(test)]
-impl From<&Amount> for RawAmount {
-    fn from(value: &Amount) -> Self {
+impl From<Amount> for RawAmount {
+    fn from(value: Amount) -> Self {
         RawAmount{
-            sign: value.immutable_amount.currency().sign.clone(),
+            sign: value.immutable_amount.currency().clone().sign,
             figure: value.immutable_amount.figure().clone(),
         }
     }

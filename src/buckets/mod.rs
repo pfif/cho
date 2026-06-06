@@ -2,7 +2,7 @@ pub mod aggregated_amounts;
 mod compute_aggregated_amounts;
 
 use crate::amounts::exchange_rates::ExchangeRates;
-use crate::amounts::{Add, Amount, Div, Figure, Sub, RawAmount};
+use crate::amounts::{Amount, Div, Figure, RawAmount, Sub};
 use crate::period::{
     ErrorPeriodsBetween, Period, PeriodConfigurationVaultValue, PeriodsConfiguration,
 };
@@ -14,6 +14,7 @@ use serde::de::{Error, Visitor};
 use serde::{Deserialize, Deserializer};
 use serde_json::value::Index;
 use std::fmt::{Formatter, Write};
+use std::ops::Add;
 use std::str::{FromStr, Split};
 use rand::distributions::Slice;
 use crate::buckets::compute_aggregated_amounts::{ComputeAggregatedAmounts, UntilDateGate};
@@ -207,7 +208,7 @@ impl Bucket {
                         // Withdrawals should never count toward what was deposited
                         Action::Deposit(amount) => ex
                             .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.add(&parsed_amount)),
+                            .map(|parsed_amount| acc + parsed_amount),
                         Action::DepositCancellation(amount) => ex
                             .new_amount_from_raw_amount(amount)
                             .map(|parsed_amount| acc.sub(&parsed_amount)),
@@ -228,7 +229,7 @@ impl Bucket {
                             Action::Deposit(amount) | Action::WithdrawalCancellation(amount) => {
                                 let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
                                 ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc.add(&parsed_amount)))
+                                    .map(|parsed_amount| Some(acc + parsed_amount))
                             }
                             Action::DepositCancellation(amount) | Action::Withdrawal(amount) => {
                                 let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
@@ -251,7 +252,7 @@ impl Bucket {
                             Action::Deposit(amount) => {
                                 let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
                                 ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc.add(&parsed_amount)))
+                                    .map(|parsed_amount| Some(acc + parsed_amount))
                             }
                             Action::DepositCancellation(amount) => {
                                 let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
@@ -274,7 +275,7 @@ impl Bucket {
                             Action::Withdrawal(amount) => {
                                 let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
                                 ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc.add(&parsed_amount)))
+                                    .map(|parsed_amount| Some(acc + parsed_amount))
                             }
                             Action::WithdrawalCancellation(amount) => {
                                 let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);

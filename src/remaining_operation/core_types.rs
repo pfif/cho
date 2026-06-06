@@ -1,5 +1,6 @@
+use std::ops::Add;
 use crate::amounts::exchange_rates::ExchangeRates;
-use crate::amounts::{Add, Amount, CurrencyIdent};
+use crate::amounts::{Amount, CurrencyIdent};
 use crate::period::{Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
 use chrono::{Local, NaiveDate};
 use group::Group;
@@ -75,7 +76,7 @@ impl RemainingOperation {
 
         let remaining = remaining_operation_screen_group.iter().fold(
             self.exchange_rates.new_amount(target_currency, dec!(0))?,
-            |total, subtotal| total.add(&subtotal.total));
+            |total, subtotal| total + subtotal.total.clone());
 
         Ok(RemainingOperationScreen {
             period: current_period,
@@ -144,10 +145,11 @@ impl From<Operand> for RemainingOperationScreenOperand {
 
 // The struct Group has its own module to isolate its internal attribute
 pub mod group {
+    use std::ops::Add;
     use chrono::NaiveDate;
     use rust_decimal_macros::dec;
     use crate::period::PeriodConfigurationVaultValue;
-    use crate::amounts::{Add, Amount, Currency, CurrencyIdent};
+    use crate::amounts::{Amount, Currency, CurrencyIdent};
     use crate::amounts::exchange_rates::ExchangeRates;
     use super::{GroupBuilder, Operand, OperandBuilder, RemainingOperationScreenGroup, RemainingOperationScreenOperand};
 
@@ -226,7 +228,7 @@ pub mod group {
             let total = self.operands
                 .iter()
                 .fold(exchange_rates.new_amount(target_currency, dec!(0))?, |acc, operand| {
-                    acc.add(&operand.amount)
+                    acc + operand.amount.clone()
                 });
 
             let mut operands: Vec<RemainingOperationScreenOperand> = vec![];
@@ -299,8 +301,8 @@ pub struct Operand {
 #[cfg(test)]
 mod test {
     mod group_test {
+        use std::ops::Add;
         use chrono::{Months, NaiveDate};
-        use crate::amounts::Add;
         use crate::amounts::exchange_rates::ExchangeRates;
         use crate::remaining_operation::core_types::group::Group;
         use crate::remaining_operation::core_types::{IllustrationValue, Operand, RemainingOperationScreenGroup, RemainingOperationScreenOperand};
@@ -380,7 +382,7 @@ mod test {
                 .expect("can build RemainingOperationScreenGroup");
             let expected = RemainingOperationScreenGroup {
                 name: group_name.to_string(),
-                total: operand_left.amount.add(&operand_right.amount),
+                total: operand_left.amount + operand_right.amount,
                 operands: vec![
                     RemainingOperationScreenOperand{
                         name: name_left, amount: amount_left, illustration: illustration_left},
@@ -463,7 +465,7 @@ mod test {
                 .expect("can build RemainingOperationScreenGroup");
             let expected = RemainingOperationScreenGroup {
                 name: group_name.to_string(),
-                total: operand_left.amount.add(&operand_right.amount),
+                total: operand_left.amount + operand_right.amount,
                 operands: vec![
                     RemainingOperationScreenOperand{
                         name: name_left, amount: amount_left, illustration: illustration_left},
@@ -513,7 +515,7 @@ mod test {
                 .expect("can build RemainingOperationScreenGroup");
             let expected = RemainingOperationScreenGroup {
                 name: group_name.to_string(),
-                total: operand_archived.amount.add(&operand.amount),
+                total: operand_archived.amount + operand.amount,
                 operands: vec![
                     RemainingOperationScreenOperand{
                         name, amount, illustration
@@ -559,7 +561,7 @@ mod test {
                 .expect("can build RemainingOperationScreenGroup");
             let expected = RemainingOperationScreenGroup {
                 name: group_name.to_string(),
-                total: operand_archived.amount.add(&operand.amount),
+                total: operand_archived.amount + operand.amount,
                 operands: vec![
                     RemainingOperationScreenOperand{
                         name, amount, illustration
@@ -606,7 +608,7 @@ mod test {
                 .expect("can build RemainingOperationScreenGroup");
             let expected = RemainingOperationScreenGroup {
                 name: group_name.to_string(),
-                total: operand_archived.amount.add(&operand.amount),
+                total: operand_archived.amount + operand.amount,
                 operands: vec![
                     RemainingOperationScreenOperand{
                         name, amount, illustration
