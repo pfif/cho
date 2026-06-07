@@ -192,137 +192,104 @@ impl Bucket {
             .collect::<Vec<_>>()
         )?;
 
+        let current_period = period_config.period_for_date(date)?;
+
         let mut aggregated_amounts = AggregatedAmounts::new(ex)?;
 
         let mut aggregated_amounts_until_date = aggregated_amounts.clone();
+        let mut aggregated_amounts_before_period_start = aggregated_amounts.clone();
 
-        for (element_date, element) in stack {
+
+        for (element_date, element) in stack.iter() {
             aggregated_amounts.apply(&element)?;
-            if &element_date <= date {
+            if element_date <= date {
                 aggregated_amounts_until_date = aggregated_amounts.clone();
+            }
+
+            if element_date < &current_period.start_date {
+                aggregated_amounts_before_period_start = aggregated_amounts.clone();
+            }
+        }
+
+        #[cfg(test)]
+        println!("BEFORE PERIOD START {:?}", aggregated_amounts_before_period_start);
+        #[cfg(test)]
+        println!("UNTIL DATE {:?}", aggregated_amounts_until_date);
+
+        let mut seen_deposit_this_period = false;
+        let mut seen_withdrawal_this_period = false;
+        for (element_date, element) in stack.iter() {
+            if element_date >= &current_period.start_date && element_date <= date {
+                match element {
+                    | Action::Deposit(amount)
+                    | Action::DepositCancellation(amount) => {
+                        seen_deposit_this_period = true
+                    },
+                    | Action::Withdrawal(amount)
+                    | Action::WithdrawalCancellation(amount) => {
+                        seen_withdrawal_this_period = true
+                    },
+                    _ => {}
+                }
+            }
+        }
+
+        let aggregated_amounts_for_this_period = aggregated_amounts_until_date.clone() - aggregated_amounts_before_period_start.clone();
+        #[cfg(test)]
+        println!("FOR PERIOD {:?}", aggregated_amounts_until_date);
+        let deposit_this_period = if seen_deposit_this_period {
+            Some(aggregated_amounts_for_this_period.deposited())
+        } else {
+            if aggregated_amounts_for_this_period.deposited() != ex.zero(&"JPY".to_string())? {
+                return Err("No deposit in this period, but deposit is not zero".to_string());
+            }
+            None
+        };
+
+        let withdrawal_this_period = if seen_withdrawal_this_period {
+            Some(aggregated_amounts_for_this_period.withdrawn())
+        } else {
+            if aggregated_amounts_for_this_period.withdrawn() != ex.zero(&"JPY".to_string())? {
+                return Err("No withdrawal in this period, but withdrawl is not zero".to_string());
+            }
+            None
+        };
+
+        let total_this_period = if seen_withdrawal_this_period || seen_deposit_this_period {
+            Some(aggregated_amounts_for_this_period.total())
+        } else {
+            if aggregated_amounts_for_this_period.total() != ex.zero(&"JPY".to_string())? {
+                return Err("No withdrawal or deposit in this period, but total is not zero".to_string());
+            }
+            None
+        };
+
+        let mut target: Option<(Amount, NaiveDate)> = None;
+        for (element_date, element) in stack.iter() {
+            match element {
+                Action::SetTarget { amount, target_date } => {
+                    if element_date <= date {
+                        target = Some((
+                            ex.new_amount_from_raw_amount(amount)?,
+                            target_date.clone()
+                        ));
+                        continue
+                    }
+                }
+                _ => {}
             }
         }
 
 
-        let current_period = period_config.period_for_date(date)?;
-        /*let deposited_until_period_start = stack.walk(ComputeDepositedUntilPeriodStart::new(current_period));
-        let (total_this_period, deposited_this_period, withdrawn_this_period) = stack.walk(ComputeTotalsForThisPeriod::new(current_period, date));
-        let target = stack.walk(SelectTarget::new(date);*/
-        let current_period = period_config.period_for_date(date)?;
-
-
-        let deposited_until_period_start = self.lines.iter().try_fold(
-            ex.zero(&"JPY".to_string())?,
-            |acc, Line((line_date, action))| {
-                if line_date < &current_period.start_date {
-                    match action {
-                        // Withdrawals should never count toward what was deposited
-                        Action::Deposit(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc + parsed_amount),
-                        Action::DepositCancellation(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc - parsed_amount),
-                        _ => Ok(acc),
-                    }
-                } else {
-                    Ok(acc)
-                }
-            },
-        )?;
-
-        let total_this_period =
-            self.lines
-                .iter()
-                .try_fold(None, |acc, Line((line_date, action))| {
-                    if line_date >= &current_period.start_date && line_date <= date {
-                        match action {
-                            Action::Deposit(amount) | Action::WithdrawalCancellation(amount) => {
-                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                                ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc + parsed_amount))
-                            }
-                            Action::DepositCancellation(amount) | Action::Withdrawal(amount) => {
-                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                                ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc - parsed_amount))
-                            }
-                            _ => Ok(acc),
-                        }
-                    } else {
-                        Ok(acc)
-                    }
-                })?;
-
-        let deposited_this_period =
-            self.lines
-                .iter()
-                .try_fold(None, |acc, Line((line_date, action))| {
-                    if line_date >= &current_period.start_date && line_date <= date {
-                        match action {
-                            Action::Deposit(amount) => {
-                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                                ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc + parsed_amount))
-                            }
-                            Action::DepositCancellation(amount) => {
-                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                                ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc - parsed_amount))
-                            }
-                            _ => Ok(acc),
-                        }
-                    } else {
-                        Ok(acc)
-                    }
-                })?;
-
-        let withdrawned_this_period =
-            self.lines
-                .iter()
-                .try_fold(None, |acc, Line((line_date, action))| {
-                    if line_date >= &current_period.start_date && line_date <= date {
-                        match action {
-                            Action::Withdrawal(amount) => {
-                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                                ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc + parsed_amount))
-                            }
-                            Action::WithdrawalCancellation(amount) => {
-                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                                ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc - parsed_amount))
-                            }
-                            _ => Ok(acc),
-                        }
-                    } else {
-                        Ok(acc)
-                    }
-                })?;
-
-        let target: Option<(Amount, &NaiveDate)> = self
-            .lines
-            .iter()
-            .try_fold(None, |acc, Line((_, line))| match line {
-                Action::SetTarget {
-                    amount,
-                    target_date,
-                } => Ok::<std::option::Option<(Amount, &chrono::NaiveDate)>, String>(Some((
-                    ex.new_amount_from_raw_amount(&amount)?,
-                    target_date
-                ))),
-                _ => Ok(acc)
-            })?;
-
         let recommended_deposit_figure = if let Some((target_amount, target_date)) = target {
-            let number_of_periods = match period_config.periods_between(date, target_date) {
+            let number_of_periods = match period_config.periods_between(date, &target_date) {
                 Ok(nb) => nb,
                 Err(ErrorPeriodsBetween::EndBeforeStart) => 1,
                 any => any?,
             };
 
             let recommended_deposit_figure = max(
-                (target_amount - deposited_until_period_start),
+                (target_amount - aggregated_amounts_before_period_start.deposited()),
                 ex.zero(&"JPY".to_string())?,
             ) / Decimal::from(number_of_periods);
 
@@ -340,8 +307,8 @@ impl Bucket {
                         .clone()
                         .unwrap_or(ex.zero(&"JPY".to_string())?)),
             current_recommended_deposit: recommended_deposit_figure,
-            current_actual_deposit: deposited_this_period,
-            current_withdrawal: withdrawned_this_period,
+            current_actual_deposit: deposit_this_period,
+            current_withdrawal: withdrawal_this_period,
             total_deposit: aggregated_amounts_until_date.deposited(),
             total_withdrawal: aggregated_amounts_until_date.withdrawn(),
             total: aggregated_amounts_until_date.total(),
@@ -520,8 +487,8 @@ mod test {
                 };
 
                 assert_eq!(
+                    (self.expected)(&ex),
                     bucket.for_period(&period_configuration, &today, &ex),
-                    (self.expected)(&ex)
                 );
             }
         }
@@ -2339,6 +2306,7 @@ mod test {
 
     mod create_operand {
         use super::*;
+        use pretty_assertions::assert_eq;
         #[test]
         fn nominal() -> () {
             let ex = ExchangeRates::for_tests();

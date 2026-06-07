@@ -1,4 +1,5 @@
-use std::ops::Add;
+use std::fmt::{Debug, Formatter};
+use std::ops::{Add, Sub};
 use crate::amounts::{Amount};
 use crate::amounts::exchange_rates::ExchangeRates;
 use crate::buckets::Action;
@@ -14,6 +15,9 @@ pub struct AggregatedAmounts {
 
 impl AggregatedAmounts {
     pub fn new(exchange_rates: &ExchangeRates) -> Result<Self, String> {
+        // TODO - TERRIBLE HACK AROUND THE FACT THAT I NEED TO CHOOSE A CURRENCY FOR AMOUNT
+        //        IN THE FUTURE I WILL MAKE AMOUNT WITHOUT CURRENCIES (currencies are removed when the
+        //        RawAmount is converted to Amount, and added back when exited from the system)
         let zero_yen = exchange_rates.zero(&"JPY".to_string())?;
         Ok(AggregatedAmounts {
             total: zero_yen.clone(),
@@ -76,6 +80,26 @@ impl AggregatedAmounts {
     pub fn deposited(&self) -> Amount { self.deposited.clone() }
     pub fn withdrawn(&self) -> Amount { self.withdrawn.clone() }
 }
+
+impl Debug for AggregatedAmounts {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "AggregatedAmounts {{ total: {:?}, deposited: {:?}, withdrawn: {:?} }}", self.total, self.deposited, self.withdrawn)
+    }
+}
+
+impl Sub<AggregatedAmounts> for AggregatedAmounts {
+    type Output = AggregatedAmounts;
+
+    fn sub(self, rhs: AggregatedAmounts) -> Self::Output {
+        AggregatedAmounts{
+            total: self.total - rhs.total,
+            deposited: self.deposited - rhs.deposited,
+            withdrawn: self.withdrawn - rhs.withdrawn,
+            exchange_rates: self.exchange_rates,
+        }
+    }
+}
+
 
 mod tests {
     use chrono::Days;
@@ -253,5 +277,10 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn subtraction() {
+        todo!()
     }
 }

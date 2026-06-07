@@ -85,6 +85,8 @@ pub mod exchange_rates {
            self.new_amount_from_currency(self.get_currency_from_sign(&raw_amount.sign)?, raw_amount.figure)
         }
 
+        // TODO - The fact that we have forcing the user to choose a currency forces hacks.
+        //        Sometimes, we don't know in what currency an amount should be
         pub fn zero(&self, currency_ident: &CurrencyIdent) -> Result<Amount, String> {
             self.new_amount(currency_ident, dec!(0))
         }
