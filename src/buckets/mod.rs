@@ -191,9 +191,17 @@ impl Bucket {
             .map(|line| line.0)
             .collect::<Vec<_>>()
         )?;
-        let aggregated_amounts = stack.try_initialize_and_walk(
-            ComputeAggregatedAmountsInitializer::new(date.clone(), ex.clone())
-        )?;
+
+        let mut aggregated_amounts = AggregatedAmounts::new(ex)?;
+
+        let mut aggregated_amounts_until_date = aggregated_amounts.clone();
+
+        for (element_date, element) in stack {
+            aggregated_amounts.apply(&element)?;
+            if &element_date <= date {
+                aggregated_amounts_until_date = aggregated_amounts.clone();
+            }
+        }
 
 
         let current_period = period_config.period_for_date(date)?;
@@ -334,9 +342,9 @@ impl Bucket {
             current_recommended_deposit: recommended_deposit_figure,
             current_actual_deposit: deposited_this_period,
             current_withdrawal: withdrawned_this_period,
-            total_deposit: aggregated_amounts.deposited(),
-            total_withdrawal: aggregated_amounts.withdrawn(),
-            total: aggregated_amounts.total(),
+            total_deposit: aggregated_amounts_until_date.deposited(),
+            total_withdrawal: aggregated_amounts_until_date.withdrawn(),
+            total: aggregated_amounts_until_date.total(),
         })
     }
 }
@@ -1367,19 +1375,23 @@ mod test {
                         .add_line(mkdate(9, 1), Action::Deposit(RawAmount::yen("25000")))
                         .add_line(
                             mkdate(9, 16),
-                            Action::DepositCancellation(RawAmount::yen("25000")),
+                            Action::DepositCancellation(RawAmount::yen("5000")),
                         )
                         .add_line(
                             mkdate(9, 17),
-                            Action::DepositCancellation(RawAmount::yen("25000")),
+                            Action::DepositCancellation(RawAmount::yen("5000")),
                         )
                         .add_line(
                             mkdate(10, 18),
-                            Action::DepositCancellation(RawAmount::yen("25000")),
+                            Action::DepositCancellation(RawAmount::yen("5000")),
                         )
                         .add_line(
                             mkdate(12, 18),
-                            Action::DepositCancellation(RawAmount::yen("25000")),
+                            Action::DepositCancellation(RawAmount::yen("5000")),
+                        )
+                        .add_line(
+                            mkdate(12, 19),
+                            Action::DepositCancellation(RawAmount::yen("5000")),
                         )
                         .expect_bucket_recommended_commit_one_hundred_thousand_in_four_months()
                         .execute();

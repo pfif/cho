@@ -5,10 +5,19 @@ pub struct ChronoStack<E: Clone> {
     items: Vec<(NaiveDate, E)>,
 }
 
+impl<E: Clone> IntoIterator for ChronoStack<E> {
+    type Item = (NaiveDate, E);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.into_iter()
+    }
+}
+
 impl<E: Clone> ChronoStack<E> {
     pub fn new(items: &[(NaiveDate, E)]) -> Result<ChronoStack<E>, String> {
         // TODO check choronological order
-        Ok(ChronoStack{items: items.to_vec()})
+        Ok(ChronoStack { items: items.to_vec() })
     }
 
     pub fn try_initialize_and_walk<O, W: ChronoStackWalker<E, O>>(&self, initializer: impl IntoChronoStackWalker<E, O, W>) -> Result<O, String> {
