@@ -1957,7 +1957,7 @@ mod test {
                 #[test]
                 fn one_today_withdrawal_last_period() {
                     Test::default()
-                        .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                        .target_set_last_period_one_hundred_thousand_in_five_months()
                         .add_line(mkdate(8, 13), Action::Withdrawal(RawAmount::yen("10000")))
                         .add_line(
                             mkdate(9, 15),
