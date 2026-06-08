@@ -478,7 +478,7 @@ mod test {
         }
 
         mod target_setting {
-            use super::*;
+          use super::*;
 
             #[test]
             fn no_lines() {
@@ -612,13 +612,45 @@ mod test {
                     .execute()
             }
 
-            fn set_in_the_future() {
-                todo!()
-            }
+          #[test]
+          fn set_in_the_future() {
+              Test::default()
+                  .add_line(mkdate(9, 14), Action::Withdrawal(RawAmount::yen("5000")))
+                  .add_line(mkdate(9, 15), Action::Deposit(RawAmount::yen("10000")))
+                  .add_line(
+                      mkdate(11, 1),
+                      Action::SetTarget {
+                          amount: RawAmount::yen("20000"),
+                          target_date: mkdate(12, 31),
+                      },
+                  )
+                  .expect_bucket(|ex| BucketAtDate {
+                      recommended_or_actual_change: ex.yen("5000"),
+                      current_recommended_deposit: None,
+                      current_actual_deposit: Some(ex.yen("10000")),
+                      current_withdrawal: Some(ex.yen("5000")),
+                      total_deposit: ex.yen("10000"),
+                      total_withdrawal: ex.yen("5000"),
+                      total: ex.yen("5000"),
+                  })
+                  .execute();
+          }
 
-            fn set_this_period_changed_in_the_future() {
-                todo!()
-            }
+          #[test]
+          fn set_this_period_changed_in_the_future() {
+              Test::default()
+                  .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                  .add_line(mkdate(9, 10), Action::Deposit(RawAmount::yen("25000")))
+                  .add_line(
+                      mkdate(11, 1),
+                      Action::SetTarget {
+                          amount: RawAmount::yen("50000"),
+                          target_date: mkdate(12, 31),
+                      },
+                  )
+                  .expect_bucket_recommended_commit_one_hundred_thousand_in_four_months()
+                  .execute();
+          }
         }
 
         mod deposits {
@@ -2064,6 +2096,7 @@ mod test {
             mod before_current_period {
                 use super::*;
 
+                #[test]
                 fn one_cancellation() {
                     Test::default()
                         .target_set_last_period_one_hundred_thousand_in_five_months()
@@ -2085,6 +2118,7 @@ mod test {
                         .execute();
                 }
 
+                #[test]
                 fn two_cancellations() {
                     Test::default()
                         .target_set_last_period_one_hundred_thousand_in_five_months()
