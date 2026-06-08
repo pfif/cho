@@ -1,5 +1,6 @@
-use std::cmp::max;
+use std::cmp::{max, Ordering};
 use std::fmt::{Debug, Display, Formatter};
+use std::ops::{Add, Div, DivAssign, Sub};
 use crate::amounts::amount::ImmutableAmount;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -84,6 +85,8 @@ pub mod exchange_rates {
            self.new_amount_from_currency(self.get_currency_from_sign(&raw_amount.sign)?, raw_amount.figure)
         }
 
+        // TODO - The fact that we have forcing the user to choose a currency forces hacks.
+        //        Sometimes, we don't know in what currency an amount should be
         pub fn zero(&self, currency_ident: &CurrencyIdent) -> Result<Amount, String> {
             self.new_amount(currency_ident, dec!(0))
         }
@@ -178,33 +181,36 @@ impl Amount {
     }
 }
 
-pub trait Add<T> {
-    fn add(&self, other: &T) -> Amount;
-}
+// Given that the creation of a new Amount (for any operation) always involves in the Addition of an amount (the
+// convert call is clone-like memory-wise), we want to make the memory cost explicit. Therefore, we do not implement AddAssign.
+//
+// Going with this approach for now, I can always revisit if I feel like there are too many clones calls in the code.
+// The memory cost could semantically be implied in the operation (even when references are manipulated, we implicitly know a clone is done).
+// If I choose that in the future, automated linter could spot the now useless clones
+//
+// Another approach may be to revisit the fact that the convert call is clone-like. I think I'll get to that when I address the fact that currencies
+// are cloned all over the place. That would allow me to implement honest to god operations that add references (without cloning them)
+//
+// I am still very much learning Rust
+impl Add for Amount {
+    type Output = Amount;
 
-pub trait Sub<T> {
-    fn sub(&self, other: &T) -> Amount;
-}
-
-pub trait Div<T> {
-    fn div(&self, divisor: &T) -> Amount;
-}
-
-impl Add<Amount> for Amount {
-    fn add(&self, other_amount: &Amount) -> Amount {
+    fn add(self, other_amount: Amount) -> Amount {
         let other_amount_converted = other_amount.convert(self.immutable_amount.currency());
         let new_immutable_amount = ImmutableAmount::new(
             self.immutable_amount.currency(),
             self.immutable_amount.figure() + other_amount_converted.immutable_amount.figure(),
         );
-        Amount {
+        Amount{
             immutable_amount: new_immutable_amount,
         }
     }
 }
 
 impl Sub<Amount> for Amount {
-    fn sub(&self, other_amount: &Amount) -> Amount {
+    type Output = Amount;
+
+    fn sub(self, other_amount: Amount) -> Amount {
         let other_amount_converted = other_amount.convert(self.immutable_amount.currency());
         let new_immutable_amount = ImmutableAmount::new(
             self.immutable_amount.currency(),
@@ -217,7 +223,9 @@ impl Sub<Amount> for Amount {
 }
 
 impl Div<Decimal> for Amount {
-    fn div(&self, divisor: &Decimal) -> Amount {
+    type Output = Amount;
+
+    fn div(self, divisor: Decimal) -> Amount {
         Amount {
             immutable_amount: ImmutableAmount::new(
                 self.immutable_amount.currency(),
@@ -227,18 +235,22 @@ impl Div<Decimal> for Amount {
     }
 }
 
-impl Amount {
-    pub fn maximum(amount_a: &Amount, amount_b: &Amount) -> Amount {
-        let amount_b_converted = amount_b.convert(amount_a.immutable_amount.currency());
-        let new_immutable_amount = ImmutableAmount::new(
-            amount_a.immutable_amount.currency(),
-            max(*amount_a.immutable_amount.figure(), *amount_b_converted.immutable_amount.figure()),
-        );
-        Amount {
-            immutable_amount: new_immutable_amount,
-        }
+impl PartialOrd for Amount {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
+}
 
+impl Ord for Amount {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Performance smell - has to construct another amount in order to do the conversion.
+        // We could simply be doing the math for the figure and compare
+        let other_converted = other.convert(self.immutable_amount.currency());
+        self.immutable_amount.figure().cmp(&other_converted.immutable_amount.figure())
+    }
+}
+
+impl Amount {
     pub fn is_negative(&self) -> bool {
         self.immutable_amount.figure() < &dec!(0)
     }
@@ -254,7 +266,7 @@ impl Amount {
 
    pub fn is_zero(&self) -> bool {
         self.immutable_amount.figure().is_zero()
-    }
+   }
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -269,6 +281,16 @@ impl RawAmount {
         RawAmount {
             sign: "¥".to_string(),
             figure: Decimal::from_str_exact(figure).expect("can build a decimal from passed string"),
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<Amount> for RawAmount {
+    fn from(value: Amount) -> Self {
+        RawAmount{
+            sign: value.immutable_amount.currency().clone().sign,
+            figure: value.immutable_amount.figure().clone(),
         }
     }
 }

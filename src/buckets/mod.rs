@@ -1,5 +1,8 @@
+pub mod aggregated_amounts;
+
+use std::cmp::max;
 use crate::amounts::exchange_rates::ExchangeRates;
-use crate::amounts::{Add, Amount, Div, Figure, Sub, RawAmount};
+use crate::amounts::{Amount, Figure, RawAmount};
 use crate::period::{
     ErrorPeriodsBetween, Period, PeriodConfigurationVaultValue, PeriodsConfiguration,
 };
@@ -11,7 +14,10 @@ use serde::de::{Error, Visitor};
 use serde::{Deserialize, Deserializer};
 use serde_json::value::Index;
 use std::fmt::{Formatter, Write};
+use std::ops::Add;
 use std::str::{FromStr, Split};
+use crate::buckets::aggregated_amounts::AggregatedAmounts;
+use crate::chrono_stack::{ChronoStack};
 
 pub type BucketsVaultValue = Vec<Bucket>;
 impl VaultReadable for BucketsVaultValue {
@@ -148,226 +154,120 @@ pub struct BucketAtDate {
 }
 
 impl Bucket {
-    // TODO make the buckets truly multi currency (replace any "JPY")
-
-    /* TODO Idea for a refactor
-
-    ChronoStackWalker. It takes an implementation of the ChronoStackVisitor. It also takes a list of
-    CalendarEntry, a (date, T) tuple.
-    When executed, it calls visitor.visit(date, obj: T) for a slice of the CalendarEntry list.
-
-    The slice is configurable:
-    - CalendarEntries in in a period
-    - CalendarEntries up until a period
-    - All calendar entries
-
-    It verifies if entries are in order (over the whole stack - even if it won't call visitor on it)
-
-    Another object, the BucketChronoStackWalker is built upon the ChronoStack walker.
-    Features:
-    - it filters what type of lines are passed in
-
-    BEFORE STARTING TO IMPLEMENT, DO NOT FORGET TO UNCOMMENT THE TESTS THAT ARE CURRENTLY COMMENTED OUT WAITING FOR THIS REFACTOR
-    */
-
     fn for_period(
         &self,
         period_config: &PeriodConfigurationVaultValue,
         date: &NaiveDate,
         ex: &ExchangeRates,
     ) -> Result<BucketAtDate, String> {
-        let current_period = period_config.period_for_date(date)?;
-        let total = self.lines.iter().try_fold(
-            ex.zero(&"JPY".to_string())?,
-            |acc, Line((line_date, action))| {
-                if line_date <= date {
-                    match action {
-                        Action::Deposit(amount) | Action::WithdrawalCancellation(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.add(&parsed_amount)),
-                        Action::Withdrawal(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.sub(&parsed_amount)),
-                        Action::DepositCancellation(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.sub(&parsed_amount))
-                            .and_then(|new_acc| {
-                                if new_acc.is_negative() {
-                                    Err("attempt to withdraw more money than the Bucket contains"
-                                        .to_string())
-                                } else {
-                                    Ok(new_acc)
-                                }
-                            }),
-                        _ => Ok(acc),
-                    }
-                } else {
-                    Ok(acc)
-                }
-            },
-        )?;
-
-        let deposited = self.lines.iter().try_fold(
-            ex.zero(&"JPY".to_string())?,
-            |acc, Line((line_date, action))| {
-                if line_date <= date {
-                    match action {
-                        Action::Deposit(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.add(&parsed_amount)),
-                        Action::DepositCancellation(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.sub(&parsed_amount)),
-                        _ => Ok(acc),
-                    }
-                } else {
-                    Ok(acc)
-                }
-            },
-        )?;
-
-        let withdrawn = self.lines.iter().try_fold(
-            ex.zero(&"JPY".to_string())?,
-            |acc, Line((line_date, action))| {
-                if line_date <= date {
-                    match action {
-                        Action::Withdrawal(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.add(&parsed_amount)),
-                        Action::WithdrawalCancellation(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.sub(&parsed_amount))
-                            .and_then(|new_acc| {
-                                if new_acc.is_negative() {
-                                    Err("attempt to put back money that was not withdrawn"
-                                        .to_string())
-                                } else {
-                                    Ok(new_acc)
-                                }
-                            }),
-                        _ => Ok(acc),
-                    }
-                } else {
-                    Ok(acc)
-                }
-            },
-        )?;
-
-
-        let deposited_until_period_start = self.lines.iter().try_fold(
-            ex.zero(&"JPY".to_string())?,
-            |acc, Line((line_date, action))| {
-                if line_date < &current_period.start_date {
-                    match action {
-                        // Withdrawals should never count toward what was deposited
-                        Action::Deposit(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.add(&parsed_amount)),
-                        Action::DepositCancellation(amount) => ex
-                            .new_amount_from_raw_amount(amount)
-                            .map(|parsed_amount| acc.sub(&parsed_amount)),
-                        _ => Ok(acc),
-                    }
-                } else {
-                    Ok(acc)
-                }
-            },
-        )?;
-
-        let total_this_period =
-            self.lines
-                .iter()
-                .try_fold(None, |acc, Line((line_date, action))| {
-                    if line_date >= &current_period.start_date && line_date <= date {
-                        match action {
-                            Action::Deposit(amount) | Action::WithdrawalCancellation(amount) => {
-                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                                ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc.add(&parsed_amount)))
-                            }
-                            Action::DepositCancellation(amount) | Action::Withdrawal(amount) => {
-                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                                ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc.sub(&parsed_amount)))
-                            }
-                            _ => Ok(acc),
-                        }
-                    } else {
-                        Ok(acc)
-                    }
-                })?;
-
-        let deposited_this_period =
-            self.lines
-                .iter()
-                .try_fold(None, |acc, Line((line_date, action))| {
-                    if line_date >= &current_period.start_date && line_date <= date {
-                        match action {
-                            Action::Deposit(amount) => {
-                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                                ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc.add(&parsed_amount)))
-                            }
-                            Action::DepositCancellation(amount) => {
-                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                                ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc.sub(&parsed_amount)))
-                            }
-                            _ => Ok(acc),
-                        }
-                    } else {
-                        Ok(acc)
-                    }
-                })?;
-
-        let withdrawned_this_period =
-            self.lines
-                .iter()
-                .try_fold(None, |acc, Line((line_date, action))| {
-                    if line_date >= &current_period.start_date && line_date <= date {
-                        match action {
-                            Action::Withdrawal(amount) => {
-                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                                ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc.add(&parsed_amount)))
-                            }
-                            Action::WithdrawalCancellation(amount) => {
-                                let acc = acc.unwrap_or(ex.zero(&"JPY".to_string())?);
-                                ex.new_amount_from_raw_amount(amount)
-                                    .map(|parsed_amount| Some(acc.sub(&parsed_amount)))
-                            }
-                            _ => Ok(acc),
-                        }
-                    } else {
-                        Ok(acc)
-                    }
-                })?;
-
-        let target: Option<(Amount, &NaiveDate)> = self
+        let stack = ChronoStack::new(&self
             .lines
-            .iter()
-            .try_fold(None, |acc, Line((_, line))| match line {
-                Action::SetTarget {
-                    amount,
-                    target_date,
-                } => Ok::<std::option::Option<(Amount, &chrono::NaiveDate)>, String>(Some((
-                    ex.new_amount_from_raw_amount(&amount)?,
-                    target_date
-                ))),
-                _ => Ok(acc)
-            })?;
+            .clone()
+            .into_iter()
+            .map(|line| line.0)
+            .collect::<Vec<_>>()
+        )?;
+
+        let current_period = period_config.period_for_date(date)?;
+
+        let mut aggregated_amounts = AggregatedAmounts::new(ex)?;
+
+        let mut aggregated_amounts_until_date = aggregated_amounts.clone();
+        let mut aggregated_amounts_before_period_start = aggregated_amounts.clone();
+
+
+        for (element_date, element) in stack.iter() {
+            aggregated_amounts.apply(&element)?;
+            if element_date <= date {
+                aggregated_amounts_until_date = aggregated_amounts.clone();
+            }
+
+            if element_date < &current_period.start_date {
+                aggregated_amounts_before_period_start = aggregated_amounts.clone();
+            }
+        }
+
+        #[cfg(test)]
+        println!("BEFORE PERIOD START {:?}", aggregated_amounts_before_period_start);
+        #[cfg(test)]
+        println!("UNTIL DATE {:?}", aggregated_amounts_until_date);
+
+        let mut seen_deposit_this_period = false;
+        let mut seen_withdrawal_this_period = false;
+        for (element_date, element) in stack.iter() {
+            if element_date >= &current_period.start_date && element_date <= date {
+                match element {
+                    | Action::Deposit(amount)
+                    | Action::DepositCancellation(amount) => {
+                        seen_deposit_this_period = true
+                    },
+                    | Action::Withdrawal(amount)
+                    | Action::WithdrawalCancellation(amount) => {
+                        seen_withdrawal_this_period = true
+                    },
+                    _ => {}
+                }
+            }
+        }
+
+        let aggregated_amounts_for_this_period = aggregated_amounts_until_date.clone() - aggregated_amounts_before_period_start.clone();
+        #[cfg(test)]
+        println!("FOR PERIOD {:?}", aggregated_amounts_until_date);
+        let deposit_this_period = if seen_deposit_this_period {
+            Some(aggregated_amounts_for_this_period.deposited())
+        } else {
+            if aggregated_amounts_for_this_period.deposited() != ex.zero(&"JPY".to_string())? {
+                return Err("No deposit in this period, but deposit is not zero".to_string());
+            }
+            None
+        };
+
+        let withdrawal_this_period = if seen_withdrawal_this_period {
+            Some(aggregated_amounts_for_this_period.withdrawn())
+        } else {
+            if aggregated_amounts_for_this_period.withdrawn() != ex.zero(&"JPY".to_string())? {
+                return Err("No withdrawal in this period, but withdrawl is not zero".to_string());
+            }
+            None
+        };
+
+        let total_this_period = if seen_withdrawal_this_period || seen_deposit_this_period {
+            Some(aggregated_amounts_for_this_period.total())
+        } else {
+            if aggregated_amounts_for_this_period.total() != ex.zero(&"JPY".to_string())? {
+                return Err("No withdrawal or deposit in this period, but total is not zero".to_string());
+            }
+            None
+        };
+
+        let mut target: Option<(Amount, NaiveDate)> = None;
+        for (element_date, element) in stack.iter() {
+            match element {
+                Action::SetTarget { amount, target_date } => {
+                    if element_date <= date {
+                        target = Some((
+                            ex.new_amount_from_raw_amount(amount)?,
+                            target_date.clone()
+                        ));
+                        continue
+                    }
+                }
+                _ => {}
+            }
+        }
+
 
         let recommended_deposit_figure = if let Some((target_amount, target_date)) = target {
-            let number_of_periods = match period_config.periods_between(date, target_date) {
+            let number_of_periods = match period_config.periods_between(date, &target_date) {
                 Ok(nb) => nb,
                 Err(ErrorPeriodsBetween::EndBeforeStart) => 1,
                 any => any?,
             };
 
-            let recommended_deposit_figure = Amount::maximum(
-                &target_amount.sub(&deposited_until_period_start),
-                &ex.zero(&"JPY".to_string())?,
-            ).div(&Decimal::from(number_of_periods));
+            let recommended_deposit_figure = max(
+                (target_amount - aggregated_amounts_before_period_start.deposited()),
+                ex.zero(&"JPY".to_string())?,
+            ) / Decimal::from(number_of_periods);
 
             Some(recommended_deposit_figure)
         } else {
@@ -383,14 +283,15 @@ impl Bucket {
                         .clone()
                         .unwrap_or(ex.zero(&"JPY".to_string())?)),
             current_recommended_deposit: recommended_deposit_figure,
-            current_actual_deposit: deposited_this_period,
-            current_withdrawal: withdrawned_this_period,
-            total_deposit: deposited,
-            total_withdrawal: withdrawn,
-            total,
+            current_actual_deposit: deposit_this_period,
+            current_withdrawal: withdrawal_this_period,
+            total_deposit: aggregated_amounts_until_date.deposited(),
+            total_withdrawal: aggregated_amounts_until_date.withdrawn(),
+            total: aggregated_amounts_until_date.total(),
         })
     }
 }
+
 
 impl OperandBuilder for Bucket {
     fn build(
@@ -432,6 +333,7 @@ mod test {
     fn mkdate(month: u32, date: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(2025, month, date).expect("Can create date")
     }
+
     mod for_period {
         use super::*;
         use crate::period::CalendarMonthPeriodConfiguration;
@@ -561,8 +463,8 @@ mod test {
                 };
 
                 assert_eq!(
+                    (self.expected)(&ex),
                     bucket.for_period(&period_configuration, &today, &ex),
-                    (self.expected)(&ex)
                 );
             }
         }
@@ -574,7 +476,6 @@ mod test {
                 }
             }
         }
-
 
         mod target_setting {
             use super::*;
@@ -709,6 +610,14 @@ mod test {
                         total: ex.yen("0"),
                     })
                     .execute()
+            }
+
+            fn set_in_the_future() {
+                todo!()
+            }
+
+            fn set_this_period_changed_in_the_future() {
+                todo!()
             }
         }
 
@@ -1219,7 +1128,7 @@ mod test {
                             mkdate(9, 15),
                             Action::DepositCancellation(RawAmount::yen("30000")),
                         )
-                        .expect_error("attempt to withdraw more money than the Bucket contains")
+                        .expect_error("attempt to remove more than was deposited")
                         .execute();
                 }
 
@@ -1254,7 +1163,7 @@ mod test {
                             Action::DepositCancellation(RawAmount::yen("30000")),
                         )
                         .add_line(mkdate(9, 15), Action::Deposit(RawAmount::yen("30000")))
-                        .expect_error("attempt to withdraw more money than the Bucket contains")
+                        .expect_error("attempt to remove more than was deposited")
                         .execute();
                 }
             }
@@ -1329,27 +1238,27 @@ mod test {
                 #[test]
                 fn one_today__too_cancels_too_much() {
                     Test::default()
-                        .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                        .target_set_last_period_one_hundred_thousand_in_five_months()
                         .add_line(mkdate(8, 8), Action::Deposit(RawAmount::yen("25000")))
                         .add_line(
                             mkdate(8, 15),
                             Action::DepositCancellation(RawAmount::yen("30000")),
                         )
-                        .expect_error("attempt to withdraw more money than the Bucket contains")
+                        .expect_error("attempt to remove more than was deposited")
                         .execute();
                 }
 
                 #[test]
                 fn one_cancellation_too_big_followed_by_one_deposit_that_brings_back_the_bucket_to_positive() {
                     Test::default()
-                        .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                        .target_set_last_period_one_hundred_thousand_in_five_months()
                         .add_line(mkdate(8, 8), Action::Deposit(RawAmount::yen("25000")))
                         .add_line(
                             mkdate(8, 13),
                             Action::DepositCancellation(RawAmount::yen("30000")),
                         )
                         .add_line(mkdate(8, 15), Action::Deposit(RawAmount::yen("30000")))
-                        .expect_error("attempt to withdraw more money than the Bucket contains")
+                        .expect_error("attempt to remove more than was deposited")
                         .execute();
                 }
             }
@@ -1416,36 +1325,37 @@ mod test {
                         .add_line(mkdate(9, 1), Action::Deposit(RawAmount::yen("25000")))
                         .add_line(
                             mkdate(9, 16),
-                            Action::DepositCancellation(RawAmount::yen("25000")),
+                            Action::DepositCancellation(RawAmount::yen("5000")),
                         )
                         .add_line(
                             mkdate(9, 17),
-                            Action::DepositCancellation(RawAmount::yen("25000")),
+                            Action::DepositCancellation(RawAmount::yen("5000")),
                         )
                         .add_line(
                             mkdate(10, 18),
-                            Action::DepositCancellation(RawAmount::yen("25000")),
+                            Action::DepositCancellation(RawAmount::yen("5000")),
                         )
                         .add_line(
                             mkdate(12, 18),
-                            Action::DepositCancellation(RawAmount::yen("25000")),
+                            Action::DepositCancellation(RawAmount::yen("5000")),
+                        )
+                        .add_line(
+                            mkdate(12, 19),
+                            Action::DepositCancellation(RawAmount::yen("5000")),
                         )
                         .expect_bucket_recommended_commit_one_hundred_thousand_in_four_months()
                         .execute();
                 }
-                /*
                 #[test]
                 fn one_cancellation_too_big_followed_by_one_deposit_that_brings_back_the_bucket_to_positive() {
                     Test::default()
                         .target_set_in_current_period_one_hundred_thousand_in_four_months()
-                        .add_line(mkdate(10, 8), Line::Deposit(RawAmount::yen("25000")))
-                        .add_line(mkdate(10, 13), Line::DepositCancellation(RawAmount::yen("30000")))
-                        .add_line(mkdate(10, 15), Line::Deposit(RawAmount::yen("30000")))
-                        .expect_error("attempt to withdraw more money than the Bucket contains")
+                        .add_line(mkdate(10, 8), Action::Deposit(RawAmount::yen("25000")))
+                        .add_line(mkdate(10, 13), Action::DepositCancellation(RawAmount::yen("30000")))
+                        .add_line(mkdate(10, 15), Action::Deposit(RawAmount::yen("30000")))
+                        .expect_error("attempt to remove more than was deposited")
                         .execute();
                 }
-
-                 */
             }
 
             mod across_periods {
@@ -1783,7 +1693,7 @@ mod test {
                 #[test]
                 fn withdraw_more_than_deposited() {
                     Test::default()
-                        .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                        .target_set_last_period_one_hundred_thousand_in_five_months()
                         .add_line(mkdate(8, 8), Action::Deposit(RawAmount::yen("20000")))
                         .add_line(mkdate(8, 15), Action::Withdrawal(RawAmount::yen("30000")))
                         .expect_bucket(|ex| BucketAtDate {
@@ -1801,14 +1711,14 @@ mod test {
                 #[test]
                 fn one_withdrawal_too_big_followed_by_one_deposit_that_brings_back_the_bucket_to_positive() {
                     Test::default()
-                        .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                        .target_set_last_period_one_hundred_thousand_in_five_months()
                         .add_line(mkdate(8, 8), Action::Deposit(RawAmount::yen("25000")))
                         .add_line(
                             mkdate(8, 13),
                             Action::DepositCancellation(RawAmount::yen("30000")),
                         )
                         .add_line(mkdate(8, 15), Action::Deposit(RawAmount::yen("30000")))
-                        .expect_error("attempt to withdraw more money than the Bucket contains")
+                        .expect_error("attempt to remove more than was deposited")
                         .execute();
                 }
             }
@@ -1868,19 +1778,6 @@ mod test {
                         .expect_bucket_recommended_commit_one_hundred_thousand_in_four_months()
                         .execute();
                 }
-                /*
-                #[test]
-                fn one_cancellation_too_big_followed_by_one_deposit_that_brings_back_the_bucket_to_positive() {
-                    Test::default()
-                        .target_set_in_current_period_one_hundred_thousand_in_four_months()
-                        .add_line(mkdate(10, 8), Line::Deposit(RawAmount::yen("25000")))
-                        .add_line(mkdate(10, 13), Line::Withdrawal(RawAmount::yen("30000")))
-                        .add_line(mkdate(10, 15), Line::Deposit(RawAmount::yen("30000")))
-                        .expect_error("attempt to withdraw more money than the Bucket contains")
-                        .execute();
-                }
-
-                 */
             }
 
             mod across_periods {
@@ -2017,7 +1914,7 @@ mod test {
                 #[test]
                 fn one_today_withdrawal_last_period() {
                     Test::default()
-                        .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                        .target_set_last_period_one_hundred_thousand_in_five_months()
                         .add_line(mkdate(8, 13), Action::Withdrawal(RawAmount::yen("10000")))
                         .add_line(
                             mkdate(9, 15),
@@ -2191,7 +2088,7 @@ mod test {
                 #[test]
                 fn withdraws_too_much() {
                     Test::default()
-                        .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                        .target_set_last_period_one_hundred_thousand_in_five_months()
                         .add_line(mkdate(8, 8), Action::Deposit(RawAmount::yen("25000")))
                         .add_line(mkdate(8, 13), Action::Withdrawal(RawAmount::yen("10000")))
                         .add_line(
@@ -2205,7 +2102,7 @@ mod test {
                 #[test]
                 fn withdraws_too_much_but_money_is_withdrawn_again() {
                     Test::default()
-                        .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                        .target_set_last_period_one_hundred_thousand_in_five_months()
                         .add_line(mkdate(8, 8), Action::Deposit(RawAmount::yen("25000")))
                         .add_line(mkdate(8, 10), Action::Withdrawal(RawAmount::yen("10000")))
                         .add_line(
@@ -2298,6 +2195,16 @@ mod test {
                         .expect_bucket_recommended_commit_one_hundred_thousand_in_four_months_five_thousand_withdrawn()
                         .execute();
                 }
+              #[test]
+              fn one_cancellation_too_big_followed_by_one_deposit_that_brings_back_the_bucket_to_positive() {
+                  Test::default()
+                      .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                      .add_line(mkdate(10, 8), Action::Withdrawal(RawAmount::yen("25000")))
+                      .add_line(mkdate(10, 13), Action::WithdrawalCancellation(RawAmount::yen("30000")))
+                      .add_line(mkdate(10, 15), Action::Withdrawal(RawAmount::yen("30000")))
+                      .expect_error("attempt to put back money that was not withdrawn")
+                      .execute();
+              }
             }
         }
 
@@ -2376,6 +2283,7 @@ mod test {
 
     mod create_operand {
         use super::*;
+        use pretty_assertions::assert_eq;
         #[test]
         fn nominal() -> () {
             let ex = ExchangeRates::for_tests();
