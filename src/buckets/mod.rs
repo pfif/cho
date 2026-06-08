@@ -1265,7 +1265,7 @@ mod test {
                 #[test]
                 fn one_today__too_cancels_too_much() {
                     Test::default()
-                        .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                        .target_set_last_period_one_hundred_thousand_in_five_months()
                         .add_line(mkdate(8, 8), Action::Deposit(RawAmount::yen("25000")))
                         .add_line(
                             mkdate(8, 15),
@@ -1278,7 +1278,7 @@ mod test {
                 #[test]
                 fn one_cancellation_too_big_followed_by_one_deposit_that_brings_back_the_bucket_to_positive() {
                     Test::default()
-                        .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                        .target_set_last_period_one_hundred_thousand_in_five_months()
                         .add_line(mkdate(8, 8), Action::Deposit(RawAmount::yen("25000")))
                         .add_line(
                             mkdate(8, 13),
@@ -1723,7 +1723,7 @@ mod test {
                 #[test]
                 fn withdraw_more_than_deposited() {
                     Test::default()
-                        .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                        .target_set_last_period_one_hundred_thousand_in_five_months()
                         .add_line(mkdate(8, 8), Action::Deposit(RawAmount::yen("20000")))
                         .add_line(mkdate(8, 15), Action::Withdrawal(RawAmount::yen("30000")))
                         .expect_bucket(|ex| BucketAtDate {
@@ -1741,7 +1741,7 @@ mod test {
                 #[test]
                 fn one_withdrawal_too_big_followed_by_one_deposit_that_brings_back_the_bucket_to_positive() {
                     Test::default()
-                        .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                        .target_set_last_period_one_hundred_thousand_in_five_months()
                         .add_line(mkdate(8, 8), Action::Deposit(RawAmount::yen("25000")))
                         .add_line(
                             mkdate(8, 13),
@@ -2131,7 +2131,7 @@ mod test {
                 #[test]
                 fn withdraws_too_much() {
                     Test::default()
-                        .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                        .target_set_last_period_one_hundred_thousand_in_five_months()
                         .add_line(mkdate(8, 8), Action::Deposit(RawAmount::yen("25000")))
                         .add_line(mkdate(8, 13), Action::Withdrawal(RawAmount::yen("10000")))
                         .add_line(
@@ -2145,7 +2145,7 @@ mod test {
                 #[test]
                 fn withdraws_too_much_but_money_is_withdrawn_again() {
                     Test::default()
-                        .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                        .target_set_last_period_one_hundred_thousand_in_five_months()
                         .add_line(mkdate(8, 8), Action::Deposit(RawAmount::yen("25000")))
                         .add_line(mkdate(8, 10), Action::Withdrawal(RawAmount::yen("10000")))
                         .add_line(
