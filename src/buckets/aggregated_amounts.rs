@@ -102,7 +102,6 @@ impl Sub<AggregatedAmounts> for AggregatedAmounts {
 
 
 mod tests {
-    use chrono::Days;
     use crate::amounts::{RawAmount};
     use super::*;
 
@@ -277,10 +276,5 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn subtraction() {
-        todo!()
     }
 }

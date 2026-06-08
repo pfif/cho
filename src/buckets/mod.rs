@@ -477,11 +477,6 @@ mod test {
             }
         }
 
-
-        #[test]
-        fn uncomment_the_commented_tests() {
-            todo!()
-        }
         mod target_setting {
             use super::*;
 
@@ -1351,19 +1346,16 @@ mod test {
                         .expect_bucket_recommended_commit_one_hundred_thousand_in_four_months()
                         .execute();
                 }
-                /*
                 #[test]
                 fn one_cancellation_too_big_followed_by_one_deposit_that_brings_back_the_bucket_to_positive() {
                     Test::default()
                         .target_set_in_current_period_one_hundred_thousand_in_four_months()
-                        .add_line(mkdate(10, 8), Line::Deposit(RawAmount::yen("25000")))
-                        .add_line(mkdate(10, 13), Line::DepositCancellation(RawAmount::yen("30000")))
-                        .add_line(mkdate(10, 15), Line::Deposit(RawAmount::yen("30000")))
-                        .expect_error("attempt to withdraw more money than the Bucket contains")
+                        .add_line(mkdate(10, 8), Action::Deposit(RawAmount::yen("25000")))
+                        .add_line(mkdate(10, 13), Action::DepositCancellation(RawAmount::yen("30000")))
+                        .add_line(mkdate(10, 15), Action::Deposit(RawAmount::yen("30000")))
+                        .expect_error("attempt to remove more than was deposited")
                         .execute();
                 }
-
-                 */
             }
 
             mod across_periods {
@@ -1786,19 +1778,6 @@ mod test {
                         .expect_bucket_recommended_commit_one_hundred_thousand_in_four_months()
                         .execute();
                 }
-                /*
-                #[test]
-                fn one_cancellation_too_big_followed_by_one_deposit_that_brings_back_the_bucket_to_positive() {
-                    Test::default()
-                        .target_set_in_current_period_one_hundred_thousand_in_four_months()
-                        .add_line(mkdate(10, 8), Line::Deposit(RawAmount::yen("25000")))
-                        .add_line(mkdate(10, 13), Line::Withdrawal(RawAmount::yen("30000")))
-                        .add_line(mkdate(10, 15), Line::Deposit(RawAmount::yen("30000")))
-                        .expect_error("attempt to withdraw more money than the Bucket contains")
-                        .execute();
-                }
-
-                 */
             }
 
             mod across_periods {
@@ -2216,6 +2195,16 @@ mod test {
                         .expect_bucket_recommended_commit_one_hundred_thousand_in_four_months_five_thousand_withdrawn()
                         .execute();
                 }
+              #[test]
+              fn one_cancellation_too_big_followed_by_one_deposit_that_brings_back_the_bucket_to_positive() {
+                  Test::default()
+                      .target_set_in_current_period_one_hundred_thousand_in_four_months()
+                      .add_line(mkdate(10, 8), Action::Withdrawal(RawAmount::yen("25000")))
+                      .add_line(mkdate(10, 13), Action::WithdrawalCancellation(RawAmount::yen("30000")))
+                      .add_line(mkdate(10, 15), Action::Withdrawal(RawAmount::yen("30000")))
+                      .expect_error("attempt to put back money that was not withdrawn")
+                      .execute();
+              }
             }
         }
 
