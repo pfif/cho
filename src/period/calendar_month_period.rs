@@ -26,7 +26,7 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
         if start > end {
             return Err(EndBeforeStart);
         }
-        
+
         // The number of years between the two dates, including start and end
         let full_years = (end.year() - start.year() + 1) as u16;
 
@@ -63,117 +63,138 @@ mod period_for_date_tests {
         }
     }
 
-    fn thirty_days() -> Test {
-        Test::default().expected_output(Period {
-            start_date: date(4, 1),
-            end_date: date(4, 30),
-        })
+    mod thirty_days {
+        use super::*;
+
+        fn make() -> Test {
+            Test::default().expected_output(Period {
+                start_date: date(4, 1),
+                end_date: date(4, 30),
+            })
+        }
+
+        #[test]
+        fn mid_month() {
+            make().input(date(4, 15)).execute();
+        }
+
+        #[test]
+        fn end_of_month() {
+            make().input(date(4, 30)).execute();
+        }
+
+        #[test]
+        fn beginning_of_month() {
+            make().input(date(4, 1)).execute();
+        }
     }
 
-    #[test]
-    fn thirty_days__mid_month() {
-        thirty_days().input(date(4, 15)).execute();
+    mod thirty_one_days {
+        use super::*;
+
+        fn make() -> Test {
+            Test::default().expected_output(Period {
+                start_date: date(5, 1),
+                end_date: date(5, 31),
+            })
+        }
+
+        #[test]
+        fn mid_month() {
+            make().input(date(5, 15)).execute();
+        }
+
+        #[test]
+        fn end_of_month() {
+            make().input(date(5, 31)).execute();
+        }
+
+        #[test]
+        fn beginning_of_month() {
+            make().input(date(5, 1)).execute();
+        }
     }
 
-    #[test]
-    fn thirty_days__end_of_month() {
-        thirty_days().input(date(4, 30)).execute();
+    mod end_of_year {
+        use super::*;
+
+        fn make() -> Test {
+            Test::default().expected_output(Period {
+                start_date: date(12, 1),
+                end_date: date(12, 31),
+            })
+        }
+
+        #[test]
+        fn mid_month() {
+            make().input(date(12, 15)).execute();
+        }
+
+        #[test]
+        fn end_of_month() {
+            make().input(date(12, 31)).execute();
+        }
+
+        #[test]
+        fn beginning_of_month() {
+            make().input(date(12, 1)).execute();
+        }
     }
 
-    #[test]
-    fn thirty_days__beginning_of_month() {
-        thirty_days().input(date(4, 1)).execute();
-    }
-    fn thirty_one_days() -> Test {
-        Test::default().expected_output(Period {
-            start_date: date(5, 1),
-            end_date: date(5, 31),
-        })
+    mod february_28 {
+        use super::*;
+
+        fn make() -> Test {
+            Test::default().expected_output(Period {
+                start_date: date(2, 1),
+                end_date: date(2, 28),
+            })
+        }
+
+        #[test]
+        fn mid_month() {
+            make().input(date(2, 15)).execute();
+        }
+
+        #[test]
+        fn end_of_month() {
+            make().input(date(2, 28)).execute();
+        }
+
+        #[test]
+        fn beginning_of_month() {
+            make().input(date(2, 1)).execute();
+        }
     }
 
-    #[test]
-    fn thirty_one_days__mid_month() {
-        thirty_one_days().input(date(5, 15)).execute();
-    }
+    mod february_29 {
+      use super::*;
 
-    #[test]
-    fn thirty_one_days__end_of_month() {
-        thirty_one_days().input(date(5, 31)).execute();
-    }
-
-    #[test]
-    fn thirty_one_days__beginning_of_month() {
-        thirty_one_days().input(date(5, 1)).execute();
-    }
-
-    fn end_of_year() -> Test {
-        Test::default().expected_output(Period {
-            start_date: date(12, 1),
-            end_date: date(12, 31),
-        })
-    }
-
-    #[test]
-    fn end_of_year__mid_month() {
-        end_of_year().input(date(12, 15)).execute();
-    }
-
-    #[test]
-    fn end_of_year__end_of_month() {
-        end_of_year().input(date(12, 31)).execute();
-    }
-
-    #[test]
-    fn end_of_year__beginning_of_month() {
-        end_of_year().input(date(12, 1)).execute();
-    }
-
-    fn february_28() -> Test {
-        Test::default().expected_output(Period {
-            start_date: date(2, 1),
-            end_date: date(2, 28),
-        })
-    }
-
-    #[test]
-    fn february_28__mid_month() {
-        february_28().input(date(2, 15)).execute();
-    }
-
-    #[test]
-    fn february_28__end_of_month() {
-        february_28().input(date(2, 28)).execute();
-    }
-
-    #[test]
-    fn february_28__beginning_of_month() {
-        february_28().input(date(2, 1)).execute();
-    }
-
-    fn date_bisextile(month: u32, day: u32) -> NaiveDate {
+      fn date_bisextile(month: u32, day: u32) -> NaiveDate {
         return NaiveDate::from_ymd_opt(2024, month, day).unwrap();
-    }
+      }
 
-    fn february_29() -> Test {
-        Test::default().expected_output(Period {
-            start_date: date_bisextile(2, 1),
-            end_date: date_bisextile(2, 29),
-        })
-    }
+      fn make() -> Test {
+            Test::default().expected_output(Period {
+                start_date: date_bisextile(2, 1),
+                end_date: date_bisextile(2, 29),
+            })
+        }
 
-    #[test]
-    fn february_29__mid_month() {
-        february_29().input(date_bisextile(2, 15)).execute();
-    }
+        #[test]
+        fn mid_month() {
+            make().input(date_bisextile(2, 15)).execute();
+        }
 
-    #[test]
-    fn february_29__end_of_month() {
-        february_29().input(date_bisextile(2, 29)).execute();
-    }
+        #[test]
+        fn end_of_month() {
+            make().input(date_bisextile(2, 29)).execute();
+        }
 
-    #[test]
-    fn february_29__beginning_of_month() {
-        february_29().input(date_bisextile(2, 1)).execute();
+        #[test]
+        fn beginning_of_month() {
+            make().input(date_bisextile(2, 1)).execute();
+        }
     }
 }
 
@@ -211,142 +232,162 @@ mod test_periods_between {
         }
     }
 
-    #[test]
-    fn same_month__mid() {
+    mod same_month {
+      use super::*;
+
+      #[test]
+      fn mid() {
         Test {
-            start: date(4, 4),
-            end: date(4, 15),
-            expected_output: 1,
+          start: date(4, 4),
+          end: date(4, 15),
+          expected_output: 1,
         }
-        .execute();
+          .execute();
+      }
     }
 
-    #[test]
-    fn adjacent_months_ends() {
-        Test {
-            start: date(4, 1),
-            end: date(5, 31),
-            expected_output: 2,
+    mod adjacent_months {
+        use super::*;
+
+        #[test]
+        fn ends() {
+            Test {
+                start: date(4, 1),
+                end: date(5, 31),
+                expected_output: 2,
+            }
+            .execute();
         }
-        .execute();
+
+        #[test]
+        fn mid() {
+            Test {
+                start: date(4, 4),
+                end: date(5, 15),
+                expected_output: 2,
+            }
+            .execute();
+        }
+
+        #[test]
+        fn inner_ends() {
+            Test {
+                start: date(4, 30),
+                end: date(5, 1),
+                expected_output: 2,
+            }
+            .execute();
+        }
     }
 
-    #[test]
-    fn adjacent_months_mid() {
-        Test {
-            start: date(4, 4),
-            end: date(5, 15),
-            expected_output: 2,
+    mod several_months {
+        use super::*;
+
+        #[test]
+        fn ends() {
+            Test {
+                start: date(2, 1),
+                end: date(6, 30),
+                expected_output: 5,
+            }
+            .execute();
         }
-        .execute();
+
+        #[test]
+        fn mid() {
+            Test {
+                start: date(2, 26),
+                end: date(6, 15),
+                expected_output: 5,
+            }
+            .execute();
+        }
+
+        #[test]
+        fn inner_ends() {
+            Test {
+                start: date(2, 28),
+                end: date(6, 1),
+                expected_output: 5,
+            }
+            .execute();
+        }
     }
 
-    #[test]
-    fn adjacent_months__inner_ends() {
-        Test {
-            start: date(4, 30),
-            end: date(5, 1),
-            expected_output: 2,
+    mod adjacent_years {
+        use super::*;
+
+        #[test]
+        fn ends() {
+            Test {
+                start: date(1, 1),
+                end: date_next_year(12, 31),
+                expected_output: 24,
+            }
+            .execute();
         }
-        .execute();
+
+        #[test]
+        fn mid() {
+            Test {
+                start: date(10, 17),
+                end: date_next_year(2, 14),
+                expected_output: 5,
+            }
+            .execute();
+        }
+
+        #[test]
+        fn inner_ends() {
+            Test {
+                start: date(12, 31),
+                end: date_next_year(1, 1),
+                expected_output: 2,
+            }
+            .execute();
+        }
     }
 
-    #[test]
-    fn several_months__ends() {
-        Test {
-            start: date(2, 1),
-            end: date(6, 30),
-            expected_output: 5,
-        }
-        .execute();
-    }
+    mod several_years {
+        use super::*;
 
-    #[test]
-    fn several_months__mid() {
-        Test {
-            start: date(2, 26),
-            end: date(6, 15),
-            expected_output: 5,
+        #[test]
+        fn ends() {
+            Test {
+                start: date(1, 1),
+                end: date_several_years(12, 31),
+                expected_output: 48,
+            }
+            .execute();
         }
-        .execute();
-    }
 
-    #[test]
-    fn several_months__inner_ends() {
-        Test {
-            start: date(2, 28),
-            end: date(6, 1),
-            expected_output: 5,
+        #[test]
+        fn mid() {
+            // Full years: 2024, 2025 -> 24 months
+            // Start year (2023): 3 months
+            // End year (2026): 2 months
+            // Total: 29 months
+            Test {
+                start: date(10, 17),
+                end: date_several_years(2, 15),
+                expected_output: 29,
+            }
+            .execute();
         }
-        .execute();
-    }
 
-    #[test]
-    fn adjacent_years__ends() {
-        Test {
-            start: date(1, 1),
-            end: date_next_year(12, 31),
-            expected_output: 24,
+        #[test]
+        fn inner_ends() {
+            // Full years: 2024, 2025 -> 24 months
+            // Start year (2023): 1 month
+            // End year (2026): 1 months
+            // Total: 26 months
+            Test {
+                start: date(12, 31),
+                end: date_several_years(1, 1),
+                expected_output: 26,
+            }
+            .execute();
         }
-        .execute();
-    }
-
-    #[test]
-    fn adjacent_years__mid() {
-        Test {
-            start: date(10, 17),
-            end: date_next_year(2, 14),
-            expected_output: 5,
-        }
-        .execute();
-    }
-
-    #[test]
-    fn adjacent_years__inner_ends() {
-        Test {
-            start: date(12, 31),
-            end: date_next_year(1, 1),
-            expected_output: 2,
-        }
-        .execute();
-    }
-
-    #[test]
-    fn several_years__ends() {
-        Test {
-            start: date(1, 1),
-            end: date_several_years(12, 31),
-            expected_output: 48,
-        }
-        .execute();
-    }
-
-    #[test]
-    fn several_years__mid() {
-        // Full years: 2024, 2025 -> 24 months
-        // Start year (2023): 3 months
-        // End year (2026): 2 months
-        // Total: 29 months
-        Test {
-            start: date(10, 17),
-            end: date_several_years(2, 15),
-            expected_output: 29,
-        }
-        .execute();
-    }
-
-    #[test]
-    fn several_years__inner_ends() {
-        // Full years: 2024, 2025 -> 24 months
-        // Start year (2023): 1 month
-        // End year (2026): 1 months
-        // Total: 26 months
-        Test {
-            start: date(12, 31),
-            end: date_several_years(1, 1),
-            expected_output: 26,
-        }
-        .execute();
     }
 
     #[test]

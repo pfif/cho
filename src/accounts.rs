@@ -315,7 +315,6 @@ mod tests_accountjson_amount_at {
     }
 }
 
-#[allow(non_snake_case)]
 #[cfg(test)]
 mod tests_get_accounts {
     use chrono::NaiveDate;
@@ -352,7 +351,7 @@ mod tests_get_accounts {
     }
 
     #[test]
-    fn parse_accounts__nominal() {
+    fn parse_accounts_nominal() {
         let directory = tempdir().unwrap();
 
         create_dir(Path::join(directory.path(), ACCOUNT_DIR)).unwrap();

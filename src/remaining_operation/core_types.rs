@@ -573,7 +573,7 @@ mod test {
         }
 
         #[test]
-        fn two_operands_one_archived_today__non_zero_amount() {
+        fn two_operands_one_archived_today_and_non_zero_amount() {
             let date = NaiveDate::from_ymd_opt(2026,5, 9).expect("Can create date");
             let ex = ExchangeRates::for_tests();
 
