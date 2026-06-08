@@ -154,28 +154,6 @@ pub struct BucketAtDate {
 }
 
 impl Bucket {
-    // TODO make the buckets truly multi currency (replace any "JPY")
-
-    /* TODO Idea for a refactor
-
-    ChronoStackWalker. It takes an implementation of the ChronoStackVisitor. It also takes a list of
-    CalendarEntry, a (date, T) tuple.
-    When executed, it calls visitor.visit(date, obj: T) for a slice of the CalendarEntry list.
-
-    The slice is configurable:
-    - CalendarEntries in in a period
-    - CalendarEntries up until a period
-    - All calendar entries
-
-    It verifies if entries are in order (over the whole stack - even if it won't call visitor on it)
-
-    Another object, the BucketChronoStackWalker is built upon the ChronoStack walker.
-    Features:
-    - it filters what type of lines are passed in
-
-    BEFORE STARTING TO IMPLEMENT, DO NOT FORGET TO UNCOMMENT THE TESTS THAT ARE CURRENTLY COMMENTED OUT WAITING FOR THIS REFACTOR
-    */
-
     fn for_period(
         &self,
         period_config: &PeriodConfigurationVaultValue,
