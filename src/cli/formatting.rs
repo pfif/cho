@@ -25,7 +25,7 @@ pub fn format_remaining_operation_screen(screen: &RemainingOperationScreen) -> S
     format!("{}\n", components.join("\n\n"))
 }
 
-fn render_group(group: &RemainingOperationScreenGroup) -> String {
+pub fn render_group(group: &RemainingOperationScreenGroup) -> String {
     let group_title = title(&group.name);
 
     let table = if !group.operands.is_empty() {

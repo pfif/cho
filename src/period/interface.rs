@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use crate::period::calendar_month_period::CalendarMonthPeriodConfiguration;
 use crate::period::fixed_length_period::FixedLengthPeriodConfiguration;
 use crate::vault::VaultReadable;
@@ -55,7 +56,7 @@ impl From<ErrorPeriodsBetween> for String {
 }
 
 #[cfg_attr(test, automock)]
-pub trait PeriodsConfiguration {
+pub trait PeriodsConfiguration{
     fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String>;
     fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, ErrorPeriodsBetween>;
 }
@@ -69,4 +70,31 @@ impl Period {
     pub fn contains(&self, date: &NaiveDate) -> bool {
         self.start_date <= *date && *date <= self.end_date
     }
+}
+
+impl Display for Period {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} to {}", self.start_date, self.end_date)
+    }
+}
+
+impl Period {
+    pub fn id(&self) -> String {
+        format!("{}/{}", self.start_date, self.end_date)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn todo_display_for_period(){
+        todo!()
+    }
+
+    #[test]
+    fn todo_id_for_period(){
+        todo!()
+    }
+
+
 }

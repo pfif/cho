@@ -12,12 +12,11 @@ use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use serde::de::{Error, Visitor};
 use serde::{Deserialize, Deserializer};
-use serde_json::value::Index;
-use std::fmt::{Formatter, Write};
-use std::ops::Add;
-use std::str::{FromStr, Split};
+use std::fmt::{Formatter};
+use std::str::{Split, SplitWhitespace};
 use crate::buckets::aggregated_amounts::AggregatedAmounts;
 use crate::chrono_stack::{ChronoStack};
+use crate::line::LineWithDateVisitor;
 
 pub type BucketsVaultValue = Vec<Bucket>;
 impl VaultReadable for BucketsVaultValue {
@@ -47,53 +46,32 @@ impl<'de> Deserialize<'de> for Line {
     where
         D: Deserializer<'de>,
     {
-        struct LineVisitor;
-        impl LineVisitor {
-            fn parse_amount<E: Error>(line: &mut Split<&str>) -> Result<RawAmount, E> {
+        struct ActionVisitor;
+        impl ActionVisitor {
+            fn parse_amount<E: Error>(line: &mut SplitWhitespace) -> Result<RawAmount, E> {
                 let raw_amount_str = line.next().ok_or(Error::custom("No amounts specified"))?;
 
-                let mut raw_amount_str_itr = raw_amount_str.chars();
-                let sign = raw_amount_str_itr
-                    .next()
-                    .map(|sign| sign.to_string())
-                    .ok_or(Error::custom("amount is too short"))?;
+                let raw_amount_str_itr: &str = raw_amount_str.into();
 
-                let figure_raw: String = raw_amount_str_itr.collect();
-                let figure = Decimal::from_str_exact(&figure_raw).map_err(|err| {
-                    Error::custom(format!(
-                        "Error parsing amount: {}. Error: {}",
-                        figure_raw, err
-                    ))
-                })?;
-
-                Ok(RawAmount { sign, figure })
+                Ok(RawAmount::try_from(raw_amount_str_itr).map_err(|s| {
+                    Error::custom(format!("Failed to parse amount: {}. Error: {}", raw_amount_str_itr, s))
+                })?)
             }
         }
 
-        impl<'de> Visitor<'de> for LineVisitor {
-            type Value = Line;
+        impl<'de> Visitor<'de> for ActionVisitor {
+            type Value = Action;
 
             fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
-                formatter.write_str("a line")
+                formatter.write_str("an action")
             }
 
             fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
-                // TODO rewrite with nom
-                let mut line = v.split(" ");
-                let raw_date = line
-                    .next()
-                    .ok_or(Error::custom("Could not find the date"))?;
-                let date = NaiveDate::parse_from_str(raw_date, "%Y/%m/%d").map_err(|err| {
-                    Error::custom(format!(
-                        "Failed to parse date: {}. Error: {}",
-                        raw_date, err
-                    ))
-                })?;
-
+                let mut line = v.split_whitespace();
                 let tag = line.next().ok_or(Error::custom("No tag specified"))?;
-                let line_data = match tag {
+                let action = match tag {
                     "TARG" => {
-                        let raw_amount = LineVisitor::parse_amount(&mut line)?;
+                        let raw_amount = ActionVisitor::parse_amount(&mut line)?;
 
                         let raw_target_date = line
                             .next()
@@ -111,22 +89,24 @@ impl<'de> Deserialize<'de> for Line {
                             target_date,
                         })
                     }
-                    "DEPO" => Ok(Action::Deposit(LineVisitor::parse_amount(&mut line)?)),
-                    "DEPO-" => Ok(Action::DepositCancellation(LineVisitor::parse_amount(
+                    "DEPO" => Ok(Action::Deposit(ActionVisitor::parse_amount(&mut line)?)),
+                    "DEPO-" => Ok(Action::DepositCancellation(ActionVisitor::parse_amount(
                         &mut line,
                     )?)),
-                    "WITH" => Ok(Action::Withdrawal(LineVisitor::parse_amount(&mut line)?)),
-                    "WITH-" => Ok(Action::WithdrawalCancellation(LineVisitor::parse_amount(
+                    "WITH" => Ok(Action::Withdrawal(ActionVisitor::parse_amount(&mut line)?)),
+                    "WITH-" => Ok(Action::WithdrawalCancellation(ActionVisitor::parse_amount(
                         &mut line,
                     )?)),
                     _ => Err(Error::custom("Unknown tag")),
                 }?;
 
-                Ok(Line((date, line_data)))
+                Ok(action)
             }
         }
 
-        deserializer.deserialize_str(LineVisitor)
+        let line_visitor = LineWithDateVisitor::new(ActionVisitor);
+
+        Ok(Line(deserializer.deserialize_str(line_visitor)?))
     }
 }
 

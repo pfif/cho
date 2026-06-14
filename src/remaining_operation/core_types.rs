@@ -148,7 +148,7 @@ pub mod group {
     use std::ops::Add;
     use chrono::NaiveDate;
     use rust_decimal_macros::dec;
-    use crate::period::PeriodConfigurationVaultValue;
+    use crate::period::{PeriodConfigurationVaultValue, PeriodsConfiguration};
     use crate::amounts::{Amount, Currency, CurrencyIdent};
     use crate::amounts::exchange_rates::ExchangeRates;
     use super::{GroupBuilder, Operand, OperandBuilder, RemainingOperationScreenGroup, RemainingOperationScreenOperand};
@@ -176,10 +176,10 @@ pub mod group {
             Ok(group)
         }
 
-        pub fn from_group_builder<O: OperandBuilder, B: GroupBuilder<O>>(
+        pub fn from_group_builder<P: PeriodsConfiguration, O: OperandBuilder, B: GroupBuilder<O>>(
             group_builder: B,
             exchange_rates: &ExchangeRates,
-            period_configuration: &PeriodConfigurationVaultValue,
+            period_configuration: &P,
             today: &NaiveDate,
         ) -> Result<Group, String>{
             let (name, operand_builders) = group_builder.build()?;

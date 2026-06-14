@@ -9,6 +9,7 @@ mod buckets;
 pub mod amounts;
 pub mod chrono_stack;
 mod predicted_transaction;
+mod line;
 
 use crate::cli::remaining_operation;
 fn main() {

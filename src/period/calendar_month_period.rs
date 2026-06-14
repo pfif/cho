@@ -4,7 +4,7 @@ use serde::Deserialize;
 use crate::period::interface::ErrorPeriodsBetween;
 use crate::period::interface::ErrorPeriodsBetween::EndBeforeStart;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct CalendarMonthPeriodConfiguration {}
 
 impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {

@@ -1,10 +1,12 @@
 use std::cmp::{max, Ordering};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, Div, DivAssign, Sub};
+use std::str::Chars;
 use crate::amounts::amount::ImmutableAmount;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
+use serde::de::Error;
 
 pub type Figure = Decimal;
 pub type CurrencyIdent = String;
@@ -269,7 +271,8 @@ impl Amount {
    }
 }
 
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(try_from = "String")]
 pub struct RawAmount {
     pub sign: String,
     pub figure: Figure,
@@ -292,5 +295,36 @@ impl From<Amount> for RawAmount {
             sign: value.immutable_amount.currency().clone().sign,
             figure: value.immutable_amount.figure().clone(),
         }
+    }
+}
+
+impl TryFrom<&str> for RawAmount {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let mut value = value.chars();
+
+        let sign = value
+            .next()
+            .map(|sign| sign.to_string())
+            .ok_or("amount is too short".to_string())?;
+
+        let figure_raw: String = value.collect();
+        let figure = Decimal::from_str_exact(&figure_raw).map_err(|err|
+                format!("Error: {err}"))?;
+
+        Ok(RawAmount{
+            sign,
+            figure,
+        })
+    }
+}
+
+impl TryFrom<String> for RawAmount {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let value: &str = &value;
+        RawAmount::try_from(value)
     }
 }

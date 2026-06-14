@@ -7,7 +7,7 @@ use argument_parsing::RemainingOptions;
 use crate::remaining_operation::core_types::RemainingOperation;
 use crate::amounts::exchange_rates::ExchangeRates;
 
-mod formatting;
+pub mod formatting;
 mod argument_parsing;
 mod tests;
 
