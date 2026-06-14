@@ -8,6 +8,7 @@ mod predicted_income;
 mod buckets;
 pub mod amounts;
 pub mod chrono_stack;
+mod predicted_transaction;
 
 use crate::cli::remaining_operation;
 fn main() {

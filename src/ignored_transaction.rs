@@ -23,7 +23,7 @@ pub struct IgnoredTransaction {
 
 // TODO requires tests!!
 impl OperandBuilder for IgnoredTransaction {
-    fn build(self, period_configuration: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
+    fn build<P: PeriodsConfiguration>(self, period_configuration: &P, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
         let current_period = period_configuration.period_for_date(today)?;
         if !current_period.contains(&self.date) {
            return Ok(None);

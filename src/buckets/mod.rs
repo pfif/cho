@@ -154,9 +154,9 @@ pub struct BucketAtDate {
 }
 
 impl Bucket {
-    fn for_period(
+    fn for_period<P: PeriodsConfiguration>(
         &self,
-        period_config: &PeriodConfigurationVaultValue,
+        period_config: &P,
         date: &NaiveDate,
         ex: &ExchangeRates,
     ) -> Result<BucketAtDate, String> {
@@ -294,9 +294,9 @@ impl Bucket {
 
 
 impl OperandBuilder for Bucket {
-    fn build(
+    fn build<P: PeriodsConfiguration>(
         self,
-        period_configuration: &PeriodConfigurationVaultValue,
+        period_configuration: &P,
         today: &NaiveDate,
         exchange_rates: &ExchangeRates,
     ) -> Result<Option<Operand>, String> {

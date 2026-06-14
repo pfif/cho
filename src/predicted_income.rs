@@ -2,7 +2,7 @@ use chrono::NaiveDate;
 use derive_builder::Builder;
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use crate::period::{Period, PeriodConfigurationVaultValue};
+use crate::period::{Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
 use crate::amounts::exchange_rates::ExchangeRates;
 use crate::remaining_operation::core_types::{GroupBuilder, IllustrationValue, Operand, OperandBuilder};
 use crate::remaining_operation::core_types::group::Group;
@@ -21,7 +21,7 @@ impl VaultReadable for PredictedIncome {
 }
 
 impl OperandBuilder for PredictedIncome {
-    fn build(self, period_config: &PeriodConfigurationVaultValue, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
+    fn build<P: PeriodsConfiguration>(self, period_config: &P, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
         let amount = exchange_rates.new_amount(&self.currency, self.figure)?;
 
         Ok(Some(Operand{

@@ -94,9 +94,9 @@ pub trait GroupBuilder<B: OperandBuilder> {
 }
 
 pub trait OperandBuilder {
-    fn build(
+    fn build<P: PeriodsConfiguration>(
         self,
-        period_configuration: &PeriodConfigurationVaultValue,
+        period_configuration: &P,
         today: &NaiveDate,
         // Exchange rate is only necessary because other parts of the codebase need to convert their understanding of currency into Amounts produced by Exchange rates
         // Once the entire codebase adopts ExchangeRates, we won't need to pass it around
