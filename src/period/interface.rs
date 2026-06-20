@@ -55,7 +55,6 @@ impl From<ErrorPeriodsBetween> for String {
     }
 }
 
-#[cfg_attr(test, automock)]
 pub trait PeriodsConfiguration{
     fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String>;
     fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, ErrorPeriodsBetween>;
