@@ -93,7 +93,7 @@ impl PredictedTransactionTemplate {
             PredictedTransaction {
                 name: format!("{} - {}", self.name, period),
                 target_amount: ex.new_amount_from_raw_amount(&self.target.amount)?,
-                period_id: period.id(),
+                period,
                 amount:  if has_payment {
                     ex.zero(&"JPY".to_string())?
                 } else {
@@ -145,13 +145,13 @@ impl<'de> Deserialize<'de> for Payment {
 #[derive(Clone, Deserialize)]
 struct Target {
     amount: RawAmount,
-    starts_on: NaiveDate,
+    starts_on: Period,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 struct PredictedTransaction {
     target_amount: Amount,
-    period_id: String,
+    period: Period,
     name: String,
     amount: Amount,
 }
@@ -207,7 +207,8 @@ mod test {
         ];
 
         for case in cases {
-            let pred_trans_started_on = NaiveDate::from_ymd_opt(2025, 5, 7).expect("valid_date");
+            let pred_trans_starting_period = periods_configuration.period_for_date(
+                &NaiveDate::from_ymd_opt(2025, 5, 7).expect("valid_date")).expect("valid period");
             let configuration_name = "Spotify".to_string();
 
             let month_start = NaiveDate::from_ymd_opt(2026, 6, 1).expect("valid date");
@@ -218,7 +219,7 @@ mod test {
                 archive: None,
                 target: Target {
                     amount: RawAmount::yen("1000"),
-                    starts_on: pred_trans_started_on.clone()
+                    starts_on: pred_trans_starting_period.clone()
                 },
                 payments: case.payments,
             };
@@ -238,7 +239,7 @@ mod test {
                            name: format!("{configuration_name} - {month_start} to {month_end}"),
                            target_amount: ex.new_amount_from_raw_amount(&configuration.target.amount).expect("target's amount is valid"),
                            amount: case.expected_amount,
-                           period_id: periods_configuration.period_for_date(&today).expect("can create period for today").id(),
+                           period: pred_trans_starting_period.clone()
                        },
                        "{}",
                        case.name

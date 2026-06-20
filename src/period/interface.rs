@@ -6,7 +6,7 @@ use chrono::NaiveDate;
 use clap::builder::Str;
 #[cfg(test)]
 use mockall::automock;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
@@ -94,6 +94,13 @@ mod test {
     fn todo_id_for_period(){
         todo!()
     }
+}
 
-
+impl<'de> Deserialize<'de> for Period {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>
+    {
+        todo!()
+    }
 }
