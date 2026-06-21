@@ -181,6 +181,9 @@ struct PredictedTransaction {
 
 impl PredictedTransaction {
     // TODO One more reason to make period hold their own configuration?
+    //      On the one hand, it's nice to make clear where the PeriodConfig is needed
+    //      On the other hand it's verbose.
+    //      Maybe the inbetween solution is to not make the PeriodConfiguration required to compute the ID. Idk
     fn new<P: PeriodsConfiguration>(
         period_config: &P,
         template_name: String,
