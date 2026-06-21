@@ -36,8 +36,8 @@ impl PeriodsConfiguration for PeriodConfigurationVaultValue {
         self.unpack().period_for_date(date)
     }
 
-    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, ErrorPeriodsBetween> {
-        self.unpack().periods_between(start, end)
+    fn periods_between_nb(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, ErrorPeriodsBetween> {
+        self.unpack().periods_between_nb(start, end)
     }
 
     fn id_for_period(&self, period: &Period) -> Result<String, String> {
@@ -70,9 +70,23 @@ impl From<ErrorPeriodsBetween> for String {
 
 pub trait PeriodsConfiguration{
     fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String>;
-    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, ErrorPeriodsBetween>;
+    fn periods_between_nb(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, ErrorPeriodsBetween>;
+
+    // TODO do I want to make this start: Period, end: Period?
+    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<Vec<Period>, ErrorPeriodsBetween> {
+        todo!()
+        // The robot found this, that is almost right. It may however not be the most optimized code for all PeriodsConfiguration
+
+        let mut periods = Vec::new();
+        let mut current_period = self.period_for_date(start)?;
+        while current_period.end_date < *end {
+            periods.push(current_period);
+            current_period = self.period_for_date(&current_period.end_date)?;
+        }
+        Ok(periods)
+    }
     // TODO I would like to avoid passing an incompatible period to this function. The best idea I
-    //      have had do from from the chunky chunk text below is to implement a
+    //      have had do from from the chunky chunk of text below is to implement a
     //      struct CheckedPeriod<T: PeriodsConfiguration> {
     //          period: Period
     //          _periods_configuration: PhantomData(T)
@@ -83,6 +97,7 @@ pub trait PeriodsConfiguration{
     // TODO I don't know if these two function need a self. If they don't that would help quite a bit with keeping the Deserialize trait for Period
     fn id_for_period(&self, period: &Period) -> Result<String, String>;
     fn period_from_id(&self, value: &str) -> Result<Period, String>;
+    // TODO is this really needed? If all I use it for is one test ...
     fn previous_period(&self, period: &Period) -> Result<Period, String>;
 }
 

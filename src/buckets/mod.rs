@@ -238,7 +238,7 @@ impl Bucket {
 
 
         let recommended_deposit_figure = if let Some((target_amount, target_date)) = target {
-            let number_of_periods = match period_config.periods_between(date, &target_date) {
+            let number_of_periods = match period_config.periods_between_nb(date, &target_date) {
                 Ok(nb) => nb,
                 Err(ErrorPeriodsBetween::EndBeforeStart) => 1,
                 any => any?,

@@ -12,7 +12,7 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
         first_and_last_day_of_month(date.year(), date.month())
     }
 
-    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, ErrorPeriodsBetween> {
+    fn periods_between_nb(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, ErrorPeriodsBetween> {
         if start > end {
             return Err(EndBeforeStart);
         }
@@ -261,7 +261,7 @@ mod test_periods_between {
     impl Test {
         fn execute(&self) {
             let config = CalendarMonthPeriodConfiguration {};
-            let result = config.periods_between(&self.start, &self.end).unwrap();
+            let result = config.periods_between_nb(&self.start, &self.end).unwrap();
             assert_eq!(result, self.expected_output)
         }
     }
@@ -427,7 +427,7 @@ mod test_periods_between {
     #[test]
     fn end_before_start() {
         let config = CalendarMonthPeriodConfiguration {};
-        let result = config.periods_between(&date(4, 4), &date(3, 15));
+        let result = config.periods_between_nb(&date(4, 4), &date(3, 15));
         assert_eq!(result, Err(ErrorPeriodsBetween::EndBeforeStart))
     }
 }
