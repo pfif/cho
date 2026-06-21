@@ -1,5 +1,5 @@
 use crate::period::{Period, PeriodsConfiguration};
-use chrono::{Datelike, Months, NaiveDate};
+use chrono::{DateTime, Datelike, Months, NaiveDate};
 use serde::Deserialize;
 use crate::period::interface::ErrorPeriodsBetween;
 use crate::period::interface::ErrorPeriodsBetween::EndBeforeStart;
@@ -9,17 +9,8 @@ pub struct CalendarMonthPeriodConfiguration {}
 
 impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
     fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String> {
-        Ok(Period {
-            start_date: date
-                .with_day(1)
-                .ok_or("Could not compute the first day of the month")?,
-            end_date: (|| {
-                let next_month = *date + Months::new(1);
-                let first_day = next_month.with_day(1)?;
-                first_day.pred_opt()
-            })()
-            .ok_or("Could not compute the last day of the month")?,
-        })
+        let (start_date, end_date) = first_and_last_day_of_month(date.year(), date.month())?;
+        Ok(Period {start_date, end_date})
     }
 
     fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, ErrorPeriodsBetween> {
@@ -35,6 +26,33 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
 
         Ok(full_years * 12 - month_to_start - end_year_end)
     }
+}
+
+impl CalendarMonthPeriodConfiguration {
+
+    // Note: this will likely become part of PeriodsConfiguration at some point
+    pub fn period_from_string(value: &str) -> Result<Period, String> {
+        let (year, month): (i32, u32) = value
+            .split_once('-')
+            .ok_or("- character could not be found in Period definition".to_string())
+            .and_then(|(year, month)| {
+                match (str::parse(year), str::parse(month)) {
+                    (Ok(year), Ok(month)) => Ok((year, month)),
+                    | (Err(val), _)
+                    | (_, Err(val))
+                    => Err(format!("{} not a valid integer", val))
+                }
+            })?;
+
+        first_and_last_day_of_month(year, month)
+            .map(|(start_date, end_date)| Period { start_date, end_date })
+    }
+}
+
+fn first_and_last_day_of_month(year: i32, month: u32) -> Result<(NaiveDate, NaiveDate), String> {
+    let first_day = NaiveDate::from_ymd_opt(year, month, 1).ok_or("Could not compute the first day of the month".to_string())?;
+    let next_month = (first_day + Months::new(1)).pred_opt().ok_or("Could not compute the last day of the month".to_string())?;
+    Ok((first_day, next_month))
 }
 
 #[cfg(test)]

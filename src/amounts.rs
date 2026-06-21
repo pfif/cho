@@ -5,8 +5,7 @@ use std::str::Chars;
 use crate::amounts::amount::ImmutableAmount;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use serde::{Deserialize, Deserializer};
-use serde::de::Error;
+use serde::{Deserialize};
 
 pub type Figure = Decimal;
 pub type CurrencyIdent = String;

@@ -90,6 +90,7 @@ impl RemainingOperation {
 pub trait GroupBuilder<B: OperandBuilder> {
     fn build(
         self,
+    // TODO Why does this return a String and not a &'static str?
     ) -> Result<(String, Vec<B>), String>;
 }
 

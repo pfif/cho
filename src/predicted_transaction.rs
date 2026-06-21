@@ -64,9 +64,11 @@ pub type PeriodTransactionsVaultValue = Vec<PredictedTransactionTemplate>;
 impl VaultReadable for PeriodTransactionsVaultValue {
     const KEY: &'static str = "predicted_transactions";
 }
-impl GroupBuilder<PredictedTransaction> for PeriodTransactionsVaultValue {
-    fn build(self) -> Result<(String, Vec<PredictedTransaction>), String> {
-        todo!()
+impl GroupBuilder<PredictedTransactionTemplate> for PeriodTransactionsVaultValue {
+    fn build(self) -> Result<(String, Vec<PredictedTransactionTemplate>), String> {
+        let predicted_transactions_templates: Vec<PredictedTransactionTemplate> = self.into_iter().collect();
+        Ok(("Predicted Transactions".to_string(),
+         predicted_transactions_templates))
     }
 }
 
@@ -142,6 +144,11 @@ impl<'de> Deserialize<'de> for Payment {
     }
 }
 
+// As of now, the Target assumes that the Period is valid for for the RemainingOperation's
+// PeriodsConfiguration, but I keep thinking of usage for other kind of targets
+// - Putting money on the side for a date later in the month
+// - Keeping money for my weekly Tuesday downtown hang, or weekly activities (which is an instance of the above, but regular)
+// Therefore, we will have several kind of Target. Good to keep in mind
 #[derive(Clone, Deserialize)]
 struct Target {
     amount: RawAmount,
@@ -154,6 +161,17 @@ struct PredictedTransaction {
     period: Period,
     name: String,
     amount: Amount,
+}
+
+impl OperandBuilder for PredictedTransactionTemplate {
+    fn build<P: PeriodsConfiguration>(
+        self,
+        period_configuration: &P,
+        today: &NaiveDate,
+        exchange_rates: &ExchangeRates,
+    ) -> Result<Option<Operand>, String> {
+        todo!()
+    }
 }
 
 impl OperandBuilder for PredictedTransaction {

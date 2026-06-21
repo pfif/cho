@@ -1,12 +1,13 @@
-use std::fmt::Display;
-use crate::period::calendar_month_period::CalendarMonthPeriodConfiguration;
+use std::fmt::{format, Display, Formatter};
+use crate::period::calendar_month_period::{CalendarMonthPeriodConfiguration};
 use crate::period::fixed_length_period::FixedLengthPeriodConfiguration;
 use crate::vault::VaultReadable;
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use clap::builder::Str;
 #[cfg(test)]
 use mockall::automock;
 use serde::{Deserialize, Deserializer};
+use serde::de::Error;
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
@@ -59,6 +60,52 @@ pub trait PeriodsConfiguration{
     fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String>;
     fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, ErrorPeriodsBetween>;
 }
+
+// A period is a time interval between two dates.
+//
+// Note: It became apparent that Periods may need to be used as input for operations that would differ per PeriodsConfiguration operation.
+//       For instance, getting the "next" period after the current one
+//
+// I hesitate between two designs:
+// - Periods know their PeriodConfiguration, and the PeriodsConfiguration specific operation live on them. (For instance, period.next())
+//   Period configuration are responsible for creating / checking that PeriodsConfiguration associated with them match their model. Therefore, it is impossible to get an incompatible period calling a PeriodConfiguration.
+//   As a matter of fact, the PeriodConfiguration does the building at all time (even if it is from a string)
+//   The interface is also moderatly nicer (period.next(), as opposed to period_config.next(period);
+//
+//
+//   This looks clean, but in practice, knowing the PeriodConfiguration at build time for a Period
+//   is quite a heavy lift.
+//
+//   What I for sure don't want to do is have the Deserialze trait knows the
+//   PeriodConfiguration ahead of time (I am not sure serde supports, or even advises that).
+//   This would mean that when we deserialize a an object that specifies both a PeriodsConfiguration
+//   and a Period (like PredictedTransaction, ultimately), we need to deserialize the PeriodsConfiguration,
+//   and then use that to deserialize the Period. Probably possible, but also insanely complex.
+//
+//   Alternatively, it supposes to have RawPeriod with deser impl, but that then need to be loaded through the PeriodsConfig
+//   A design fairly similar to RawAmounts and Amounts, which I find to be a bit heavy
+//
+//   I also don't want to be wasteful memory-wise by cloning the PeriodsConfiguration over and over.
+//   I would like to store a reference to the PeriodsConfig. That would mean either:
+//       - making Period into Period<'p, P: PeriodsConfiguration> and store a &'p PeriodsConfiguration (which has repercussions everywhere in the codebase)
+//       - Storing a Rc<PeriodsConfiguration>
+//
+// - Period don't know their PeriodConfiguration, and we pass them to the PeriodsConfiguration. It's
+//   simpler for now, and I am trying to get to a prototype going.
+//   But this does have drawbacks:
+//       - calls are ugly-ish [period_config.next(period)]
+//       - there are Result<> for all these operations, as we need to error if an incompatible Period
+//         is passed
+//       - the error will be less obvious, as it won't happen when starting to work with the
+//         PeriodsConfiguration, but in the middle of its usage
+//         (although this could also be achieved with a method on PeriodsConfiguration that checks
+//         the date. It's just that we will keep needing to remember to call it. Or maybe this could
+//         all be done with a simple Marker on the Period? Or another type called PeriodChecked which
+//         calls the Periods. PeriodChecked can only be built by a PeriodsConfiguration. This last one
+//         keeps things truly simple
+//
+//   Let's keep period like this as I keep prototyping, but I feel like refactoring to get Period
+//   linked to a PeriodsConfiguration will be in order at some point
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Period {
     pub start_date: NaiveDate,
@@ -94,6 +141,18 @@ mod test {
     fn todo_id_for_period(){
         todo!()
     }
+
+    fn todo_period_try_from_str() {
+        todo!()
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Period {
+    type Error = String;
+
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        CalendarMonthPeriodConfiguration::period_from_string(value)
+    }
 }
 
 impl<'de> Deserialize<'de> for Period {
@@ -101,6 +160,22 @@ impl<'de> Deserialize<'de> for Period {
     where
         D: Deserializer<'de>
     {
-        todo!()
+        struct PeriodVisitor;
+        impl<'de> serde::de::Visitor<'de> for PeriodVisitor {
+            type Value = Period;
+
+            fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+                todo!()
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: Error
+            {
+                Period::try_from(v).map_err(|e| E::custom(e))
+            }
+        }
+
+        deserializer.deserialize_str(PeriodVisitor)
     }
 }
