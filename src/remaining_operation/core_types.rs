@@ -103,7 +103,10 @@ pub trait OperandBuilder {
         // Once the entire codebase adopts ExchangeRates, we won't need to pass it around
         // TODO Remove exchange rate from this interface
         exchange_rates: &ExchangeRates,
-    ) -> Result<Option<Operand>, String>;
+    // TODO I don't know if we need to be building an intermediate Vec here.
+    //      An iterator would potentially allow to iterate over the Operands without allocating
+    //      new memory for them?
+    ) -> Result<Vec<Operand>, String>;
 }
 
 /* Output types */
@@ -185,13 +188,13 @@ pub mod group {
         ) -> Result<Group, String>{
             let (name, operand_builders) = group_builder.build()?;
 
-            let operands: Vec<Operand> = operand_builders
+            let operands = operand_builders
                 .into_iter()
                 .map(|operand_builder| operand_builder.build(period_configuration, today, &exchange_rates))
-                .collect::<Result<Vec<Option<Operand>>, String>>()?
+                .collect::<Result<Vec<Vec<Operand>>, String>>()?
                 .into_iter()
-                .filter_map(|operand| operand)
-                .collect();
+                .flatten()
+                .collect::<Vec<Operand>>();
 
             Group::new(&name, operands)
         }

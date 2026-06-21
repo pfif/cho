@@ -26,12 +26,21 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
 
         Ok(full_years * 12 - month_to_start - end_year_end)
     }
+
+    fn id_for_period(&self, period: &Period) -> Result<String, String> {
+        // TODO test passing in periods with the wrong date! Or maybe having CheckedPeriod<Self> would be enough?
+        Ok(format!("{:04}-{:02}", period.start_date.year(), period.start_date.month()))
+    }
+
+    fn period_from_id(&self, value: &str) -> Result<Period, String> {
+        CalendarMonthPeriodConfiguration::period_from_id(value)
+    }
 }
 
 impl CalendarMonthPeriodConfiguration {
 
     // Note: this will likely become part of PeriodsConfiguration at some point
-    pub fn period_from_string(value: &str) -> Result<Period, String> {
+    pub fn period_from_id(value: &str) -> Result<Period, String> {
         let (year, month): (i32, u32) = value
             .split_once('-')
             .ok_or("- character could not be found in Period definition".to_string())

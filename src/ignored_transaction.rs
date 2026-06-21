@@ -23,10 +23,10 @@ pub struct IgnoredTransaction {
 
 // TODO requires tests!!
 impl OperandBuilder for IgnoredTransaction {
-    fn build<P: PeriodsConfiguration>(self, period_configuration: &P, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
+    fn build<P: PeriodsConfiguration>(self, period_configuration: &P, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Vec<Operand>, String> {
         let current_period = period_configuration.period_for_date(today)?;
         if !current_period.contains(&self.date) {
-           return Ok(None);
+           return Ok(vec![]);
         };
         
         let amount = exchange_rates.new_amount(&self.currency, self.amount)?;
@@ -35,7 +35,7 @@ impl OperandBuilder for IgnoredTransaction {
         } else {
             (false, exchange_rates.new_amount(&self.currency, dec![0])?)
         };
-        Ok(Some(Operand{
+        Ok(vec![Operand{
             name: self.name.clone(),
             amount: operand_amount, 
             illustration: vec![
@@ -43,7 +43,7 @@ impl OperandBuilder for IgnoredTransaction {
                 ("Date".to_string(), self.date.into())
             ],
             archived_from: None,
-        }))
+        }])
     }
 }
 

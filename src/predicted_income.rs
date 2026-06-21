@@ -21,15 +21,15 @@ impl VaultReadable for PredictedIncome {
 }
 
 impl OperandBuilder for PredictedIncome {
-    fn build<P: PeriodsConfiguration>(self, period_config: &P, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Option<Operand>, String> {
+    fn build<P: PeriodsConfiguration>(self, period_config: &P, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Vec<Operand>, String> {
         let amount = exchange_rates.new_amount(&self.currency, self.figure)?;
 
-        Ok(Some(Operand{
+        Ok(vec![Operand{
             name: "Predicted Income".to_string(),
             amount,
             illustration: Vec::new(),
             archived_from: None,
-        }))
+        }])
     }
 }
 

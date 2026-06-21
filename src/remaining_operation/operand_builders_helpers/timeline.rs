@@ -19,7 +19,7 @@ pub struct TimelineOperandBuilderHelper {
 impl TimelineOperandBuilderHelper {
     pub fn build(
         self,
-    ) -> Result<Option<Operand>, String> {
+    ) -> Result<Vec<Operand>, String> {
         let (end_amount, predicted) = match &self.wrapper_end_amount {
             TimelineOperandEnd::Current(amount) => (amount.clone(), false),
             TimelineOperandEnd::Predicted(amount) => (amount.clone(), true)
@@ -33,11 +33,11 @@ impl TimelineOperandBuilderHelper {
         illustration.push(("Committed".into(), IllustrationValue::Bool(!predicted)));
         illustration.push(("Difference".into(), IllustrationValue::Amount(difference.clone())));
 
-        Ok(Some(Operand {
+        Ok(vec![Operand {
             name: self.name.clone(),
             amount: difference,
             illustration,
             archived_from: self.archived_since,
-        }))
+        }])
     }
 }

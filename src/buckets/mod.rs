@@ -279,9 +279,9 @@ impl OperandBuilder for Bucket {
         period_configuration: &P,
         today: &NaiveDate,
         exchange_rates: &ExchangeRates,
-    ) -> Result<Option<Operand>, String> {
+    ) -> Result<Vec<Operand>, String> {
         let period = self.for_period(period_configuration, today, exchange_rates)?;
-        Ok(Some(Operand {
+        Ok(vec![Operand {
             name: self.name,
             amount: period.recommended_or_actual_change.flip_sign(),
             illustration: vec![
@@ -302,7 +302,7 @@ impl OperandBuilder for Bucket {
                 ("Total".to_string(), period.total.into()),
             ],
             archived_from: self.archived_since,
-        }))
+        }])
     }
 }
 
@@ -2353,7 +2353,7 @@ mod test {
 
             assert_eq!(
                 bucket.build(&period_configuration, &today, &ex),
-                Ok(Some(Operand {
+                Ok(vec![Operand {
                     name: "test-bucket".to_string(),
                     amount: ex.yen("-1000"),
                     illustration: vec![
@@ -2383,7 +2383,7 @@ mod test {
                         )
                     ],
                     archived_from: None,
-                }))
+                }])
             );
         }
 
@@ -2411,7 +2411,7 @@ mod test {
 
             assert_eq!(
                 bucket.build(&period_configuration, &today, &ex),
-                Ok(Some(Operand {
+                Ok(vec![Operand {
                     name: "test-bucket".to_string(),
                     amount: ex.yen("500"),
                     illustration: vec![
@@ -2441,7 +2441,7 @@ mod test {
                         )
                     ],
                     archived_from: None,
-                }))
+                }])
             );
         }
 
@@ -2469,7 +2469,7 @@ mod test {
 
                 assert_eq!(
                     bucket.build(&period_configuration, &today, &ex),
-                    Ok(Some(Operand {
+                    Ok(vec![Operand {
                         name: "test-bucket".to_string(),
                         amount: ex.yen("-1000"),
                         illustration: vec![
@@ -2499,7 +2499,7 @@ mod test {
                             )
                         ],
                         archived_from: None,
-                    }))
+                    }])
                 );
             }
         }

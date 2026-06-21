@@ -49,6 +49,7 @@ impl OperandBuilder for PredictedTransaction:
         ("period_id", self.period.id)
 )]
  */
+// TODO this file is a mess, too many structs are declared. Organize it better
 use std::fmt::{Debug, Formatter};
 use chrono::NaiveDate;
 use serde::{Deserialize, Deserializer};
@@ -93,14 +94,17 @@ impl PredictedTransactionTemplate {
 
         Ok(vec![
             PredictedTransaction {
-                name: format!("{} - {}", self.name, period),
+                name: format!("{} - {}", self.name, period_config.id_for_period(&period)?),
                 target_amount: ex.new_amount_from_raw_amount(&self.target.amount)?,
-                period,
                 amount:  if has_payment {
+                    // TODO Technically, I could infer the currency from the target amount, but the
+                    //      Amount make up makes this hard currently. To fix once I will have fixed
+                    //      amounts
                     ex.zero(&"JPY".to_string())?
                 } else {
                     ex.new_amount_from_raw_amount(&self.target.amount)?
-                }
+                },
+                archive_from: self.archive.map(|archive_information| archive_information.on),
             },
         ])
     }
@@ -158,9 +162,9 @@ struct Target {
 #[derive(Debug, PartialEq, Eq)]
 struct PredictedTransaction {
     target_amount: Amount,
-    period: Period,
     name: String,
     amount: Amount,
+    archive_from: Option<NaiveDate>,
 }
 
 impl OperandBuilder for PredictedTransactionTemplate {
@@ -169,19 +173,23 @@ impl OperandBuilder for PredictedTransactionTemplate {
         period_configuration: &P,
         today: &NaiveDate,
         exchange_rates: &ExchangeRates,
-    ) -> Result<Option<Operand>, String> {
-        todo!()
+    ) -> Result<Vec<Operand>, String> {
+        Ok(self.
+            predicted_transactions(period_configuration, today, exchange_rates)?
+            .into_iter()
+            .map(|predicted_transaction| predicted_transaction.build_operand())
+            .collect::<Vec<Operand>>())
     }
 }
 
-impl OperandBuilder for PredictedTransaction {
-    fn build<P: PeriodsConfiguration>(
-        self,
-        period_configuration: &P,
-        today: &NaiveDate,
-        exchange_rates: &ExchangeRates,
-    ) -> Result<Option<Operand>, String> {
-        todo!()
+impl PredictedTransaction {
+    fn build_operand(self) -> Operand {
+        Operand{
+            name: self.name,
+            amount: self.amount,
+            illustration: vec![],
+            archived_from: self.archive_from,
+        }
     }
 }
 
@@ -218,23 +226,26 @@ mod test {
                 name: "One payment".to_string(),
                 payments: vec![Payment((
                     today - Days::new(4),
-                    periods_configuration.period_for_date(&today).expect("valid_period_for_today").id(),
-                ))],
+                    // TODO arf... this is quite ugly...
+                    //      this makes storing an Rc<> to the PeriodsConfiguration looks fine
+                    periods_configuration.id_for_period(
+                        &periods_configuration.period_for_date(&today).expect("valid_period_for_today")
+                    ).expect("valid period id")),
+                )],
                 expected_amount: ex.yen("0")
             }
         ];
 
         for case in cases {
-            let pred_trans_starting_period = periods_configuration.period_for_date(
-                &NaiveDate::from_ymd_opt(2025, 5, 7).expect("valid_date")).expect("valid period");
+            let pred_trans_starting_period = periods_configuration.period_for_date(&today).expect("valid period");
+            let pred_trans_starting_period_id = periods_configuration.id_for_period(&pred_trans_starting_period).expect("valid period id");
             let configuration_name = "Spotify".to_string();
 
-            let month_start = NaiveDate::from_ymd_opt(2026, 6, 1).expect("valid date");
-            let month_end = NaiveDate::from_ymd_opt(2026, 6, 30).expect("valid date");
+            let archive = None;
 
             let configuration = PredictedTransactionTemplate {
                 name: configuration_name.clone(),
-                archive: None,
+                archive: archive.clone(),
                 target: Target {
                     amount: RawAmount::yen("1000"),
                     starts_on: pred_trans_starting_period.clone()
@@ -254,10 +265,10 @@ mod test {
 
             assert_eq!(predicted_transaction,
                        PredictedTransaction {
-                           name: format!("{configuration_name} - {month_start} to {month_end}"),
+                           name: format!("{configuration_name} - {pred_trans_starting_period_id}"),
                            target_amount: ex.new_amount_from_raw_amount(&configuration.target.amount).expect("target's amount is valid"),
                            amount: case.expected_amount,
-                           period: pred_trans_starting_period.clone()
+                           archive_from: archive.map(|archive_information| archive_information.on),
                        },
                        "{}",
                        case.name
@@ -307,7 +318,7 @@ Normal group
 +===================================
 | Spotify - 2026-06       | ¥2000  |
 |-------------------------+--------+
-| Eletrictiy - 2026-05    | ¥8000  |
+| Electrictiy - 2026-05   | ¥8000  |
 |-------------------------+--------+
 | Electricity - 2026-06   | ¥8000  |
 |-------------------------+--------+
@@ -317,6 +328,10 @@ Normal group
 
     #[test] fn todo_test_for_a_payment_outside_of_the_remaining_period(){ todo!() }
     #[test] fn todo_test_for_late_payments() { todo!() }
-    #[test] fn todo_test_for_payments_much_later_than_starts_on() { todo!() }
+    #[test] fn todo_test_for_payments_much_later_than_starts_on() { todo!("display them below the table") }
     #[test] fn todo_test_for_a_cancelled_payment() { todo!("Maybe... but then again maybe there is no need for this") }
+    #[test] fn todo_test_for_build_operand_forwarding_the_archive_from(){ todo!() }
+    #[test] fn todo_add_a_paid_on_illustration() { todo!("The paid on illustration should show the date of the payment")}
+    #[test] fn todo_keep_showing_payments_which_were_late_but_have_been_made_in_the_current_period() { todo!("Did not pay electricity last month, paid it this month for both last and current period. It should still show up")}
+    #[test] fn todo_weekly_payments() { todo!("want to keep 5000 yen for every tuesday of the period")}
 }

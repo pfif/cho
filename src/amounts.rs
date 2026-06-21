@@ -87,7 +87,9 @@ pub mod exchange_rates {
         }
 
         // TODO - The fact that we have forcing the user to choose a currency forces hacks.
-        //        Sometimes, we don't know in what currency an amount should be
+        //        Sometimes, we don't know in what currency an amount should be in, and that should
+        //        be fine? Or not? PredictedAmount could guess the currency from the Target Amount
+        //        Not sure if Bucket could
         pub fn zero(&self, currency_ident: &CurrencyIdent) -> Result<Amount, String> {
             self.new_amount(currency_ident, dec!(0))
         }
@@ -179,6 +181,10 @@ impl Amount {
         Amount {
             immutable_amount: new_immutable_amount,
         }
+    }
+
+    pub fn currency(&self) -> &Currency {
+        self.immutable_amount.currency()
     }
 }
 

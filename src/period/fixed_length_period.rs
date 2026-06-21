@@ -76,6 +76,14 @@ impl PeriodsConfiguration for FixedLengthPeriodConfiguration {
         // +1 because we return 1 if both dates are in the same period, 2 is they are in two contiguous period
         return Ok((end_period_number + 1) - start_period_number);
     }
+
+    fn id_for_period(&self, period: &Period) -> Result<String, String> {
+        todo!("Not implemented because I am not using these in PredictedTransaction yet. This will come for sure")
+    }
+
+    fn period_from_id(&self, value: &str) -> Result<Period, String> {
+        todo!("Not implemented because I am not using these in PredictedTransaction yet. This will come for sure")
+    }
 }
 
 #[cfg(test)]

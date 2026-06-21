@@ -39,6 +39,14 @@ impl PeriodsConfiguration for PeriodConfigurationVaultValue {
     fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, ErrorPeriodsBetween> {
         self.unpack().periods_between(start, end)
     }
+
+    fn id_for_period(&self, period: &Period) -> Result<String, String> {
+        self.unpack().id_for_period(period)
+    }
+
+    fn period_from_id(&self, value: &str) -> Result<Period, String> {
+        self.unpack().period_from_id(value)
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -59,6 +67,18 @@ impl From<ErrorPeriodsBetween> for String {
 pub trait PeriodsConfiguration{
     fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String>;
     fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, ErrorPeriodsBetween>;
+    // TODO I would like to avoid passing an incompatible period to this function. The best idea I
+    //      have had do from from the chunky chunk text below is to implement a
+    //      struct CheckedPeriod<T: PeriodsConfiguration> {
+    //          period: Period
+    //          _periods_configuration: PhantomData(T)
+    //      }
+    //      adding a check(p: Period) -> Result<CheckedPeriod<Self>, String>
+    //      and turning this function into id_for_period(&self, period: Checked<Self>) -> Result<String, String>
+    //
+    // TODO I don't know if these two function need a self. If they don't that would help quite a bit with keeping the Deserialize trait for Period
+    fn id_for_period(&self, period: &Period) -> Result<String, String>;
+    fn period_from_id(&self, value: &str) -> Result<Period, String>;
 }
 
 // A period is a time interval between two dates.
@@ -118,18 +138,6 @@ impl Period {
     }
 }
 
-impl Display for Period {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} to {}", self.start_date, self.end_date)
-    }
-}
-
-impl Period {
-    pub fn id(&self) -> String {
-        format!("{}/{}", self.start_date, self.end_date)
-    }
-}
-
 #[cfg(test)]
 mod test {
     #[test]
@@ -138,11 +146,7 @@ mod test {
     }
 
     #[test]
-    fn todo_id_for_period(){
-        todo!()
-    }
-
-    fn todo_period_try_from_str() {
+    fn todo_id_to_and_from_period(){
         todo!()
     }
 }
@@ -151,7 +155,9 @@ impl<'a> TryFrom<&'a str> for Period {
     type Error = String;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        CalendarMonthPeriodConfiguration::period_from_string(value)
+        // TODO Right. I should be calling the interface here. This means fairly profound change to
+        //      the design, which I will get to later
+        CalendarMonthPeriodConfiguration::period_from_id(value)
     }
 }
 
