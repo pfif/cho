@@ -74,7 +74,15 @@ pub trait PeriodsConfiguration{
 
     // TODO do I want to make this start: Period, end: Period?
     fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<Vec<Period>, ErrorPeriodsBetween> {
-        todo!()
+        todo!("\
+Note for next time I opened this file: don't start by solving that.\
+Try to write the algorithm in PredictedTransactionTemplate.predicted_transactions with that function\
+\
+Also, it looks like fixed_length periods are not really useful at all in this program. Even for predicted transactions.\
+I think something like CalendarWeeksPeriodConfiguration would be less complex to write and maintain, and be enough for most use cases.\
+If I one day come up for a use case for a payment repeating every 19 days starting Tuesday June 22nd, 2027 - maybe I'll rethink this decision.\
+In the meantime... let's chuck it?");
+        /*
         // The robot found this, that is almost right. It may however not be the most optimized code for all PeriodsConfiguration
 
         let mut periods = Vec::new();
@@ -84,6 +92,8 @@ pub trait PeriodsConfiguration{
             current_period = self.period_for_date(&current_period.end_date)?;
         }
         Ok(periods)
+        
+         */
     }
     // TODO I would like to avoid passing an incompatible period to this function. The best idea I
     //      have had do from from the chunky chunk of text below is to implement a
