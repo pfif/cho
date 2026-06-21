@@ -9,8 +9,7 @@ pub struct CalendarMonthPeriodConfiguration {}
 
 impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
     fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String> {
-        let (start_date, end_date) = first_and_last_day_of_month(date.year(), date.month())?;
-        Ok(Period {start_date, end_date})
+        first_and_last_day_of_month(date.year(), date.month())
     }
 
     fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, ErrorPeriodsBetween> {
@@ -35,12 +34,21 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
     fn period_from_id(&self, value: &str) -> Result<Period, String> {
         CalendarMonthPeriodConfiguration::period_from_id(value)
     }
+
+    fn previous_period(&self, period: &Period) -> Result<Period, String> {
+        // TODO test passing in periods with the wrong date! Or maybe having CheckedPeriod<Self> would be enough?
+
+        // TODO this does not work for the first month of the year, because the previous month is the 12th month of the previous year.
+        //      write a test about that
+        first_and_last_day_of_month(period.start_date.year(), period.start_date.month() - 1)
+    }
 }
 
 impl CalendarMonthPeriodConfiguration {
 
-    // Note: this will likely become part of PeriodsConfiguration at some point
+    // Note: this will likely become period_from_id quite soon
     pub fn period_from_id(value: &str) -> Result<Period, String> {
+        // TODO rewrite with nom
         let (year, month): (i32, u32) = value
             .split_once('-')
             .ok_or("- character could not be found in Period definition".to_string())
@@ -54,14 +62,13 @@ impl CalendarMonthPeriodConfiguration {
             })?;
 
         first_and_last_day_of_month(year, month)
-            .map(|(start_date, end_date)| Period { start_date, end_date })
     }
 }
 
-fn first_and_last_day_of_month(year: i32, month: u32) -> Result<(NaiveDate, NaiveDate), String> {
-    let first_day = NaiveDate::from_ymd_opt(year, month, 1).ok_or("Could not compute the first day of the month".to_string())?;
-    let next_month = (first_day + Months::new(1)).pred_opt().ok_or("Could not compute the last day of the month".to_string())?;
-    Ok((first_day, next_month))
+fn first_and_last_day_of_month(year: i32, month: u32) -> Result<Period, String> {
+    let start_date = NaiveDate::from_ymd_opt(year, month, 1).ok_or("Could not compute the first day of the month".to_string())?;
+    let end_date = (start_date + Months::new(1)).pred_opt().ok_or("Could not compute the last day of the month".to_string())?;
+    Ok(Period { start_date, end_date })
 }
 
 #[cfg(test)]

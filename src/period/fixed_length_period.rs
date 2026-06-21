@@ -78,11 +78,15 @@ impl PeriodsConfiguration for FixedLengthPeriodConfiguration {
     }
 
     fn id_for_period(&self, period: &Period) -> Result<String, String> {
-        todo!("Not implemented because I am not using these in PredictedTransaction yet. This will come for sure")
+        todo!("Not implemented because I am not using these in PredictedTransaction yet. This will probably come")
     }
 
     fn period_from_id(&self, value: &str) -> Result<Period, String> {
-        todo!("Not implemented because I am not using these in PredictedTransaction yet. This will come for sure")
+        todo!("Not implemented because I am not using these in PredictedTransaction yet. This will probably come")
+    }
+
+    fn previous_period(&self, period: &Period) -> Result<Period, String> {
+        todo!("Not implemented because I am not using these in PredictedTransaction yet. This will probably come")
     }
 }
 

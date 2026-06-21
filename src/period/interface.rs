@@ -47,6 +47,10 @@ impl PeriodsConfiguration for PeriodConfigurationVaultValue {
     fn period_from_id(&self, value: &str) -> Result<Period, String> {
         self.unpack().period_from_id(value)
     }
+
+    fn previous_period(&self, period: &Period) -> Result<Period, String> {
+        self.unpack().previous_period(period)
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -79,6 +83,7 @@ pub trait PeriodsConfiguration{
     // TODO I don't know if these two function need a self. If they don't that would help quite a bit with keeping the Deserialize trait for Period
     fn id_for_period(&self, period: &Period) -> Result<String, String>;
     fn period_from_id(&self, value: &str) -> Result<Period, String>;
+    fn previous_period(&self, period: &Period) -> Result<Period, String>;
 }
 
 // A period is a time interval between two dates.
@@ -147,6 +152,10 @@ mod test {
 
     #[test]
     fn todo_id_to_and_from_period(){
+        todo!()
+    }
+
+    fn todo_previous_and_next_periods(){
         todo!()
     }
 }
