@@ -97,6 +97,9 @@ impl PredictedTransactionTemplate {
         let period = period_config.period_for_date(date)?;
         let expected_payments = period_config.periods_between(&self.target.starts_on, &period)?;
 
+        let zero_amount = ex.zero(&"JPY".to_string())?;
+        let expected_amount = ex.new_amount_from_raw_amount(&self.target.amount.clone())?;
+
         // TODO I could build a ChronoStack from Payment directly here, and from an Action directly in buckets
         //      Just impl From(Payment or Action) for (NaiveDate, _)
         //      and change ChronoStack::new to take an Into Vec<(NaiveDate, _)>
@@ -122,37 +125,55 @@ impl PredictedTransactionTemplate {
         //      ChronoStack::iter_for_date() -> impl Iterator<Item=&(Bool, (NaiveDate, E))>, where Bool is true if the date is at or before the date, false otherwise
         //      Or
         //      ChronoStack::iters_for_date() -> (&[...], &[...]), using `split_at_checked` on the vec
-        let paid_for_period_until_today = payment_stack
-            .iter()
-            .filter_map(|(payment_date, payment_period)| {
-                if payment_date <= date {
-                    Some(payment_period)
-                } else {
-                    None
-                }
-            })
-            .collect::<HashSet<&Period>>();
+        //      Or
+        //      ChronoStack::iters_for_period_and_date() -> (&[things before period start], &[things between period start and date], &[things after date]), using `split_at_checked` on the vec
+        //      ...
+        //      But in a way that's not satisfactory... one of the problem with checking the date inside of the current function (or inside of Bucket::for_tests)
+        //      is that tests must all take the date into consideration. I keep writing
+        //      tests with boundary for the current date in mind. I wonder if there's a way around that.
+        //      I write handlers for a function of ChronoStack which itself ... does all the date math. Not sure if that even makes sense
+        //      The issue, the thing that is complected in that case is "limiting what operations are taken into account
+        //      (those that fall in the previous and current period)" and "the actual feature that must be applied - in this case, payment check"
+        //      IT'S ALL COMPLECTED. Although bucket partly solved this problem with "AggregatedAmounts"
+        //      ...
+        //      Another pattern is to use "date management function" in both the function being
+        //      tested and the test. The hard thing here is that the current function uses function
+        //      that checks attribute of the date
+        //      whereas tests would need to use function to generate date with these attributes?
+        //      It's not necessarily a bad thing...
+
+        let (paid_for_before_period, paid_for_in_period_until_date, _) = payment_stack
+            .iters_for_periods_and_date(&period, date);
+        let (paid_for_before_period, paid_for_in_period_until_date) = (
+            paid_for_before_period.collect::<HashSet<_>>(),
+            paid_for_in_period_until_date.collect::<HashSet<_>>(),
+        );
 
         expected_payments
             .into_iter()
-            .map(|payment_period| {
-                let paid = paid_for_period_until_today.contains(&payment_period);
-                let amount = if paid {
-                    ex.zero(&"JPY".to_string())?
+            .filter_map(|payment_period| {
+                let paid_before_period = paid_for_before_period.contains(&payment_period);
+                let paid_in_period_until_date = paid_for_in_period_until_date.contains(&payment_period);
+
+                let amount = if !paid_before_period && !paid_in_period_until_date {
+                    Some(expected_amount.clone())
+                } else if paid_in_period_until_date {
+                    Some(zero_amount.clone())
                 } else {
-                    ex.new_amount_from_raw_amount(&self.target.amount)?
+                    None
                 };
 
-                PredictedTransaction::new(
-                    period_config,
-                    self.name.clone(),
-                    payment_period,
-                    amount,
-                    self.archive
-                        .clone()
-                        .map(|archive_information| archive_information.on),
-                )
+                amount.map(|amount| (payment_period, amount))
             })
+            .map(|(payment_period, payment_amount)| PredictedTransaction::new(
+                period_config,
+                self.name.clone(),
+                payment_period,
+                payment_amount,
+                self.archive
+                    .clone()
+                    .map(|archive_information| archive_information.on),
+            ))
             .collect()
     }
 }
@@ -168,6 +189,7 @@ struct ArchiveInformation {
 /// A payment is a date and a period id.
 #[derive(Clone, Debug)]
 struct Payment((NaiveDate, Period));
+// TODO hash impl that only takes period into account [gosh that feels wrooooong]
 
 impl<'de> Deserialize<'de> for Payment {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -355,6 +377,23 @@ mod test {
                     payments: vec![],
                     expected_predicted_transitions: vec![
                         make_pred_trans(last_period.clone(), pred_trans_target_amount.clone()),
+                        make_pred_trans(current_period.clone(), pred_trans_target_amount.clone()),
+                    ],
+                },
+                TestCase {
+                    name: "Started last month - paid last month this month".to_string(),
+                    starting_period: last_period.clone(),
+                    payments: vec![Payment((today - Days::new(4), last_period.clone()))],
+                    expected_predicted_transitions: vec![
+                        make_pred_trans(last_period.clone(), ex.yen("0")),
+                        make_pred_trans(current_period.clone(), pred_trans_target_amount.clone()),
+                    ],
+                },
+                TestCase {
+                    name: "Started last month - paid last month this month".to_string(),
+                    starting_period: last_period.clone(),
+                    payments: vec![Payment((last_period.start_date + Days::new(4), last_period.clone()))],
+                    expected_predicted_transitions: vec![
                         make_pred_trans(current_period.clone(), pred_trans_target_amount.clone()),
                     ],
                 },

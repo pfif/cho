@@ -156,6 +156,7 @@ impl Bucket {
         let mut aggregated_amounts_before_period_start = aggregated_amounts.clone();
 
 
+        // TODO change to use stack.iters_for_periods_and_date
         for (element_date, element) in stack.iter() {
             aggregated_amounts.apply(&element)?;
             if element_date <= date {
@@ -175,6 +176,7 @@ impl Bucket {
 
         let mut seen_deposit_this_period = false;
         let mut seen_withdrawal_this_period = false;
+        // TODO change to use stack.iters_for_periods_and_date
         for (element_date, element) in stack.iter() {
             if element_date >= &current_period.start_date && element_date <= date {
                 match element {
@@ -222,6 +224,7 @@ impl Bucket {
         };
 
         let mut target: Option<(Amount, NaiveDate)> = None;
+        // TODO change to use stack.iters_for_periods_and_date
         for (element_date, element) in stack.iter() {
             match element {
                 Action::SetTarget { amount, target_date } => {
