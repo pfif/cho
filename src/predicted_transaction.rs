@@ -143,10 +143,10 @@ impl PredictedTransactionTemplate {
         //      It's not necessarily a bad thing...
 
         let (paid_for_before_period, paid_for_in_period_until_date, _) = payment_stack
-            .iters_for_periods_and_date(&period, date);
-        let (paid_for_before_period, paid_for_in_period_until_date) = (
-            paid_for_before_period.collect::<HashSet<_>>(),
-            paid_for_in_period_until_date.collect::<HashSet<_>>(),
+            .into_split_for_period_and_date(&period, date);
+        let (paid_for_before_period, paid_for_in_period_until_date): (HashSet<_>, HashSet<_>) = (
+            paid_for_before_period.into_iter().collect(),
+            paid_for_in_period_until_date.into_iter().collect(),
         );
 
         expected_payments

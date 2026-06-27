@@ -155,32 +155,32 @@ impl Bucket {
         let period = period_config.period_for_date(date)?;
 
         let (actions_before_period, actions_in_period_before_date, actions_after_date) =
-            stack.iters_for_periods_and_date(&period, date);
+            stack.into_split_for_period_and_date(&period, date);
 
         let mut aggregated_amounts = AggregatedAmounts::new(ex)?;
 
         actions_before_period
-            .clone()
+            .iter()
             .try_for_each(|action| aggregated_amounts.apply(action))?;
         let aggregated_amounts_before_period = aggregated_amounts.clone();
 
         actions_in_period_before_date
-            .clone()
-            .try_for_each(|action| aggregated_amounts.apply(&action))?;
+            .iter()
+            .try_for_each(|action| aggregated_amounts.apply(action))?;
         let aggregated_amounts_until_date = aggregated_amounts.clone();
 
-        actions_after_date.clone().try_for_each(|action| aggregated_amounts.apply(&action))?;
+        actions_after_date.iter().try_for_each(|action| aggregated_amounts.apply(action))?;
 
         let seen_deposit_this_period =
             actions_in_period_before_date
-                .clone()
+                .iter()
                 .any(|action| match action {
                     Action::Deposit(_) | Action::DepositCancellation(_) => true,
                     _ => false,
                 });
 
         let seen_withdrawal_this_period = actions_in_period_before_date
-            .clone()
+            .iter()
             .any(|action| match action {
                 Action::Withdrawal(_) | Action::WithdrawalCancellation(_) => true,
                 _ => false,
@@ -219,7 +219,8 @@ impl Bucket {
         };
 
         let target = actions_before_period
-            .chain(actions_in_period_before_date)
+            .iter()
+            .chain(actions_in_period_before_date.iter())
             .filter_map(|action| match action {
                     Action::SetTarget {
                     amount,

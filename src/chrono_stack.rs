@@ -34,40 +34,34 @@ impl<E: Clone + Debug> ChronoStack<E> {
         self.items.iter()
     }
 
-    // TODO can this actually take a period configuration?
-    pub fn iters_for_periods_and_date(
-        &self,
+    pub fn into_split_for_period_and_date(
+        self,
         period: &Period,
         date: &NaiveDate,
-    ) -> (
-        impl Iterator<Item = &E> + Clone,
-        impl Iterator<Item = &E> + Clone,
-        impl Iterator<Item = &E> + Clone,
-    ) {
-        let first_in_period_idx = self.
-                items.
+    ) -> (Vec<E>, Vec<E>, Vec<E>) {
+        let items = self.items;
+        let first_in_period_idx = items.
                 iter().
                 // Split at the first item ...
                 position(|item| (item.0 >= period.start_date)).
                 // ... or if None was found, the entire vec is before the period start
-                unwrap_or(self.items.len());
+                unwrap_or(items.len());
 
-        let first_date_after_period_idx = self.
-                items.
+        let first_date_after_period_idx = items.
                 iter().
                 // Split at the first item after the period start ...
                 position(|item| &item.0 > date).
                 // ... or if None was found, the entire vec is before the period start
-                unwrap_or(self.items.len());
+                unwrap_or(items.len());
 
-        let before_period_start = &self.items[..first_in_period_idx];
-        let in_period_before_date = &self.items[first_in_period_idx..first_date_after_period_idx];
-        let after_date = &self.items[first_date_after_period_idx..];
+        let before_period_start = &items[..first_in_period_idx];
+        let in_period_before_date = &items[first_in_period_idx..first_date_after_period_idx];
+        let after_date = &items[first_date_after_period_idx..];
 
         (
-            before_period_start.iter().map(|(_date, element)| element),
-            in_period_before_date.iter().map(|(_date, element)| element),
-            after_date.iter().map(|(_date, element)| element),
+            before_period_start.iter().map(|(_date, element)| element.clone()).collect(),
+            in_period_before_date.iter().map(|(_date, element)| element.clone()).collect(),
+            after_date.iter().map(|(_date, element)| element.clone()).collect(),
         )
     }
 }
@@ -165,7 +159,7 @@ mod tests {
         use super::*;
         #[test]
         fn todo() {
-            todo!("find all the edge cases and test them all")
+            todo!("find all the edge cases and test them all. one edge case is: date is not between period start and end")
         }
     }
 }
