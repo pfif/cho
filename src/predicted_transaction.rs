@@ -49,9 +49,11 @@ impl OperandBuilder for PredictedTransaction:
         ("period_id", self.period.id)
 )]
  */
+use std::collections::HashSet;
 // TODO this file is a mess, too many structs are declared. Organize it better
 use crate::amounts::exchange_rates::ExchangeRates;
 use crate::amounts::{Amount, RawAmount};
+use crate::chrono_stack::ChronoStack;
 use crate::line::LineWithDateVisitor;
 use crate::period::{Period, PeriodsConfiguration};
 use crate::remaining_operation::core_types::{GroupBuilder, Operand, OperandBuilder};
@@ -93,24 +95,65 @@ impl PredictedTransactionTemplate {
         ex: &ExchangeRates,
     ) -> Result<Vec<PredictedTransaction>, String> {
         let period = period_config.period_for_date(date)?;
-        let has_payment = self.payments.into_iter().next().is_some();
-        let amount = if has_payment {
-            // TODO Technically, I could infer the currency from the target amount, but the
-            //      Amount make up makes this hard currently. To fix once I will have fixed
-            //      amounts
-            ex.zero(&"JPY".to_string())?
-        } else {
-            ex.new_amount_from_raw_amount(&self.target.amount)?
-        };
+        let expected_payments = period_config.periods_between(&self.target.starts_on, &period)?;
 
-        Ok(vec![PredictedTransaction::new(
-            period_config,
-            self.name,
-            period,
-            amount,
-            self.archive
-                .map(|archive_information| archive_information.on),
-        )?])
+        // TODO I could build a ChronoStack from Payment directly here, and from an Action directly in buckets
+        //      Just impl From(Payment or Action) for (NaiveDate, _)
+        //      and change ChronoStack::new to take an Into Vec<(NaiveDate, _)>
+        let payment_stack = ChronoStack::new(
+            &self
+                .payments
+                .clone()
+                .into_iter()
+                .map(|p| p.0)
+                .collect::<Vec<(NaiveDate, Period)>>(),
+        )?;
+
+        // TODO I almost forgot to take into consideration elements until the current date, but not past that.
+        //      I wonder if there is an abstraction that could help with this.
+        //      The use for ChronoStack::iter is still quite complex in Bucket though, so ... maybe it's overkill
+        //      Althouuuugh... it's possible that ChronoStack::iter_until_date ChronoStack::iter_after_date() could work!
+        //      Or even something crazy like
+        //      let iter = ChronoStack::iter_until_date(date)
+        //      // the for loop or iter call until the date
+        //      let iter_after_date = iter.continue()
+        //      // the for loop or iter call after the date
+        //      Or
+        //      ChronoStack::iter_for_date() -> impl Iterator<Item=&(Bool, (NaiveDate, E))>, where Bool is true if the date is at or before the date, false otherwise
+        //      Or
+        //      ChronoStack::iters_for_date() -> (&[...], &[...]), using `split_at_checked` on the vec
+        let paid_for_period_until_today = payment_stack
+            .iter()
+            .filter_map(|(payment_date, payment_period)| {
+                if payment_date <= date {
+                    Some(payment_period)
+                } else {
+                    None
+                }
+            })
+            .collect::<HashSet<&Period>>();
+
+        expected_payments
+            .into_iter()
+            .map(|payment_period| {
+                let paid = paid_for_period_until_today.contains(&payment_period);
+                let amount = if paid {
+                    ex.zero(&"JPY".to_string())?
+                } else {
+                    ex.new_amount_from_raw_amount(&self.target.amount)?
+                };
+
+                PredictedTransaction::new(
+                    period_config,
+                    self.name.clone(),
+                    payment_period,
+                    amount,
+                    self.archive
+                        .clone()
+                        .map(|archive_information| archive_information.on),
+                )
+            })
+            .collect()
     }
 }
 
@@ -180,10 +223,14 @@ struct PredictedTransaction {
 }
 
 impl PredictedTransaction {
-    // TODO One more reason to make period hold their own configuration?
+    // TODO One more reason to make period hold their own configuration? If so, we woun't need to
+    //      pass in a PeriodConfig here.
     //      On the one hand, it's nice to make clear where the PeriodConfig is needed
     //      On the other hand it's verbose.
     //      Maybe the inbetween solution is to not make the PeriodConfiguration required to compute the ID. Idk
+    //
+    //      Wait. I could just ... encode the id for the period in the period at construction time ...
+    //      So simple
     fn new<P: PeriodsConfiguration>(
         period_config: &P,
         template_name: String,
@@ -262,13 +309,16 @@ mod test {
 
             let configuration_name = "Spotify".to_string();
 
+            let archive: Option<ArchiveInformation> = None;
             let make_pred_trans = |period, amount| -> PredictedTransaction {
                 PredictedTransaction::new(
                     &periods_configuration,
                     configuration_name.clone(),
                     period,
                     amount,
-                    None,
+                    None, // Should be a reference to archive above, but it cannot be moved into the
+                          // closure because it does not implement Copy
+                          // TODO solve that?
                 )
                 .expect("valid predicted transaction")
             };
@@ -311,12 +361,6 @@ mod test {
             ];
 
             for case in cases {
-                let pred_trans_starting_period_id = periods_configuration
-                    .id_for_period(&case.starting_period)
-                    .expect("valid period id");
-
-                let archive = None;
-
                 let configuration = PredictedTransactionTemplate {
                     name: configuration_name.clone(),
                     archive: archive.clone(),
@@ -402,7 +446,8 @@ Normal group
     }
 
     #[test]
-    fn todo_test_for_a_payment_outside_of_the_remaining_period() {
+    fn todo_test_for_early_payments_ie_a_payment_for_after_the_remaining_period_but_in_the_current_period(
+    ) {
         todo!()
     }
     #[test]
@@ -436,5 +481,15 @@ Normal group
     #[test]
     fn todo_predicted_transaction_new() {
         todo!("Currently used by the 'predicted_transaction_template.predicted_transactions' test, but inner not tested")
+    }
+
+    #[test]
+    fn todo_payments_out_of_order() {
+        todo!("This is optional as it's already tested back and forth in chrono_stack.rs")
+    }
+
+    #[test]
+    fn boundary_check() {
+        todo!("payment today, for current period, payment tomorrow, for next period. そんな感じ")
     }
 }

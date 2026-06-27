@@ -72,8 +72,16 @@ pub trait PeriodsConfiguration{
     fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String>;
     fn periods_between_nb(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, ErrorPeriodsBetween>;
 
-    // TODO do I want to make this start: Period, end: Period?
-    fn periods_between(&self, start: &NaiveDate, end: &NaiveDate) -> Result<Vec<Period>, ErrorPeriodsBetween> {
+    // TODO I would like to avoid passing an incompatible period to this function. The best idea I
+    //      have had do from from the chunky chunk of text below is to implement a
+    //      struct CheckedPeriod<T: PeriodsConfiguration> {
+    //          period: Period
+    //          _periods_configuration: PhantomData(T)
+    //      }
+    //      adding a check(p: Period) -> Result<CheckedPeriod<Self>, String>
+    //      and turning this function into id_for_period(&self, period: Checked<Self>) -> Result<String, String>
+    //
+    fn periods_between(&self, start: &Period, end: &Period) -> Result<Vec<Period>, ErrorPeriodsBetween> {
         todo!("\
 Note for next time I opened this file: don't start by solving that.\
 Try to write the algorithm in PredictedTransactionTemplate.predicted_transactions with that function\
@@ -95,16 +103,8 @@ In the meantime... let's chuck it?");
         
          */
     }
-    // TODO I would like to avoid passing an incompatible period to this function. The best idea I
-    //      have had do from from the chunky chunk of text below is to implement a
-    //      struct CheckedPeriod<T: PeriodsConfiguration> {
-    //          period: Period
-    //          _periods_configuration: PhantomData(T)
-    //      }
-    //      adding a check(p: Period) -> Result<CheckedPeriod<Self>, String>
-    //      and turning this function into id_for_period(&self, period: Checked<Self>) -> Result<String, String>
-    //
     // TODO I don't know if these two function need a self. If they don't that would help quite a bit with keeping the Deserialize trait for Period
+    //      I think id_for_period is not required ... as I can bake it in the Period or CheckedPeriod
     fn id_for_period(&self, period: &Period) -> Result<String, String>;
     fn period_from_id(&self, value: &str) -> Result<Period, String>;
     // TODO is this really needed? If all I use it for is one test ...
@@ -156,7 +156,7 @@ In the meantime... let's chuck it?");
 //
 //   Let's keep period like this as I keep prototyping, but I feel like refactoring to get Period
 //   linked to a PeriodsConfiguration will be in order at some point
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Period {
     pub start_date: NaiveDate,
     pub end_date: NaiveDate,

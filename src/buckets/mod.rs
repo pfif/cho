@@ -167,6 +167,7 @@ impl Bucket {
             }
         }
 
+        // TODO proper logging I'm beggin thee
         #[cfg(test)]
         println!("BEFORE PERIOD START {:?}", aggregated_amounts_before_period_start);
         #[cfg(test)]
