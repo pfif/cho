@@ -77,7 +77,7 @@ pub trait PeriodsConfiguration{
     //      adding a check(p: Period) -> Result<CheckedPeriod<Self>, String>
     //      and turning this function into id_for_period(&self, period: Checked<Self>) -> Result<String, String>
     //
-    fn periods_between(&self, start: &Period, end: &Period) -> Result<Vec<Period>, ErrorPeriodsBetween> {
+    fn periods_between(&self, start: &Period, end: &Period) -> Result<Vec<Period>, String> {
         todo!("\
 Note for next time I opened this file: don't start by solving that.\
 Try to write the algorithm in PredictedTransactionTemplate.predicted_transactions with that function\
@@ -101,6 +101,7 @@ In the meantime... let's chuck it?");
     }
     // TODO I don't know if these two function need a self. If they don't that would help quite a bit with keeping the Deserialize trait for Period
     //      I think id_for_period is not required ... as I can bake it in the Period or CheckedPeriod
+    //      Update: none of the PeriodsConfiguration method need a self now, given that they are all devoid of fields to access
     fn id_for_period(&self, period: &Period) -> Result<String, String>;
     fn period_from_id(&self, value: &str) -> Result<Period, String>;
     // TODO is this really needed? If all I use it for is one test ...

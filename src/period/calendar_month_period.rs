@@ -1,8 +1,8 @@
+use crate::period::interface::ErrorPeriodsBetween;
+use crate::period::interface::ErrorPeriodsBetween::EndBeforeStart;
 use crate::period::{Period, PeriodsConfiguration};
 use chrono::{DateTime, Datelike, Months, NaiveDate};
 use serde::Deserialize;
-use crate::period::interface::ErrorPeriodsBetween;
-use crate::period::interface::ErrorPeriodsBetween::EndBeforeStart;
 
 #[derive(Deserialize, Clone)]
 pub struct CalendarMonthPeriodConfiguration {}
@@ -12,7 +12,11 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
         first_and_last_day_of_month(date.year(), date.month())
     }
 
-    fn periods_between_nb(&self, start: &NaiveDate, end: &NaiveDate) -> Result<u16, ErrorPeriodsBetween> {
+    fn periods_between_nb(
+        &self,
+        start: &NaiveDate,
+        end: &NaiveDate,
+    ) -> Result<u16, ErrorPeriodsBetween> {
         if start > end {
             return Err(EndBeforeStart);
         }
@@ -26,31 +30,78 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
         Ok(full_years * 12 - month_to_start - end_year_end)
     }
 
-    fn periods_between(&self, start: &Period, end: &Period) -> Result<Vec<Period>, ErrorPeriodsBetween> {
-        if start.start_date == NaiveDate::from_ymd_opt(2026, 5, 1).expect("good date"){
-            Ok(vec![
-                Period {
-                start_date: NaiveDate::from_ymd_opt(2026, 5, 1).expect("very good date"),
-                end_date: NaiveDate::from_ymd_opt(2026, 5, 31).expect("such good date")
-            },
-            Period {
-                start_date: NaiveDate::from_ymd_opt(2026, 6, 1).expect("good date"),
-                end_date: NaiveDate::from_ymd_opt(2026, 6, 30).expect("good date")
-            }])
-        } else if start.start_date == NaiveDate::from_ymd_opt(2026, 6, 1).expect("marvelous date"){
-            Ok(vec![
-                Period {
-                start_date: NaiveDate::from_ymd_opt(2026, 6, 1).expect("incredible date"),
-                end_date: NaiveDate::from_ymd_opt(2026, 6, 30).expect("what date!!!")
-            }])
-        } else {
-            todo!("This function needs to actually be implemented")
+    fn periods_between(&self, start: &Period, end: &Period) -> Result<Vec<Period>, String> {
+        let start_date = start.start_date;
+        let end_date = end.start_date;
+
+        if end_date < start_date {
+            return Err("End before start".to_string())
         }
+
+        fn generate_periods(
+            year: i32,
+            month: impl Iterator<Item = u32>,
+        ) -> impl Iterator<Item = Result<Period, String>> {
+            month.map(move |month| first_and_last_day_of_month(year, month))
+        }
+
+        let (periods_start_year_end_month, periods_end_year_end_month, years_in_between) =
+            if start_date.year() == end_date.year() {
+                (end_date.month(), None, 0..0)
+            } else {
+                (
+                    12,
+                    Some(end_date.month()),
+                    (start_date.year() + 1..end_date.year())
+                )
+            };
+
+
+        let periods_start_year = generate_periods(
+            start_date.year(),
+            start_date.month()..=periods_start_year_end_month,
+        );
+
+        let periods_in_between_years = years_in_between
+            .map(move |year| generate_periods(year, 1..=12))
+            .flatten();
+
+        let periods_end_year = periods_end_year_end_month
+            .map(|end_month| 1..=end_month)
+            .into_iter()
+            .flatten()
+            .map(move |month| first_and_last_day_of_month(end_date.year(), month));
+
+        let result = periods_start_year
+            .chain(periods_in_between_years)
+            .chain(periods_end_year)
+            .collect::<Result<Vec<Period>, String>>()?;
+
+        {
+
+            let periods_between_nb = self.periods_between_nb(&start_date, &end_date).expect("Could compute periods between number");
+            let result_len = result.len() as u16;
+            debug_assert!(
+                    periods_between_nb
+                    == result_len,
+                "periods_between_nb returned the wrong number of periods for {:?} and {:?}: {} instead of {}",
+                start_date,
+                end_date,
+                periods_between_nb,
+                result_len,
+            );
+        }
+
+        Ok(result)
     }
 
     fn id_for_period(&self, period: &Period) -> Result<String, String> {
         // TODO test passing in periods with the wrong date! Or maybe having CheckedPeriod<Self> would be enough?
-        Ok(format!("{:04}-{:02}", period.start_date.year(), period.start_date.month()))
+        Ok(format!(
+            "{:04}-{:02}",
+            period.start_date.year(),
+            period.start_date.month()
+        ))
     }
 
     fn period_from_id(&self, value: &str) -> Result<Period, String> {
@@ -67,30 +118,33 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
 }
 
 impl CalendarMonthPeriodConfiguration {
-
     // Note: this will likely become period_from_id quite soon
     pub fn period_from_id(value: &str) -> Result<Period, String> {
         // TODO rewrite with nom
         let (year, month): (i32, u32) = value
             .split_once('-')
             .ok_or("- character could not be found in Period definition".to_string())
-            .and_then(|(year, month)| {
-                match (str::parse(year), str::parse(month)) {
+            .and_then(
+                |(year, month)| match (str::parse(year), str::parse(month)) {
                     (Ok(year), Ok(month)) => Ok((year, month)),
-                    | (Err(val), _)
-                    | (_, Err(val))
-                    => Err(format!("{} not a valid integer", val))
-                }
-            })?;
+                    (Err(val), _) | (_, Err(val)) => Err(format!("{} not a valid integer", val)),
+                },
+            )?;
 
         first_and_last_day_of_month(year, month)
     }
 }
 
 fn first_and_last_day_of_month(year: i32, month: u32) -> Result<Period, String> {
-    let start_date = NaiveDate::from_ymd_opt(year, month, 1).ok_or("Could not compute the first day of the month".to_string())?;
-    let end_date = (start_date + Months::new(1)).pred_opt().ok_or("Could not compute the last day of the month".to_string())?;
-    Ok(Period { start_date, end_date })
+    let start_date = NaiveDate::from_ymd_opt(year, month, 1)
+        .ok_or(format!("Could not compute the first day of the month for {} {}", year, month))?;
+    let end_date = (start_date + Months::new(1))
+        .pred_opt()
+        .ok_or("Could not compute the last day of the month".to_string())?;
+    Ok(Period {
+        start_date,
+        end_date,
+    })
 }
 
 #[cfg(test)]
@@ -224,13 +278,13 @@ mod period_for_date_tests {
     }
 
     mod february_29 {
-      use super::*;
+        use super::*;
 
-      fn date_bisextile(month: u32, day: u32) -> NaiveDate {
-        return NaiveDate::from_ymd_opt(2024, month, day).unwrap();
-      }
+        fn date_bisextile(month: u32, day: u32) -> NaiveDate {
+            return NaiveDate::from_ymd_opt(2024, month, day).unwrap();
+        }
 
-      fn make() -> Test {
+        fn make() -> Test {
             Test::default().expected_output(Period {
                 start_date: date_bisextile(2, 1),
                 end_date: date_bisextile(2, 29),
@@ -256,10 +310,10 @@ mod period_for_date_tests {
 
 #[cfg(test)]
 mod test_periods_between_nb {
-    use crate::period::calendar_month_period::CalendarMonthPeriodConfiguration;
+    use crate::period::calendar_month_period::{first_and_last_day_of_month, CalendarMonthPeriodConfiguration};
+    use crate::period::interface::ErrorPeriodsBetween;
     use crate::period::PeriodsConfiguration;
     use chrono::NaiveDate;
-    use crate::period::interface::ErrorPeriodsBetween;
 
     fn date(month: u32, day: u32) -> NaiveDate {
         return NaiveDate::from_ymd_opt(2023, month, day).unwrap();
@@ -289,17 +343,17 @@ mod test_periods_between_nb {
     }
 
     mod same_month {
-      use super::*;
+        use super::*;
 
-      #[test]
-      fn mid() {
-        Test {
-          start: date(4, 4),
-          end: date(4, 15),
-          expected_output: 1,
+        #[test]
+        fn mid() {
+            Test {
+                start: date(4, 4),
+                end: date(4, 15),
+                expected_output: 1,
+            }
+            .execute();
         }
-          .execute();
-      }
     }
 
     mod adjacent_months {
@@ -452,10 +506,139 @@ mod test_periods_between_nb {
         let result = config.periods_between_nb(&date(4, 4), &date(3, 15));
         assert_eq!(result, Err(ErrorPeriodsBetween::EndBeforeStart))
     }
-
     mod periods_between {
         use super::*;
+
         #[test]
-        fn todo() {todo!()}
+        fn tests() {
+            let config = CalendarMonthPeriodConfiguration {};
+
+            struct Test {
+                name: &'static str,
+                start: (i32, u32),
+                end: (i32, u32),
+                expected_output: Vec<(i32, u32)>,
+            }
+
+            let period = |(year, month)| {
+                first_and_last_day_of_month(year, month).expect("Could build period")
+            };
+
+            let cases = vec![
+                Test {
+                    name: "same month",
+                    start: (2025, 8),
+                    end: (2025, 8),
+                    expected_output: vec![(2025, 8)],
+                },
+                Test {
+                    name: "adjacent months",
+                    start: (2025, 8),
+                    end: (2025, 9),
+                    expected_output: vec![(2025, 8), (2025, 9)],
+                },
+                Test {
+                    name: "one month in between",
+                    start: (2025, 8),
+                    end: (2025, 10),
+                    expected_output: vec![(2025, 8), (2025, 9), (2025, 10)],
+                },
+                Test {
+                    name: "a few months in between",
+                    start: (2025, 8),
+                    end: (2025, 12),
+                    expected_output: vec![
+                        (2025, 8),
+                        (2025, 9),
+                        (2025, 10),
+                        (2025, 11),
+                        (2025, 12),
+                    ],
+                },
+                Test {
+                    name: "adjacent month at year boundary",
+                    start: (2025, 12),
+                    end: (2026, 1),
+                    expected_output: vec![(2025, 12), (2026, 1)],
+                },
+                Test {
+                    name: "one year apart",
+                    start: (2025, 8),
+                    end: (2026, 8),
+                    expected_output: vec![
+                        (2025, 8),
+                        (2025, 9),
+                        (2025, 10),
+                        (2025, 11),
+                        (2025, 12),
+                        (2026, 1),
+                        (2026, 2),
+                        (2026, 3),
+                        (2026, 4),
+                        (2026, 5),
+                        (2026, 6),
+                        (2026, 7),
+                        (2026, 8),
+                    ],
+                },
+                Test {
+                    name: "two years apart",
+                    start: (2025, 8),
+                    end: (2027, 8),
+                    expected_output: vec![
+                        (2025, 8),
+                        (2025, 9),
+                        (2025, 10),
+                        (2025, 11),
+                        (2025, 12),
+                        (2026, 1),
+                        (2026, 2),
+                        (2026, 3),
+                        (2026, 4),
+                        (2026, 5),
+                        (2026, 6),
+                        (2026, 7),
+                        (2026, 8),
+                        (2026, 9),
+                        (2026, 10),
+                        (2026, 11),
+                        (2026, 12),
+                        (2027, 1),
+                        (2027, 2),
+                        (2027, 3),
+                        (2027, 4),
+                        (2027, 5),
+                        (2027, 6),
+                        (2027, 7),
+                        (2027, 8),
+                    ],
+                },
+            ];
+
+            for case in cases {
+                let start = period(case.start);
+                let end = period(case.end);
+                let expected_output = case
+                    .expected_output
+                    .into_iter()
+                    .map(period)
+                    .collect();
+
+                let result = config.periods_between(&start, &end);
+
+                assert_eq!(result, Ok(expected_output), "{}", case.name);
+            }
+        }
+
+        #[test]
+        fn end_before_start() {
+            let config = CalendarMonthPeriodConfiguration {};
+            let start = first_and_last_day_of_month(2026, 1).expect("Could build period");
+            let end = first_and_last_day_of_month(2025, 12).expect("Could build period");
+
+            let result = config.periods_between(&start, &end);
+
+            assert!(result.is_err());
+        }
     }
 }
