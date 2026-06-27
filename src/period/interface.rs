@@ -1,6 +1,5 @@
 use std::fmt::{format, Display, Formatter};
 use crate::period::calendar_month_period::{CalendarMonthPeriodConfiguration};
-use crate::period::fixed_length_period::FixedLengthPeriodConfiguration;
 use crate::vault::VaultReadable;
 use chrono::{Datelike, NaiveDate};
 use clap::builder::Str;
@@ -12,8 +11,6 @@ use serde::de::Error;
 #[derive(Deserialize)]
 #[serde(tag = "type")]
 pub enum PeriodConfigurationVaultValue {
-    #[serde(rename = "fixed_length")]
-    FixedLength(FixedLengthPeriodConfiguration),
     #[serde(rename = "monthly")]
     CalendarMonth(CalendarMonthPeriodConfiguration),
 }
@@ -25,7 +22,6 @@ impl VaultReadable for PeriodConfigurationVaultValue {
 impl PeriodConfigurationVaultValue {
     fn unpack(&self) -> &dyn PeriodsConfiguration {
         match self {
-            PeriodConfigurationVaultValue::FixedLength(p) => p,
             PeriodConfigurationVaultValue::CalendarMonth(p) => p,
         }
     }
