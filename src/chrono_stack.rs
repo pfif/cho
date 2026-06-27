@@ -1,4 +1,4 @@
-use crate::period::Period;
+use crate::period::{Period, PeriodsConfiguration};
 use chrono::NaiveDate;
 use clap::builder::Str;
 use std::fmt::Debug;
@@ -40,9 +40,9 @@ impl<E: Clone + Debug> ChronoStack<E> {
         period: &Period,
         date: &NaiveDate,
     ) -> (
-        impl Iterator<Item = &E>,
-        impl Iterator<Item = &E>,
-        impl Iterator<Item = &E>,
+        impl Iterator<Item = &E> + Clone,
+        impl Iterator<Item = &E> + Clone,
+        impl Iterator<Item = &E> + Clone,
     ) {
         let first_in_period_idx = self.
                 items.

@@ -528,7 +528,7 @@ Normal group
     }
 
     #[test]
-    fn boundary_check() {
+    fn todo_boundary_check() {
         todo!("payment today, for current period, payment tomorrow, for next period. そんな感じ")
     }
 }
