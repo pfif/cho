@@ -40,23 +40,23 @@ impl<E: Clone + Debug> ChronoStack<E> {
         date: &NaiveDate,
     ) -> (Vec<E>, Vec<E>, Vec<E>) {
         let items = self.items;
-        let first_in_period_idx = items.
+        let first_in_period_pos = items.
                 iter().
-                // Split at the first item ...
+                // First item in the period ...
                 position(|item| (item.0 >= period.start_date)).
-                // ... or if None was found, the entire vec is before the period start
+                // ... or if None was found, the entire vec is before the period start, return last item position
                 unwrap_or(items.len());
 
-        let first_date_after_period_idx = items.
+        let first_date_after_period_pos = items.
                 iter().
-                // Split at the first item after the period start ...
+                // First item after the date...
                 position(|item| &item.0 > date).
-                // ... or if None was found, the entire vec is before the period start
+                // ... or if None was found, the entire vec is before the date, return last item position
                 unwrap_or(items.len());
 
-        let before_period_start = &items[..first_in_period_idx];
-        let in_period_before_date = &items[first_in_period_idx..first_date_after_period_idx];
-        let after_date = &items[first_date_after_period_idx..];
+        let before_period_start = &items[..first_in_period_pos];
+        let in_period_before_date = &items[first_in_period_pos..first_date_after_period_pos];
+        let after_date = &items[first_date_after_period_pos..];
 
         (
             before_period_start.iter().map(|(_date, element)| element.clone()).collect(),

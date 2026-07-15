@@ -1,4 +1,4 @@
-use std::fmt::{format, Display, Formatter};
+use std::fmt::{format, Formatter};
 use crate::period::calendar_month_period::{CalendarMonthPeriodConfiguration};
 use crate::vault::VaultReadable;
 use chrono::{Datelike, NaiveDate};
@@ -167,11 +167,6 @@ impl Period {
 
 #[cfg(test)]
 mod test {
-    #[test]
-    fn todo_display_for_period(){
-        todo!()
-    }
-
     #[test]
     fn todo_id_to_and_from_period(){
         todo!()
