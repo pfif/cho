@@ -320,7 +320,7 @@ mod test {
                 .period_for_date(&today)
                 .expect("valid period");
             let last_period = periods_configuration
-                .previous_period(&current_period)
+                .period_for_date(&NaiveDate::from_ymd_opt(2026, 5, 14).expect("valid date"))
                 .expect("could compute previous period");
 
             let ex = ExchangeRates::for_tests();

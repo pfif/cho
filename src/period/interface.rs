@@ -43,10 +43,6 @@ impl PeriodsConfiguration for PeriodConfigurationVaultValue {
     fn period_from_id(&self, value: &str) -> Result<Period, String> {
         self.unpack().period_from_id(value)
     }
-
-    fn previous_period(&self, period: &Period) -> Result<Period, String> {
-        self.unpack().previous_period(period)
-    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -104,8 +100,6 @@ In the meantime... let's chuck it?");
     //      Update: none of the PeriodsConfiguration method need a self now, given that they are all devoid of fields to access
     fn id_for_period(&self, period: &Period) -> Result<String, String>;
     fn period_from_id(&self, value: &str) -> Result<Period, String>;
-    // TODO is this really needed? If all I use it for is one test ...
-    fn previous_period(&self, period: &Period) -> Result<Period, String>;
 }
 
 // A period is a time interval between two dates.

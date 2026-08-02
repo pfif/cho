@@ -7,6 +7,7 @@ use serde::Deserialize;
 #[derive(Deserialize, Clone)]
 pub struct CalendarMonthPeriodConfiguration {}
 
+// TODO none of these need "self" anymore
 impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
     fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String> {
         first_and_last_day_of_month(date.year(), date.month())
@@ -106,14 +107,6 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
 
     fn period_from_id(&self, value: &str) -> Result<Period, String> {
         CalendarMonthPeriodConfiguration::period_from_id(value)
-    }
-
-    fn previous_period(&self, period: &Period) -> Result<Period, String> {
-        // TODO test passing in periods with the wrong date! Or maybe having CheckedPeriod<Self> would be enough?
-
-        // TODO this does not work for the first month of the year, because the previous month is the 12th month of the previous year.
-        //      write a test about that
-        first_and_last_day_of_month(period.start_date.year(), period.start_date.month() - 1)
     }
 }
 
