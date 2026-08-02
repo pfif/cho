@@ -506,10 +506,6 @@ Predicted Transactions
         todo!()
     }
     #[test]
-    fn todo_add_a_paid_on_illustration() {
-        todo!("The paid on illustration should show the date of the payment")
-    }
-    #[test]
     fn todo_keep_showing_payments_which_were_late_but_have_been_made_in_the_current_period() {
         todo!("Did not pay electricity last month, paid it this month for both last and current period. It should still show up")
     }
