@@ -365,14 +365,14 @@ mod test {
                 TestCase {
                     name: "Starts this month - One payment".to_string(),
                     starting_period: current_period.clone(),
-                    payments: vec![Payment((today - Days::new(4), current_period.clone()))],
+                    payments: vec![Payment((today, current_period.clone()))],
                     expected_predicted_transitions: vec![make_pred_trans(
                         current_period.clone(),
                         ex.yen("0"),
                     )],
                 },
                 TestCase {
-                    name: "Started last month - no payments".to_string(),
+                    name: "Started last month - last month: not paid - current: not paid".to_string(),
                     starting_period: last_period.clone(),
                     payments: vec![],
                     expected_predicted_transitions: vec![
@@ -381,7 +381,7 @@ mod test {
                     ],
                 },
                 TestCase {
-                    name: "Started last month - paid last month this month".to_string(),
+                    name: "Started last month - last month: paid today - current: not paid".to_string(),
                     starting_period: last_period.clone(),
                     payments: vec![Payment((today - Days::new(4), last_period.clone()))],
                     expected_predicted_transitions: vec![
@@ -390,7 +390,7 @@ mod test {
                     ],
                 },
                 TestCase {
-                    name: "Started last month - paid last month this month".to_string(),
+                    name: "Started last month - last month: paid last month - current: not paid".to_string(),
                     starting_period: last_period.clone(),
                     payments: vec![Payment((last_period.start_date + Days::new(4), last_period.clone()))],
                     expected_predicted_transitions: vec![
