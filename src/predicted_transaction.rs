@@ -81,8 +81,6 @@ impl GroupBuilder<PredictedTransactionTemplate> for PeriodTransactionsVaultValue
 #[derive(Clone, Deserialize)]
 struct PredictedTransactionTemplate {
     name: String,
-    #[serde(default)]
-    archive: Option<ArchiveInformation>,
     target: Target,
     payments: Vec<Payment>,
 }
@@ -139,9 +137,6 @@ impl PredictedTransactionTemplate {
                     self.name.clone(),
                     payment_period,
                     ex.new_amount_from_raw_amount(&raw_amount)?,
-                    self.archive
-                        .clone()
-                        .map(|archive_information| archive_information.on),
                 )
             })
             .collect())
@@ -161,8 +156,14 @@ impl PredictedTransactionTemplate {
             paid_for_in_period_until_date.into_iter().collect(),
         );
 
+        let last_period = if let Some(until) = &target.until {
+            until.min(current_period)
+        } else {
+            current_period
+        };
+
         let expected_transaction_periods =
-            P::periods_between(&target.starts_on, &current_period)?;
+            P::periods_between(&target.starts_on, last_period)?;
 
         let zero_yen: RawAmount = "¥0".try_into()?;
 
@@ -193,14 +194,6 @@ impl PredictedTransactionTemplate {
             .sort_by(|(left_period, _), (right_period, _)| left_period.cmp(right_period));
         Ok(display_periods)
     }
-}
-
-#[derive(Clone, Deserialize)]
-struct ArchiveInformation {
-    on: NaiveDate,
-    /// Lose string to record information about the archival -
-    /// for instance, what PredictedTransactionTemplate replaces this one, if any
-    comment: Option<String>,
 }
 
 /// A payment is a date and a period id.
@@ -252,13 +245,14 @@ impl<'de> Deserialize<'de> for Payment {
 struct Target {
     amount: RawAmount,
     starts_on: Period,
+    #[serde(default)]
+    until: Option<Period>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 struct PredictedTransaction {
     name: String,
     amount: Amount,
-    archive_from: Option<NaiveDate>,
 }
 
 impl PredictedTransaction {
@@ -274,7 +268,6 @@ impl PredictedTransaction {
         template_name: String,
         period: Period,
         amount: Amount,
-        archive_from: Option<NaiveDate>,
     ) -> Result<PredictedTransaction, String> {
         Ok(PredictedTransaction {
             name: format!(
@@ -283,7 +276,6 @@ impl PredictedTransaction {
                 CalendarMonthPeriodConfiguration::id_for_period(&period)?
             ),
             amount,
-            archive_from,
         })
     }
 }
@@ -308,7 +300,7 @@ impl PredictedTransaction {
             name: self.name,
             amount: self.amount,
             illustration: vec![],
-            archived_from: self.archive_from,
+            archived_from: None,
         }
     }
 }
@@ -343,17 +335,13 @@ mod test {
 
             let configuration_name = "Spotify".to_string();
 
-            let archive: Option<ArchiveInformation> = None;
             let make_pred_trans = |period, amount| -> PredictedTransaction {
                 PredictedTransaction::new::<P>(
                     configuration_name.clone(),
                     period,
                     amount,
-                    None, // Should be a reference to archive above, but it cannot be moved into the
-                          // closure because it does not implement Copy
-                          // TODO solve that?
                 )
-                .expect("valid predicted transaction")
+                    .expect("valid predicted transaction")
             };
 
             struct TestCase {
@@ -420,10 +408,10 @@ mod test {
             for case in cases {
                 let configuration = PredictedTransactionTemplate {
                     name: configuration_name.clone(),
-                    archive: archive.clone(),
                     target: Target {
                         amount: pred_trans_target_amount_raw.clone(),
                         starts_on: case.starting_period.clone(),
+                        until: None,
                     },
                     payments: case.payments.clone(),
                 };
@@ -473,16 +461,28 @@ mod test {
             "payments": [
               "2026/04/30 2026-04"
             ]
+          },
+          {
+            "name": "Archived",
+            "target": {
+              "starts_on": "2026-04",
+              "amount": "¥8000",
+              "until": "2026-05"
+            },
+            "payments": [
+              "2026/04/30 2026-04",
+              "2026/04/30 2026-05"
+          ],
           }
         ]))
-        .expect("valid PeriodTransactionsVaultValue");
+            .expect("valid PeriodTransactionsVaultValue");
 
         let group = Group::from_group_builder::<CalendarMonthPeriodConfiguration, _, _>(
             configuration,
             &exchange_rates,
             &today,
         )
-        .expect("valid group");
+            .expect("valid group");
         let group_view = group
             .into_remaining_operation_screen_group(&exchange_rates, &"JPY".to_string(), &today)
             .expect("valid group data");
@@ -517,37 +517,38 @@ Predicted Transactions
         let april = make_period_for_month(4);
         let may = make_period_for_month(5);
 
-        let target = Target {
-            amount: RawAmount::yen("1000"),
-            starts_on: january.clone(),
-        };
 
         struct TestCase<'a> {
             name: &'a str,
 
             paid_for_before_period: Vec<&'a Period>,
             paid_for_in_period_until_date: Vec<&'a Period>,
+            until: Option<&'a Period>,
 
             expected_predicted_transitions: Vec<(&'a Period, RawAmount)>,
-        };
+        }
+        ;
 
         let cases = vec![
             TestCase {
                 name: "All period paid",
                 paid_for_before_period: vec![&january, &february, &march],
                 paid_for_in_period_until_date: vec![&april],
+                until: None,
                 expected_predicted_transitions: vec![(&april, RawAmount::yen("0"))],
             },
             TestCase {
                 name: "Current period not paid",
                 paid_for_before_period: vec![&january, &february, &march],
                 paid_for_in_period_until_date: vec![],
+                until: None,
                 expected_predicted_transitions: vec![(&april, RawAmount::yen("1000"))],
             },
             TestCase {
                 name: "Current and last period not paid",
                 paid_for_before_period: vec![&january, &february],
                 paid_for_in_period_until_date: vec![],
+                until: None,
                 expected_predicted_transitions: vec![
                     (&march, RawAmount::yen("1000")),
                     (&april, RawAmount::yen("1000")),
@@ -557,6 +558,7 @@ Predicted Transactions
                 name: "Current and last period paid in current period",
                 paid_for_before_period: vec![&january, &february],
                 paid_for_in_period_until_date: vec![&march, &april],
+                until: None,
                 expected_predicted_transitions: vec![
                     (&march, RawAmount::yen("0")),
                     (&april, RawAmount::yen("0")),
@@ -566,6 +568,7 @@ Predicted Transactions
                 name: "No period paid",
                 paid_for_before_period: vec![],
                 paid_for_in_period_until_date: vec![],
+                until: None,
                 expected_predicted_transitions: vec![
                     (&january, RawAmount::yen("1000")),
                     (&february, RawAmount::yen("1000")),
@@ -577,6 +580,7 @@ Predicted Transactions
                 name: "paid next period in advance",
                 paid_for_before_period: vec![&january, &february, &march],
                 paid_for_in_period_until_date: vec![&april, &may],
+                until: None,
                 expected_predicted_transitions: vec![
                     (&april, RawAmount::yen("0")),
                     (&may, RawAmount::yen("0")),
@@ -586,11 +590,31 @@ Predicted Transactions
                 name: "current period paid before period",
                 paid_for_before_period: vec![&january, &february, &march, &april],
                 paid_for_in_period_until_date: vec![],
+                until: None,
                 expected_predicted_transitions: vec![(&april, RawAmount::yen("0"))],
+            },
+            TestCase {
+                name: "archived",
+                paid_for_before_period: vec![&january, &february, &march],
+                paid_for_in_period_until_date: vec![],
+                until: Some(&march),
+                expected_predicted_transitions: vec![],
+            },
+            TestCase {
+                name: "archived next period",
+                paid_for_before_period: vec![&january, &february, &march],
+                paid_for_in_period_until_date: vec![],
+                until: Some(&may),
+                expected_predicted_transitions: vec![(&april, RawAmount::yen("1000"))],
             },
         ];
 
         for case in cases {
+            let target = Target {
+                amount: RawAmount::yen("1000"),
+                starts_on: january.clone(),
+                until: case.until.cloned(),
+            };
             let result =
                 PredictedTransactionTemplate::decide_which_predicted_transactions_to_display::<P>(
                     &target,
@@ -601,7 +625,7 @@ Predicted Transactions
                         .cloned()
                         .collect(),
                 )
-                .expect("valid decision");
+                    .expect("valid decision");
 
             assert_eq!(
                 result,
@@ -617,34 +641,5 @@ Predicted Transactions
     #[test]
     fn test_monthly_payment() {
         test_monthly_payment_inner::<CalendarMonthPeriodConfiguration>();
-    }
-    #[test]
-    fn todo_test_for_payments_much_later_than_starts_on() {
-        todo!("display them below the table")
-    }
-    #[test]
-    fn todo_test_for_a_cancelled_payment() {
-        todo!("Maybe... but then again maybe there is no need for this")
-    }
-    #[test]
-    fn todo_test_for_build_operand_forwarding_the_archive_from() {
-        todo!()
-    }
-    #[test]
-    fn todo_keep_showing_payments_which_were_late_but_have_been_made_in_the_current_period() {
-        todo!("Did not pay electricity last month, paid it this month for both last and current period. It should still show up")
-    }
-    #[test]
-    fn todo_weekly_payments() {
-        todo!("want to keep 5000 yen for every tuesday of the period")
-    }
-    #[test]
-    fn todo_predicted_transaction_new() {
-        todo!("Currently used by the 'predicted_transaction_template.predicted_transactions' test, but inner not tested")
-    }
-
-    #[test]
-    fn todo_payments_out_of_order() {
-        todo!("This is optional as it's already tested back and forth in chrono_stack.rs")
     }
 }
