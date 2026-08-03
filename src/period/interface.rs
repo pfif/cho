@@ -1,10 +1,8 @@
-use std::fmt::{format, Formatter};
+use std::cmp::Ordering;
+use std::fmt::{Formatter};
 use crate::period::calendar_month_period::{CalendarMonthPeriodConfiguration};
 use crate::vault::VaultReadable;
 use chrono::{Datelike, NaiveDate};
-use clap::builder::Str;
-#[cfg(test)]
-use mockall::automock;
 use serde::{Deserialize, Deserializer};
 use serde::de::Error;
 
@@ -147,7 +145,7 @@ In the meantime... let's chuck it?");
 //
 //   Let's keep period like this as I keep prototyping, but I feel like refactoring to get Period
 //   linked to a PeriodsConfiguration will be in order at some point
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Ord)]
 pub struct Period {
     pub start_date: NaiveDate,
     pub end_date: NaiveDate,
@@ -156,6 +154,12 @@ pub struct Period {
 impl Period {
     pub fn contains(&self, date: &NaiveDate) -> bool {
         self.start_date <= *date && *date <= self.end_date
+    }
+}
+
+impl PartialOrd for Period {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.start_date.cmp(&other.start_date))
     }
 }
 

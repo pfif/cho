@@ -88,6 +88,7 @@ struct PredictedTransactionTemplate {
 }
 
 impl PredictedTransactionTemplate {
+    // TODO this entire function can probably be made part of the ChronoStack (works for both buckets and here)
     pub fn predicted_transactions<P: PeriodsConfiguration>(
         self,
         period_config: &P,
@@ -95,11 +96,6 @@ impl PredictedTransactionTemplate {
         ex: &ExchangeRates,
     ) -> Result<Vec<PredictedTransaction>, String> {
         let period = period_config.period_for_date(date)?;
-        let expected_payments = period_config.periods_between(&self.target.starts_on, &period)?;
-
-        let zero_amount = ex.zero(&"JPY".to_string())?;
-        let expected_amount = ex.new_amount_from_raw_amount(&self.target.amount.clone())?;
-
         // TODO I could build a ChronoStack from Payment directly here, and from an Action directly in buckets
         //      Just impl From(Payment or Action) for (NaiveDate, _)
         //      and change ChronoStack::new to take an Into Vec<(NaiveDate, _)>
@@ -112,69 +108,96 @@ impl PredictedTransactionTemplate {
                 .collect::<Vec<(NaiveDate, Period)>>(),
         )?;
 
-        // TODO I almost forgot to take into consideration elements until the current date, but not past that.
-        //      I wonder if there is an abstraction that could help with this.
-        //      The use for ChronoStack::iter is still quite complex in Bucket though, so ... maybe it's overkill
-        //      Althouuuugh... it's possible that ChronoStack::iter_until_date ChronoStack::iter_after_date() could work!
-        //      Or even something crazy like
-        //      let iter = ChronoStack::iter_until_date(date)
-        //      // the for loop or iter call until the date
-        //      let iter_after_date = iter.continue()
-        //      // the for loop or iter call after the date
-        //      Or
-        //      ChronoStack::iter_for_date() -> impl Iterator<Item=&(Bool, (NaiveDate, E))>, where Bool is true if the date is at or before the date, false otherwise
-        //      Or
-        //      ChronoStack::iters_for_date() -> (&[...], &[...]), using `split_at_checked` on the vec
-        //      Or
-        //      ChronoStack::iters_for_period_and_date() -> (&[things before period start], &[things between period start and date], &[things after date]), using `split_at_checked` on the vec
-        //      ...
-        //      But in a way that's not satisfactory... one of the problem with checking the date inside of the current function (or inside of Bucket::for_tests)
-        //      is that tests must all take the date into consideration. I keep writing
-        //      tests with boundary for the current date in mind. I wonder if there's a way around that.
-        //      I write handlers for a function of ChronoStack which itself ... does all the date math. Not sure if that even makes sense
-        //      The issue, the thing that is complected in that case is "limiting what operations are taken into account
-        //      (those that fall in the previous and current period)" and "the actual feature that must be applied - in this case, payment check"
-        //      IT'S ALL COMPLECTED. Although bucket partly solved this problem with "AggregatedAmounts"
-        //      ...
-        //      Another pattern is to use "date management function" in both the function being
-        //      tested and the test. The hard thing here is that the current function uses function
-        //      that checks attribute of the date
-        //      whereas tests would need to use function to generate date with these attributes?
-        //      It's not necessarily a bad thing...
+        let (paid_for_before_period, paid_for_in_period_until_date, _) =
+            payment_stack.into_split_for_period_and_date(&period, date);
 
-        let (paid_for_before_period, paid_for_in_period_until_date, _) = payment_stack
-            .into_split_for_period_and_date(&period, date);
-        let (paid_for_before_period, paid_for_in_period_until_date): (HashSet<_>, HashSet<_>) = (
+        self.predicted_transaction_inner(
+            period_config,
+            ex,
+            &period,
+            paid_for_before_period,
+            paid_for_in_period_until_date,
+        )?
+    }
+
+    fn predicted_transaction_inner<P: PeriodsConfiguration>(
+        self,
+        period_config: &P,
+        ex: &ExchangeRates,
+        period: &Period,
+        paid_for_before_period: Vec<Period>,
+        paid_for_in_period_until_date: Vec<Period>,
+    ) -> Result<Result<Vec<PredictedTransaction>, String>, String> {
+        let transaction_to_display = Self::decide_which_predicted_transactions_to_display(
+            period_config,
+            &self.target,
+            &period,
+            paid_for_before_period,
+            paid_for_in_period_until_date,
+        )?;
+
+        Ok(transaction_to_display
+            .into_iter()
+            .map(|(payment_period, raw_amount)| {
+                PredictedTransaction::new(
+                    period_config,
+                    self.name.clone(),
+                    payment_period,
+                    ex.new_amount_from_raw_amount(&raw_amount)?,
+                    self.archive
+                        .clone()
+                        .map(|archive_information| archive_information.on),
+                )
+            })
+            .collect())
+    }
+
+    fn decide_which_predicted_transactions_to_display<P: PeriodsConfiguration>(
+        period_config: &P,
+        target: &Target,
+        current_period: &Period,
+        paid_for_before_period: Vec<Period>,
+        paid_for_in_period_until_date: Vec<Period>,
+    ) -> Result<Vec<(Period, RawAmount)>, String> {
+        let (paid_for_before_period, paid_for_in_period_until_date): (
+            HashSet<Period>,
+            HashSet<Period>,
+        ) = (
             paid_for_before_period.into_iter().collect(),
             paid_for_in_period_until_date.into_iter().collect(),
         );
 
-        expected_payments
-            .into_iter()
-            .filter_map(|payment_period| {
-                let paid_before_period = paid_for_before_period.contains(&payment_period);
-                let paid_in_period_until_date = paid_for_in_period_until_date.contains(&payment_period);
+        let expected_transaction_periods =
+            period_config.periods_between(&target.starts_on, &current_period)?;
 
-                let amount = if !paid_before_period && !paid_in_period_until_date {
-                    Some(expected_amount.clone())
-                } else if paid_in_period_until_date {
-                    Some(zero_amount.clone())
-                } else {
-                    None
-                };
+        let zero_yen: RawAmount = "¥0".try_into()?;
 
-                amount.map(|amount| (payment_period, amount))
-            })
-            .map(|(payment_period, payment_amount)| PredictedTransaction::new(
-                period_config,
-                self.name.clone(),
-                payment_period,
-                payment_amount,
-                self.archive
-                    .clone()
-                    .map(|archive_information| archive_information.on),
-            ))
-            .collect()
+        let unpaid_periods = expected_transaction_periods.into_iter().filter(|period| {
+            let paid_before_period = paid_for_before_period.contains(&period);
+            let paid_in_period_until_date = paid_for_in_period_until_date.contains(&period);
+
+            !paid_before_period && !paid_in_period_until_date
+        });
+
+        let paid_period = Iterator::chain(
+            paid_for_in_period_until_date.iter().cloned(),
+            paid_for_before_period
+                .iter()
+                .cloned()
+                .filter(|period| period == current_period),
+        );
+
+        let mut display_periods = Iterator::chain(
+            unpaid_periods
+                .into_iter()
+                .map(|period| (period, target.amount.clone())),
+            paid_period.map(|period| (period, zero_yen.clone())),
+        )
+        .collect::<Vec<(Period, RawAmount)>>();
+
+        display_periods
+            .sort_by(|(left_period, _), (right_period, _)| left_period.cmp(right_period));
+        Ok(display_periods)
     }
 }
 
@@ -372,7 +395,8 @@ mod test {
                     )],
                 },
                 TestCase {
-                    name: "Started last month - last month: not paid - current: not paid".to_string(),
+                    name: "Started last month - last month: not paid - current: not paid"
+                        .to_string(),
                     starting_period: last_period.clone(),
                     payments: vec![],
                     expected_predicted_transitions: vec![
@@ -381,7 +405,8 @@ mod test {
                     ],
                 },
                 TestCase {
-                    name: "Started last month - last month: paid today - current: not paid".to_string(),
+                    name: "Started last month - last month: paid today - current: not paid"
+                        .to_string(),
                     starting_period: last_period.clone(),
                     payments: vec![Payment((today - Days::new(4), last_period.clone()))],
                     expected_predicted_transitions: vec![
@@ -390,12 +415,17 @@ mod test {
                     ],
                 },
                 TestCase {
-                    name: "Started last month - last month: paid last month - current: not paid".to_string(),
+                    name: "Started last month - last month: paid last month - current: not paid"
+                        .to_string(),
                     starting_period: last_period.clone(),
-                    payments: vec![Payment((last_period.start_date + Days::new(4), last_period.clone()))],
-                    expected_predicted_transitions: vec![
-                        make_pred_trans(current_period.clone(), pred_trans_target_amount.clone()),
-                    ],
+                    payments: vec![Payment((
+                        last_period.start_date + Days::new(4),
+                        last_period.clone(),
+                    ))],
+                    expected_predicted_transitions: vec![make_pred_trans(
+                        current_period.clone(),
+                        pred_trans_target_amount.clone(),
+                    )],
                 },
             ];
 
@@ -485,13 +515,118 @@ Predicted Transactions
     }
 
     #[test]
-    fn todo_test_for_early_payments_ie_a_payment_for_after_the_remaining_period_but_in_the_current_period(
+    fn test_monthly_payment(
     ) {
-        todo!()
-    }
-    #[test]
-    fn todo_test_for_late_payments() {
-        todo!()
+        let period_config = CalendarMonthPeriodConfiguration {};
+        let make_period_for_month = |month: u32| {
+            period_config
+                .period_for_date(&NaiveDate::from_ymd_opt(2026, month, 1).expect("Can build date"))
+                .expect("Can build period")
+        };
+
+        let january = make_period_for_month(1);
+        let february = make_period_for_month(2);
+        let march = make_period_for_month(3);
+        let april = make_period_for_month(4);
+        let may = make_period_for_month(5);
+
+        let target = Target {
+            amount: RawAmount::yen("1000"),
+            starts_on: january.clone(),
+        };
+
+        struct TestCase<'a> {
+            name: &'a str,
+
+            paid_for_before_period: Vec<&'a Period>,
+            paid_for_in_period_until_date: Vec<&'a Period>,
+
+            expected_predicted_transitions: Vec<(&'a Period, RawAmount)>,
+        };
+
+        let cases = vec![
+            TestCase {
+                name: "All period paid",
+                paid_for_before_period: vec![&january, &february, &march],
+                paid_for_in_period_until_date: vec![&april],
+                expected_predicted_transitions: vec![(&april, RawAmount::yen("0"))],
+            },
+            TestCase {
+                name: "Current period not paid",
+                paid_for_before_period: vec![&january, &february, &march],
+                paid_for_in_period_until_date: vec![],
+                expected_predicted_transitions: vec![(&april, RawAmount::yen("1000"))],
+            },
+            TestCase {
+                name: "Current and last period not paid",
+                paid_for_before_period: vec![&january, &february],
+                paid_for_in_period_until_date: vec![],
+                expected_predicted_transitions: vec![
+                    (&march, RawAmount::yen("1000")),
+                    (&april, RawAmount::yen("1000")),
+                ],
+            },
+            TestCase {
+                name: "Current and last period paid in current period",
+                paid_for_before_period: vec![&january, &february],
+                paid_for_in_period_until_date: vec![&march, &april],
+                expected_predicted_transitions: vec![
+                    (&march, RawAmount::yen("0")),
+                    (&april, RawAmount::yen("0")),
+                ],
+            },
+            TestCase {
+                name: "No period paid",
+                paid_for_before_period: vec![],
+                paid_for_in_period_until_date: vec![],
+                expected_predicted_transitions: vec![
+                    (&january, RawAmount::yen("1000")),
+                    (&february, RawAmount::yen("1000")),
+                    (&march, RawAmount::yen("1000")),
+                    (&april, RawAmount::yen("1000")),
+                ],
+            },
+            TestCase {
+                name: "paid next period in advance",
+                paid_for_before_period: vec![&january, &february, &march],
+                paid_for_in_period_until_date: vec![&april, &may],
+                expected_predicted_transitions: vec![
+                    (&april, RawAmount::yen("0")),
+                    (&may, RawAmount::yen("0")),
+                ],
+            },
+            TestCase {
+                name: "current period paid before period",
+                paid_for_before_period: vec![&january, &february, &march, &april],
+                paid_for_in_period_until_date: vec![],
+                expected_predicted_transitions: vec![(&april, RawAmount::yen("0"))],
+            },
+        ];
+
+        for case in cases {
+            let result =
+                PredictedTransactionTemplate::decide_which_predicted_transactions_to_display(
+                    &period_config,
+                    &target,
+                    &april,
+                    case.paid_for_before_period.into_iter().cloned().collect(),
+                    case.paid_for_in_period_until_date
+                        .into_iter()
+                        .cloned()
+                        .collect(),
+                )
+                .expect("valid decision");
+
+            assert_eq!(
+                result,
+                case.expected_predicted_transitions
+                    .into_iter()
+                    .map(|(period, raw_amount)| (period.clone(), raw_amount))
+                    .collect::<Vec<(Period, RawAmount)>>(),
+                "{}",
+                case.name
+            );
+        }
     }
     #[test]
     fn todo_test_for_payments_much_later_than_starts_on() {
