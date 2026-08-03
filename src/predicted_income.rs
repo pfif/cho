@@ -21,7 +21,7 @@ impl VaultReadable for PredictedIncome {
 }
 
 impl OperandBuilder for PredictedIncome {
-    fn build<P: PeriodsConfiguration>(self, period_config: &P, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Vec<Operand>, String> {
+    fn build<P: PeriodsConfiguration>(self, _today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Vec<Operand>, String> {
         let amount = exchange_rates.new_amount(&self.currency, self.figure)?;
 
         Ok(vec![Operand{

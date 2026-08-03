@@ -30,10 +30,6 @@ impl<E: Clone + Debug> ChronoStack<E> {
         Ok(())
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &(NaiveDate, E)> {
-        self.items.iter()
-    }
-
     pub fn into_split_for_period_and_date(
         self,
         period: &Period,
@@ -156,10 +152,6 @@ mod tests {
         }
     }
     mod iters_for_periods_and_date {
-        use super::*;
-        #[test]
-        fn todo() {
-            todo!("find all the edge cases and test them all. one edge case is: date is not between period start and end")
-        }
+        // This is not tested because it should be really well covered by crate::buckets::mods
     }
 }

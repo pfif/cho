@@ -140,7 +140,6 @@ pub struct BucketAtDate {
 impl Bucket {
     fn for_period<P: PeriodsConfiguration>(
         &self,
-        period_config: &P,
         date: &NaiveDate,
         ex: &ExchangeRates,
     ) -> Result<BucketAtDate, String> {
@@ -152,7 +151,7 @@ impl Bucket {
                 .map(|line| line.0)
                 .collect::<Vec<_>>(),
         )?;
-        let period = period_config.period_for_date(date)?;
+        let period = P::period_for_date(date)?;
 
         let (actions_before_period, actions_in_period_before_date, actions_after_date) =
             stack.into_split_for_period_and_date(&period, date);
@@ -233,7 +232,7 @@ impl Bucket {
             .last();
 
         let recommended_deposit_figure = if let Some((target_amount, target_date)) = target {
-            let number_of_periods = match period_config.periods_between_nb(date, &target_date) {
+            let number_of_periods = match P::periods_between_nb(date, &target_date) {
                 Ok(nb) => nb,
                 Err(ErrorPeriodsBetween::EndBeforeStart) => 1,
                 any => any?,
@@ -268,11 +267,10 @@ impl Bucket {
 impl OperandBuilder for Bucket {
     fn build<P: PeriodsConfiguration>(
         self,
-        period_configuration: &P,
         today: &NaiveDate,
         exchange_rates: &ExchangeRates,
     ) -> Result<Vec<Operand>, String> {
-        let period = self.for_period(period_configuration, today, exchange_rates)?;
+        let period = self.for_period::<P>(today, exchange_rates)?;
         Ok(vec![Operand {
             name: self.name,
             amount: period.recommended_or_actual_change.flip_sign(),
@@ -427,9 +425,6 @@ mod test {
             fn execute(&mut self) -> () {
                 self.executed = true;
                 let ex = ExchangeRates::for_tests();
-                let period_configuration = PeriodConfigurationVaultValue::CalendarMonth(
-                    CalendarMonthPeriodConfiguration {},
-                );
                 let today = mkdate(9, 15);
 
                 let bucket = Bucket {
@@ -440,7 +435,7 @@ mod test {
 
                 assert_eq!(
                     (self.expected)(&ex),
-                    bucket.for_period(&period_configuration, &today, &ex),
+                    bucket.for_period::<CalendarMonthPeriodConfiguration>(&today, &ex),
                 );
             }
         }
@@ -2338,8 +2333,6 @@ mod test {
         #[test]
         fn nominal() -> () {
             let ex = ExchangeRates::for_tests();
-            let period_configuration =
-                PeriodConfigurationVaultValue::CalendarMonth(CalendarMonthPeriodConfiguration {});
             let today = mkdate(9, 15);
 
             let bucket = Bucket {
@@ -2364,7 +2357,7 @@ mod test {
             };
 
             assert_eq!(
-                bucket.build(&period_configuration, &today, &ex),
+                bucket.build::<CalendarMonthPeriodConfiguration>(&today, &ex),
                 Ok(vec![Operand {
                     name: "test-bucket".to_string(),
                     amount: ex.yen("-1000"),
@@ -2402,8 +2395,6 @@ mod test {
         #[test]
         fn withdrawal_only() -> () {
             let ex = ExchangeRates::for_tests();
-            let period_configuration =
-                PeriodConfigurationVaultValue::CalendarMonth(CalendarMonthPeriodConfiguration {});
             let today = mkdate(9, 15);
 
             let bucket = Bucket {
@@ -2422,7 +2413,7 @@ mod test {
             };
 
             assert_eq!(
-                bucket.build(&period_configuration, &today, &ex),
+                bucket.build::<CalendarMonthPeriodConfiguration>(&today, &ex),
                 Ok(vec![Operand {
                     name: "test-bucket".to_string(),
                     amount: ex.yen("500"),
@@ -2461,9 +2452,6 @@ mod test {
         fn no_goal() {
             {
                 let ex = ExchangeRates::for_tests();
-                let period_configuration = PeriodConfigurationVaultValue::CalendarMonth(
-                    CalendarMonthPeriodConfiguration {},
-                );
                 let today = mkdate(9, 15);
 
                 let bucket = Bucket {
@@ -2481,7 +2469,7 @@ mod test {
                 };
 
                 assert_eq!(
-                    bucket.build(&period_configuration, &today, &ex),
+                    bucket.build::<CalendarMonthPeriodConfiguration>(&today, &ex),
                     Ok(vec![Operand {
                         name: "test-bucket".to_string(),
                         amount: ex.yen("-1000"),

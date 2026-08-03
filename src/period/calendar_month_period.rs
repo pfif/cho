@@ -9,12 +9,11 @@ pub struct CalendarMonthPeriodConfiguration {}
 
 // TODO none of these need "self" anymore
 impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
-    fn period_for_date(&self, date: &NaiveDate) -> Result<Period, String> {
+    fn period_for_date(date: &NaiveDate) -> Result<Period, String> {
         first_and_last_day_of_month(date.year(), date.month())
     }
 
     fn periods_between_nb(
-        &self,
         start: &NaiveDate,
         end: &NaiveDate,
     ) -> Result<u16, ErrorPeriodsBetween> {
@@ -31,7 +30,7 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
         Ok(full_years * 12 - month_to_start - end_year_end)
     }
 
-    fn periods_between(&self, start: &Period, end: &Period) -> Result<Vec<Period>, String> {
+    fn periods_between(start: &Period, end: &Period) -> Result<Vec<Period>, String> {
         let start_date = start.start_date;
         let end_date = end.start_date;
 
@@ -78,9 +77,10 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
             .chain(periods_end_year)
             .collect::<Result<Vec<Period>, String>>()?;
 
+        #[cfg(debug_assertions)]
         {
 
-            let periods_between_nb = self.periods_between_nb(&start_date, &end_date).expect("Could compute periods between number");
+            let periods_between_nb = CalendarMonthPeriodConfiguration::periods_between_nb(&start_date, &end_date).expect("Could compute periods between number");
             let result_len = result.len() as u16;
             debug_assert!(
                     periods_between_nb
@@ -96,7 +96,7 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
         Ok(result)
     }
 
-    fn id_for_period(&self, period: &Period) -> Result<String, String> {
+    fn id_for_period(period: &Period) -> Result<String, String> {
         // TODO test passing in periods with the wrong date! Or maybe having CheckedPeriod<Self> would be enough?
         Ok(format!(
             "{:04}-{:02}",
@@ -105,7 +105,7 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
         ))
     }
 
-    fn period_from_id(&self, value: &str) -> Result<Period, String> {
+    fn period_from_id(value: &str) -> Result<Period, String> {
         CalendarMonthPeriodConfiguration::period_from_id(value)
     }
 }
@@ -160,8 +160,7 @@ mod period_for_date_tests {
 
     impl Test {
         fn execute(self) {
-            let config = CalendarMonthPeriodConfiguration {};
-            let result = config.period_for_date(&self.input.unwrap()).unwrap();
+            let result = CalendarMonthPeriodConfiguration::period_for_date(&self.input.unwrap()).unwrap();
             assert_eq!(result, self.expected_output.unwrap())
         }
     }
@@ -329,8 +328,7 @@ mod test_periods_between_nb {
 
     impl Test {
         fn execute(&self) {
-            let config = CalendarMonthPeriodConfiguration {};
-            let result = config.periods_between_nb(&self.start, &self.end).unwrap();
+            let result = CalendarMonthPeriodConfiguration::periods_between_nb(&self.start, &self.end).unwrap();
             assert_eq!(result, self.expected_output)
         }
     }
@@ -495,8 +493,7 @@ mod test_periods_between_nb {
 
     #[test]
     fn end_before_start() {
-        let config = CalendarMonthPeriodConfiguration {};
-        let result = config.periods_between_nb(&date(4, 4), &date(3, 15));
+        let result = CalendarMonthPeriodConfiguration::periods_between_nb(&date(4, 4), &date(3, 15));
         assert_eq!(result, Err(ErrorPeriodsBetween::EndBeforeStart))
     }
     mod periods_between {
@@ -617,7 +614,7 @@ mod test_periods_between_nb {
                     .map(period)
                     .collect();
 
-                let result = config.periods_between(&start, &end);
+                let result = CalendarMonthPeriodConfiguration::periods_between(&start, &end);
 
                 assert_eq!(result, Ok(expected_output), "{}", case.name);
             }
@@ -629,7 +626,7 @@ mod test_periods_between_nb {
             let start = first_and_last_day_of_month(2026, 1).expect("Could build period");
             let end = first_and_last_day_of_month(2025, 12).expect("Could build period");
 
-            let result = config.periods_between(&start, &end);
+            let result = CalendarMonthPeriodConfiguration::periods_between(&start, &end);
 
             assert!(result.is_err());
         }

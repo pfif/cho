@@ -129,8 +129,8 @@ impl AccountJson {
 
 // TODO - Unit tests for this
 impl OperandBuilder for AccountJson {
-    fn build<P: PeriodsConfiguration>(self, period_config: &P, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Vec<Operand>, String> {
-        let current_period = period_config.period_for_date(today)?;
+    fn build<P: PeriodsConfiguration>(self, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Vec<Operand>, String> {
+        let current_period = P::period_for_date(today)?;
         let start_amount = self.amount_at(&current_period.start_date)?.into_remaining_module_amount(self.currency(), exchange_rates)?;
         let end_amount = self.amount_at(&current_period.end_date)?.into_remaining_module_amount(self.currency(), exchange_rates)?;
 

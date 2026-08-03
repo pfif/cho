@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use std::ops::Add;
 use crate::amounts::exchange_rates::ExchangeRates;
 use crate::amounts::{Amount, CurrencyIdent};
@@ -12,33 +13,31 @@ use crate::predicted_income::PredictedIncome;
 use crate::vault::{Vault, VaultReadable};
 
 /* Entrypoint */
-pub struct RemainingOperation {
+pub struct RemainingOperation<P: PeriodsConfiguration> {
     groups: Vec<Group>,
-    periods_configuration: PeriodConfigurationVaultValue,
     date: NaiveDate,
     exchange_rates: ExchangeRates,
+    periods_configuration: PhantomData<P>,
 }
 
-impl RemainingOperation {
+impl<P: PeriodsConfiguration> RemainingOperation<P> {
     pub fn new(
-        periods_configuration: PeriodConfigurationVaultValue,
         date: NaiveDate,
         exchange_rates: ExchangeRates,
-    ) -> RemainingOperation {
-        RemainingOperation {
+    ) -> RemainingOperation<P> {
+        RemainingOperation::<P> {
             groups: Vec::new(),
-            periods_configuration,
             date,
             exchange_rates,
+            periods_configuration: PhantomData,
         }
     }
     pub fn from_vault_values<V: Vault>(
         include_predicted_income: bool,
         vault: &V,
         exchange_rates: ExchangeRates,
-    ) -> Result<RemainingOperation, String> {
+    ) -> Result<RemainingOperation<P>, String> {
         let mut operation = RemainingOperation::new(
-            PeriodConfigurationVaultValue::from_vault(vault)?,
             Local::now().date_naive(),
             exchange_rates,
         );
@@ -52,7 +51,7 @@ impl RemainingOperation {
     }
 
     pub fn add_group<O: OperandBuilder, B: GroupBuilder<O>>(&mut self, builder: B) -> Result<(), String> {
-        let group = Group::from_group_builder(builder, &self.exchange_rates, &self.periods_configuration, &self.date)?;
+        let group = Group::from_group_builder::<P, _, _>(builder, &self.exchange_rates, &self.date)?;
         self.groups.push(group);
         Ok(())
     }
@@ -62,9 +61,7 @@ impl RemainingOperation {
         target_currency: &CurrencyIdent,
     ) -> Result<RemainingOperationScreen, String> {
 
-        let current_period = self
-            .periods_configuration
-            .period_for_date(&self.date)
+        let current_period = P::period_for_date(&self.date)
             .map_err(|error| "Failed to fetch Periods Configuration: ".to_string() + &error)?;
 
         let remaining_operation_screen_group = self.groups
@@ -97,7 +94,6 @@ pub trait GroupBuilder<B: OperandBuilder> {
 pub trait OperandBuilder {
     fn build<P: PeriodsConfiguration>(
         self,
-        period_configuration: &P,
         today: &NaiveDate,
         // Exchange rate is only necessary because other parts of the codebase need to convert their understanding of currency into Amounts produced by Exchange rates
         // Once the entire codebase adopts ExchangeRates, we won't need to pass it around
@@ -183,14 +179,13 @@ pub mod group {
         pub fn from_group_builder<P: PeriodsConfiguration, O: OperandBuilder, B: GroupBuilder<O>>(
             group_builder: B,
             exchange_rates: &ExchangeRates,
-            period_configuration: &P,
             today: &NaiveDate,
         ) -> Result<Group, String>{
             let (name, operand_builders) = group_builder.build()?;
 
             let operands = operand_builders
                 .into_iter()
-                .map(|operand_builder| operand_builder.build(period_configuration, today, &exchange_rates))
+                .map(|operand_builder| operand_builder.build::<P>(today, &exchange_rates))
                 .collect::<Result<Vec<Vec<Operand>>, String>>()?
                 .into_iter()
                 .flatten()
@@ -670,13 +665,11 @@ mod test {
                 NaiveDate::from_ymd_opt(2023, month, date).expect("Can create date")
             }
 
-            let period_configuration = PeriodConfigurationVaultValue::CalendarMonth(CalendarMonthPeriodConfiguration {});
             let today = mkdate(8, 20);
             let exchange_rates = ExchangeRates::for_tests();
 
 
-            let mut remaining_operation = RemainingOperation::new(
-                period_configuration,
+            let mut remaining_operation = RemainingOperation::<CalendarMonthPeriodConfiguration>::new(
                 today,
                 exchange_rates.clone(),
             );

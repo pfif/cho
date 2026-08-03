@@ -55,7 +55,7 @@ use crate::amounts::exchange_rates::ExchangeRates;
 use crate::amounts::{Amount, RawAmount};
 use crate::chrono_stack::ChronoStack;
 use crate::line::LineWithDateVisitor;
-use crate::period::{Period, PeriodsConfiguration};
+use crate::period::{CalendarMonthPeriodConfiguration, Period, PeriodsConfiguration};
 use crate::remaining_operation::core_types::{GroupBuilder, Operand, OperandBuilder};
 use crate::vault::VaultReadable;
 use chrono::NaiveDate;
@@ -91,11 +91,10 @@ impl PredictedTransactionTemplate {
     // TODO this entire function can probably be made part of the ChronoStack (works for both buckets and here)
     pub fn predicted_transactions<P: PeriodsConfiguration>(
         self,
-        period_config: &P,
         date: &NaiveDate,
         ex: &ExchangeRates,
     ) -> Result<Vec<PredictedTransaction>, String> {
-        let period = period_config.period_for_date(date)?;
+        let period = P::period_for_date(date)?;
         // TODO I could build a ChronoStack from Payment directly here, and from an Action directly in buckets
         //      Just impl From(Payment or Action) for (NaiveDate, _)
         //      and change ChronoStack::new to take an Into Vec<(NaiveDate, _)>
@@ -111,8 +110,7 @@ impl PredictedTransactionTemplate {
         let (paid_for_before_period, paid_for_in_period_until_date, _) =
             payment_stack.into_split_for_period_and_date(&period, date);
 
-        self.predicted_transaction_inner(
-            period_config,
+        self.predicted_transaction_inner::<P>(
             ex,
             &period,
             paid_for_before_period,
@@ -122,14 +120,12 @@ impl PredictedTransactionTemplate {
 
     fn predicted_transaction_inner<P: PeriodsConfiguration>(
         self,
-        period_config: &P,
         ex: &ExchangeRates,
         period: &Period,
         paid_for_before_period: Vec<Period>,
         paid_for_in_period_until_date: Vec<Period>,
     ) -> Result<Result<Vec<PredictedTransaction>, String>, String> {
-        let transaction_to_display = Self::decide_which_predicted_transactions_to_display(
-            period_config,
+        let transaction_to_display = Self::decide_which_predicted_transactions_to_display::<P>(
             &self.target,
             &period,
             paid_for_before_period,
@@ -139,8 +135,7 @@ impl PredictedTransactionTemplate {
         Ok(transaction_to_display
             .into_iter()
             .map(|(payment_period, raw_amount)| {
-                PredictedTransaction::new(
-                    period_config,
+                PredictedTransaction::new::<P>(
                     self.name.clone(),
                     payment_period,
                     ex.new_amount_from_raw_amount(&raw_amount)?,
@@ -153,7 +148,6 @@ impl PredictedTransactionTemplate {
     }
 
     fn decide_which_predicted_transactions_to_display<P: PeriodsConfiguration>(
-        period_config: &P,
         target: &Target,
         current_period: &Period,
         paid_for_before_period: Vec<Period>,
@@ -168,7 +162,7 @@ impl PredictedTransactionTemplate {
         );
 
         let expected_transaction_periods =
-            period_config.periods_between(&target.starts_on, &current_period)?;
+            P::periods_between(&target.starts_on, &current_period)?;
 
         let zero_yen: RawAmount = "¥0".try_into()?;
 
@@ -277,7 +271,6 @@ impl PredictedTransaction {
     //      Wait. I could just ... encode the id for the period in the period at construction time ...
     //      So simple
     fn new<P: PeriodsConfiguration>(
-        period_config: &P,
         template_name: String,
         period: Period,
         amount: Amount,
@@ -287,7 +280,7 @@ impl PredictedTransaction {
             name: format!(
                 "{} - {}",
                 template_name,
-                period_config.id_for_period(&period)?
+                CalendarMonthPeriodConfiguration::id_for_period(&period)?
             ),
             amount,
             archive_from,
@@ -298,12 +291,11 @@ impl PredictedTransaction {
 impl OperandBuilder for PredictedTransactionTemplate {
     fn build<P: PeriodsConfiguration>(
         self,
-        period_configuration: &P,
         today: &NaiveDate,
         exchange_rates: &ExchangeRates,
     ) -> Result<Vec<Operand>, String> {
         Ok(self
-            .predicted_transactions(period_configuration, today, exchange_rates)?
+            .predicted_transactions::<P>(today, exchange_rates)?
             .into_iter()
             .map(|predicted_transaction| predicted_transaction.build_operand())
             .collect::<Vec<Operand>>())
@@ -335,15 +327,12 @@ mod test {
         use super::*;
         use pretty_assertions::assert_eq;
 
-        #[test]
-        fn predicted_transactions() {
+        fn predicted_transactions_inner<P: PeriodsConfiguration>() {
             let periods_configuration = CalendarMonthPeriodConfiguration {};
             let today = NaiveDate::from_ymd_opt(2026, 6, 14).expect("valid date");
-            let current_period = periods_configuration
-                .period_for_date(&today)
+            let current_period = P::period_for_date(&today)
                 .expect("valid period");
-            let last_period = periods_configuration
-                .period_for_date(&NaiveDate::from_ymd_opt(2026, 5, 14).expect("valid date"))
+            let last_period = P::period_for_date(&NaiveDate::from_ymd_opt(2026, 5, 14).expect("valid date"))
                 .expect("could compute previous period");
 
             let ex = ExchangeRates::for_tests();
@@ -356,8 +345,7 @@ mod test {
 
             let archive: Option<ArchiveInformation> = None;
             let make_pred_trans = |period, amount| -> PredictedTransaction {
-                PredictedTransaction::new(
-                    &periods_configuration,
+                PredictedTransaction::new::<P>(
                     configuration_name.clone(),
                     period,
                     amount,
@@ -442,7 +430,7 @@ mod test {
 
                 let predicted_transactions = configuration
                     .clone()
-                    .predicted_transactions(&periods_configuration, &today, &ex)
+                    .predicted_transactions::<P>(&today, &ex)
                     .expect("Predicted transaction succeeded");
 
                 assert_eq!(
@@ -452,12 +440,16 @@ mod test {
                 )
             }
         }
+
+        #[test]
+        fn predicted_transactions() {
+            predicted_transactions_inner::<CalendarMonthPeriodConfiguration>();
+        }
     }
 
     #[test]
     fn integration_test() {
         let exchange_rates = ExchangeRates::for_tests();
-        let periods_configuration = CalendarMonthPeriodConfiguration {};
         let today = NaiveDate::from_ymd_opt(2026, 6, 14).expect("valid date");
 
         let configuration: PeriodTransactionsVaultValue = from_value(json!([
@@ -485,10 +477,9 @@ mod test {
         ]))
         .expect("valid PeriodTransactionsVaultValue");
 
-        let group = Group::from_group_builder(
+        let group = Group::from_group_builder::<CalendarMonthPeriodConfiguration, _, _>(
             configuration,
             &exchange_rates,
-            &periods_configuration,
             &today,
         )
         .expect("valid group");
@@ -514,13 +505,9 @@ Predicted Transactions
         );
     }
 
-    #[test]
-    fn test_monthly_payment(
-    ) {
-        let period_config = CalendarMonthPeriodConfiguration {};
+    fn test_monthly_payment_inner<P: PeriodsConfiguration>() {
         let make_period_for_month = |month: u32| {
-            period_config
-                .period_for_date(&NaiveDate::from_ymd_opt(2026, month, 1).expect("Can build date"))
+            P::period_for_date(&NaiveDate::from_ymd_opt(2026, month, 1).expect("Can build date"))
                 .expect("Can build period")
         };
 
@@ -605,8 +592,7 @@ Predicted Transactions
 
         for case in cases {
             let result =
-                PredictedTransactionTemplate::decide_which_predicted_transactions_to_display(
-                    &period_config,
+                PredictedTransactionTemplate::decide_which_predicted_transactions_to_display::<P>(
                     &target,
                     &april,
                     case.paid_for_before_period.into_iter().cloned().collect(),
@@ -627,6 +613,10 @@ Predicted Transactions
                 case.name
             );
         }
+    }
+    #[test]
+    fn test_monthly_payment() {
+        test_monthly_payment_inner::<CalendarMonthPeriodConfiguration>();
     }
     #[test]
     fn todo_test_for_payments_much_later_than_starts_on() {
@@ -656,10 +646,5 @@ Predicted Transactions
     #[test]
     fn todo_payments_out_of_order() {
         todo!("This is optional as it's already tested back and forth in chrono_stack.rs")
-    }
-
-    #[test]
-    fn todo_boundary_check() {
-        todo!("payment today, for current period, payment tomorrow, for next period. そんな感じ")
     }
 }
