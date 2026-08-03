@@ -106,13 +106,6 @@ impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
     }
 
     fn period_from_id(value: &str) -> Result<Period, String> {
-        CalendarMonthPeriodConfiguration::period_from_id(value)
-    }
-}
-
-impl CalendarMonthPeriodConfiguration {
-    // Note: this will likely become period_from_id quite soon
-    pub fn period_from_id(value: &str) -> Result<Period, String> {
         // TODO rewrite with nom
         let (year, month): (i32, u32) = value
             .split_once('-')

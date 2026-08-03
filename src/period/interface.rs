@@ -5,8 +5,9 @@ use crate::vault::VaultReadable;
 use chrono::{Datelike, NaiveDate};
 use serde::{Deserialize, Deserializer};
 use serde::de::Error;
+use strum::{EnumIter};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, EnumIter)]
 #[serde(tag = "type")]
 pub enum PeriodConfigurationVaultValue {
     #[serde(rename = "monthly")]
@@ -59,9 +60,29 @@ impl PartialOrd for Period {
 
 #[cfg(test)]
 mod test {
+    use chrono::NaiveDate;
+    use strum::IntoEnumIterator;
+    use crate::period::{CalendarMonthPeriodConfiguration, Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
+
     #[test]
-    fn todo_id_to_and_from_period(){
-        todo!()
+    fn test() {
+
+        for config in PeriodConfigurationVaultValue::iter() {
+            match config {
+                CalendarMonthPeriodConfiguration => {
+                    test_to_and_from_id::<CalendarMonthPeriodConfiguration>("2023-04", Period {
+                        start_date: NaiveDate::from_ymd_opt(2023, 4, 1).expect("Could parse date"),
+                        end_date: NaiveDate::from_ymd_opt(2023, 4, 30).expect("Could parse date"),
+                    })
+                }
+            }
+        }
+    }
+
+    fn test_to_and_from_id<P: PeriodsConfiguration>(period_str_repr: &str, expected_period: Period) {
+        let built_period = Period::try_from(period_str_repr).expect("Could parse period");
+        assert_eq!(expected_period, built_period);
+        assert_eq!(period_str_repr, P::id_for_period(&built_period).expect("Could convert period to string"));
     }
 }
 

@@ -17,7 +17,7 @@ rust_decimal = { version = "1.34.3", features = ["serde-str"] }
 rust_decimal_macros = "1.34.2"
 clap = { version = "4.5.4", features = ["derive"] }
 comfy-table = "7.1.1"
-strum = "0.28.0"
+strum = { version = "0.28.0", features = ["derive"] }
 
 [dev-dependencies]
 mockall = "0.11.4"
