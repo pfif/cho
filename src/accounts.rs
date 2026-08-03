@@ -127,7 +127,6 @@ impl AccountJson {
     }
 }
 
-// TODO - Unit tests for this
 impl OperandBuilder for AccountJson {
     fn build<P: PeriodsConfiguration>(self, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Vec<Operand>, String> {
         let current_period = P::period_for_date(today)?;

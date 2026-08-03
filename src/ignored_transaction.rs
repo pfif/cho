@@ -21,7 +21,6 @@ pub struct IgnoredTransaction {
     date: NaiveDate,
 }
 
-// TODO requires tests!!
 impl OperandBuilder for IgnoredTransaction {
     fn build<P: PeriodsConfiguration>(self, today: &NaiveDate, exchange_rates: &ExchangeRates) -> Result<Vec<Operand>, String> {
         let current_period = P::period_for_date(today)?;

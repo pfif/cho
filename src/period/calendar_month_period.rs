@@ -7,7 +7,6 @@ use serde::Deserialize;
 #[derive(Deserialize, Clone)]
 pub struct CalendarMonthPeriodConfiguration {}
 
-// TODO none of these need "self" anymore
 impl PeriodsConfiguration for CalendarMonthPeriodConfiguration {
     fn period_for_date(date: &NaiveDate) -> Result<Period, String> {
         first_and_last_day_of_month(date.year(), date.month())
