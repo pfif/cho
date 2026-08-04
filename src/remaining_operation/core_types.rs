@@ -11,6 +11,7 @@ use group::Group;
 use rust_decimal_macros::dec;
 use std::marker::PhantomData;
 use std::ops::Add;
+use crate::predicted_transaction::PredictedTransactionsVaultValue;
 /* Entrypoint */
 pub struct RemainingOperation<P: PeriodsConfiguration> {
     groups: Vec<Group>,
@@ -35,6 +36,7 @@ impl<P: PeriodsConfiguration> RemainingOperation<P> {
     ) -> Result<RemainingOperation<P>, String> {
         let mut operation = RemainingOperation::new(Local::now().date_naive(), exchange_rates);
         operation.add_group(AccountGetter::from_vault(vault)?)?;
+        operation.add_group(PredictedTransactionsVaultValue::from_vault(vault)?)?;
         operation.add_group(BucketsVaultValue::from_vault(vault)?)?;
         operation.add_group(IgnoredTransactionsVaultValues::from_vault(vault)?)?;
         if include_predicted_income {
