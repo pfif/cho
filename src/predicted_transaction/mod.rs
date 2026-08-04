@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-// TODO this file is a mess, too many structs are declared. Organize it better
 use crate::amounts::exchange_rates::ExchangeRates;
 use crate::amounts::{Amount, RawAmount};
 use crate::chrono_stack::ChronoStack;
@@ -10,6 +8,7 @@ use crate::vault::VaultReadable;
 use chrono::NaiveDate;
 use serde::de::{Error, Visitor};
 use serde::{Deserialize, Deserializer};
+use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 
 pub type PeriodTransactionsVaultValue = Vec<PredictedTransactionTemplate>;
@@ -111,8 +110,7 @@ impl PredictedTransactionTemplate {
             current_period
         };
 
-        let expected_transaction_periods =
-            P::periods_between(&target.starts_on, last_period)?;
+        let expected_transaction_periods = P::periods_between(&target.starts_on, last_period)?;
 
         let zero_yen: RawAmount = "¥0".try_into()?;
 
@@ -185,11 +183,6 @@ impl<'de> Deserialize<'de> for Payment {
     }
 }
 
-// As of now, the Target assumes that the Period is valid for for the RemainingOperation's
-// PeriodsConfiguration, but I keep thinking of usage for other kind of targets
-// - Putting money on the side for a date later in the month
-// - Keeping money for my weekly Tuesday downtown hang, or weekly activities (which is an instance of the above, but regular)
-// Therefore, we will have several kind of Target. Good to keep in mind
 #[derive(Clone, Deserialize)]
 struct Target {
     amount: RawAmount,
@@ -205,25 +198,13 @@ struct PredictedTransaction {
 }
 
 impl PredictedTransaction {
-    // TODO One more reason to make period hold their own configuration? If so, we woun't need to
-    //      pass in a PeriodConfig here.
-    //      On the one hand, it's nice to make clear where the PeriodConfig is needed
-    //      On the other hand it's verbose.
-    //      Maybe the inbetween solution is to not make the PeriodConfiguration required to compute the ID. Idk
-    //
-    //      Wait. I could just ... encode the id for the period in the period at construction time ...
-    //      So simple
     fn new<P: PeriodsConfiguration>(
         template_name: String,
         period: Period,
         amount: Amount,
     ) -> Result<PredictedTransaction, String> {
         Ok(PredictedTransaction {
-            name: format!(
-                "{} - {}",
-                template_name,
-                CalendarMonthPeriodConfiguration::id_for_period(&period)?
-            ),
+            name: format!("{} - {}", template_name, P::id_for_period(&period)?),
             amount,
         })
     }
@@ -264,123 +245,111 @@ mod test {
     use pretty_assertions::assert_eq;
     use serde_json::{from_value, json};
 
-    mod predicted_transaction_template {
-        use super::*;
-        use pretty_assertions::assert_eq;
-
-        fn predicted_transactions_inner<P: PeriodsConfiguration>() {
-            let periods_configuration = CalendarMonthPeriodConfiguration {};
-            let today = NaiveDate::from_ymd_opt(2026, 6, 14).expect("valid date");
-            let current_period = P::period_for_date(&today)
-                .expect("valid period");
-            let last_period = P::period_for_date(&NaiveDate::from_ymd_opt(2026, 5, 14).expect("valid date"))
+    #[test]
+    fn predicted_transactions() {
+        predicted_transactions_inner::<CalendarMonthPeriodConfiguration>();
+    }
+    fn predicted_transactions_inner<P: PeriodsConfiguration>() {
+        let periods_configuration = CalendarMonthPeriodConfiguration {};
+        let today = NaiveDate::from_ymd_opt(2026, 6, 14).expect("valid date");
+        let current_period = P::period_for_date(&today).expect("valid period");
+        let last_period =
+            P::period_for_date(&NaiveDate::from_ymd_opt(2026, 5, 14).expect("valid date"))
                 .expect("could compute previous period");
 
-            let ex = ExchangeRates::for_tests();
-            let pred_trans_target_amount_raw = RawAmount::yen("1000");
-            let pred_trans_target_amount = ex
-                .new_amount_from_raw_amount(&pred_trans_target_amount_raw)
-                .expect("valid amount");
+        let ex = ExchangeRates::for_tests();
+        let pred_trans_target_amount_raw = RawAmount::yen("1000");
+        let pred_trans_target_amount = ex
+            .new_amount_from_raw_amount(&pred_trans_target_amount_raw)
+            .expect("valid amount");
 
-            let configuration_name = "Spotify".to_string();
+        let configuration_name = "Spotify".to_string();
 
-            let make_pred_trans = |period, amount| -> PredictedTransaction {
-                PredictedTransaction::new::<P>(
-                    configuration_name.clone(),
-                    period,
-                    amount,
-                )
-                    .expect("valid predicted transaction")
-            };
+        let make_pred_trans = |period, amount| -> PredictedTransaction {
+            PredictedTransaction::new::<P>(configuration_name.clone(), period, amount)
+                .expect("valid predicted transaction")
+        };
 
-            struct TestCase {
-                name: String,
-                starting_period: Period,
-                payments: Vec<Payment>,
-                expected_predicted_transitions: Vec<PredictedTransaction>,
-            }
-
-            let cases: Vec<TestCase> = vec![
-                TestCase {
-                    name: "Starts this month - No payments".to_string(),
-                    starting_period: current_period.clone(),
-                    payments: vec![],
-                    expected_predicted_transitions: vec![make_pred_trans(
-                        current_period.clone(),
-                        pred_trans_target_amount.clone(),
-                    )],
-                },
-                TestCase {
-                    name: "Starts this month - One payment".to_string(),
-                    starting_period: current_period.clone(),
-                    payments: vec![Payment((today, current_period.clone()))],
-                    expected_predicted_transitions: vec![make_pred_trans(
-                        current_period.clone(),
-                        ex.yen("0"),
-                    )],
-                },
-                TestCase {
-                    name: "Started last month - last month: not paid - current: not paid"
-                        .to_string(),
-                    starting_period: last_period.clone(),
-                    payments: vec![],
-                    expected_predicted_transitions: vec![
-                        make_pred_trans(last_period.clone(), pred_trans_target_amount.clone()),
-                        make_pred_trans(current_period.clone(), pred_trans_target_amount.clone()),
-                    ],
-                },
-                TestCase {
-                    name: "Started last month - last month: paid today - current: not paid"
-                        .to_string(),
-                    starting_period: last_period.clone(),
-                    payments: vec![Payment((today - Days::new(4), last_period.clone()))],
-                    expected_predicted_transitions: vec![
-                        make_pred_trans(last_period.clone(), ex.yen("0")),
-                        make_pred_trans(current_period.clone(), pred_trans_target_amount.clone()),
-                    ],
-                },
-                TestCase {
-                    name: "Started last month - last month: paid last month - current: not paid"
-                        .to_string(),
-                    starting_period: last_period.clone(),
-                    payments: vec![Payment((
-                        last_period.start_date + Days::new(4),
-                        last_period.clone(),
-                    ))],
-                    expected_predicted_transitions: vec![make_pred_trans(
-                        current_period.clone(),
-                        pred_trans_target_amount.clone(),
-                    )],
-                },
-            ];
-
-            for case in cases {
-                let configuration = PredictedTransactionTemplate {
-                    name: configuration_name.clone(),
-                    target: Target {
-                        amount: pred_trans_target_amount_raw.clone(),
-                        starts_on: case.starting_period.clone(),
-                        until: None,
-                    },
-                    payments: case.payments.clone(),
-                };
-
-                let predicted_transactions = configuration
-                    .clone()
-                    .predicted_transactions::<P>(&today, &ex)
-                    .expect("Predicted transaction succeeded");
-
-                assert_eq!(
-                    predicted_transactions, case.expected_predicted_transitions,
-                    "{}",
-                    case.name
-                )
-            }
+        struct TestCase {
+            name: String,
+            starting_period: Period,
+            payments: Vec<Payment>,
+            expected_predicted_transitions: Vec<PredictedTransaction>,
         }
 
-        #[test]
-        fn predicted_transactions() {
-            predicted_transactions_inner::<CalendarMonthPeriodConfiguration>();
+        let cases: Vec<TestCase> = vec![
+            TestCase {
+                name: "Starts this month - No payments".to_string(),
+                starting_period: current_period.clone(),
+                payments: vec![],
+                expected_predicted_transitions: vec![make_pred_trans(
+                    current_period.clone(),
+                    pred_trans_target_amount.clone(),
+                )],
+            },
+            TestCase {
+                name: "Starts this month - One payment".to_string(),
+                starting_period: current_period.clone(),
+                payments: vec![Payment((today, current_period.clone()))],
+                expected_predicted_transitions: vec![make_pred_trans(
+                    current_period.clone(),
+                    ex.yen("0"),
+                )],
+            },
+            TestCase {
+                name: "Started last month - last month: not paid - current: not paid".to_string(),
+                starting_period: last_period.clone(),
+                payments: vec![],
+                expected_predicted_transitions: vec![
+                    make_pred_trans(last_period.clone(), pred_trans_target_amount.clone()),
+                    make_pred_trans(current_period.clone(), pred_trans_target_amount.clone()),
+                ],
+            },
+            TestCase {
+                name: "Started last month - last month: paid today - current: not paid".to_string(),
+                starting_period: last_period.clone(),
+                payments: vec![Payment((today - Days::new(4), last_period.clone()))],
+                expected_predicted_transitions: vec![
+                    make_pred_trans(last_period.clone(), ex.yen("0")),
+                    make_pred_trans(current_period.clone(), pred_trans_target_amount.clone()),
+                ],
+            },
+            TestCase {
+                name: "Started last month - last month: paid last month - current: not paid"
+                    .to_string(),
+                starting_period: last_period.clone(),
+                payments: vec![Payment((
+                    last_period.start_date + Days::new(4),
+                    last_period.clone(),
+                ))],
+                expected_predicted_transitions: vec![make_pred_trans(
+                    current_period.clone(),
+                    pred_trans_target_amount.clone(),
+                )],
+            },
+        ];
+
+        for case in cases {
+            let configuration = PredictedTransactionTemplate {
+                name: configuration_name.clone(),
+                target: Target {
+                    amount: pred_trans_target_amount_raw.clone(),
+                    starts_on: case.starting_period.clone(),
+                    until: None,
+                },
+                payments: case.payments.clone(),
+            };
+
+            let predicted_transactions = configuration
+                .clone()
+                .predicted_transactions::<P>(&today, &ex)
+                .expect("Predicted transaction succeeded");
+
+            assert_eq!(
+                predicted_transactions, case.expected_predicted_transitions,
+                "{}",
+                case.name
+            )
         }
     }
 
@@ -424,14 +393,14 @@ mod test {
           ],
           }
         ]))
-            .expect("valid PeriodTransactionsVaultValue");
+        .expect("valid PeriodTransactionsVaultValue");
 
         let group = Group::from_group_builder::<CalendarMonthPeriodConfiguration, _, _>(
             configuration,
             &exchange_rates,
             &today,
         )
-            .expect("valid group");
+        .expect("valid group");
         let group_view = group
             .into_remaining_operation_screen_group(&exchange_rates, &"JPY".to_string(), &today)
             .expect("valid group data");
@@ -454,6 +423,10 @@ Predicted Transactions
         );
     }
 
+    #[test]
+    fn test_monthly_payment() {
+        test_monthly_payment_inner::<CalendarMonthPeriodConfiguration>();
+    }
     fn test_monthly_payment_inner<P: PeriodsConfiguration>() {
         let make_period_for_month = |month: u32| {
             P::period_for_date(&NaiveDate::from_ymd_opt(2026, month, 1).expect("Can build date"))
@@ -466,7 +439,6 @@ Predicted Transactions
         let april = make_period_for_month(4);
         let may = make_period_for_month(5);
 
-
         struct TestCase<'a> {
             name: &'a str,
 
@@ -475,8 +447,7 @@ Predicted Transactions
             until: Option<&'a Period>,
 
             expected_predicted_transitions: Vec<(&'a Period, RawAmount)>,
-        }
-        ;
+        };
 
         let cases = vec![
             TestCase {
@@ -574,7 +545,7 @@ Predicted Transactions
                         .cloned()
                         .collect(),
                 )
-                    .expect("valid decision");
+                .expect("valid decision");
 
             assert_eq!(
                 result,
@@ -586,9 +557,5 @@ Predicted Transactions
                 case.name
             );
         }
-    }
-    #[test]
-    fn test_monthly_payment() {
-        test_monthly_payment_inner::<CalendarMonthPeriodConfiguration>();
     }
 }
