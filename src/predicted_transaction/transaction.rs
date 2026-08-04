@@ -9,7 +9,7 @@ pub struct PredictedTransaction {
 }
 
 impl PredictedTransaction {
-    fn new<P: PeriodsConfiguration>(
+    pub(super) fn new<P: PeriodsConfiguration>(
         template_name: String,
         period: Period,
         amount: Amount,
@@ -20,7 +20,7 @@ impl PredictedTransaction {
         })
     }
 
-    fn build_operand(self) -> Operand {
+    pub(super) fn build_operand(self) -> Operand {
         Operand {
             name: self.name,
             amount: self.amount,
