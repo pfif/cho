@@ -9,8 +9,8 @@ use serde::{Deserialize, Deserializer};
 use std::fmt::Debug;
 use template::PredictedTransactionTemplate;
 
-mod template;
-mod transaction;
+pub mod template;
+pub mod transaction;
 
 pub type PeriodTransactionsVaultValue = Vec<PredictedTransactionTemplate>;
 impl VaultReadable for PeriodTransactionsVaultValue {

@@ -42,6 +42,11 @@ pub struct AccountGetter{
 }
 
 impl AccountGetter {
+    #[cfg(test)]
+    pub fn new(accounts: Vec<AccountJson>) -> AccountGetter {
+        AccountGetter { accounts }
+    }
+
     // TODO - This should read the account from the Vault, otherwise this is breaking the abstraction of
     //        however we choose to store "state". We assume it is always through a file
     pub fn from_vault<V: Vault>(vault: &V) -> Result<AccountGetter, String>{

@@ -11,7 +11,7 @@ use group::Group;
 use rust_decimal_macros::dec;
 use std::marker::PhantomData;
 use std::ops::Add;
-
+use crate::predicted_transaction::PeriodTransactionsVaultValue;
 /* Entrypoint */
 pub struct RemainingOperation<P: PeriodsConfiguration> {
     groups: Vec<Group>,
@@ -618,30 +618,21 @@ mod test {
     }
 
     mod integration_test {
-        use crate::accounts::AccountJson;
+        use crate::accounts::{AccountGetter, AccountJson};
         use crate::amounts::exchange_rates::ExchangeRates;
         use crate::amounts::Amount;
-        use crate::buckets::Bucket;
-        use crate::ignored_transaction::IgnoredTransactionBuilder;
+        use crate::buckets::{Bucket, BucketsVaultValue};
+        use crate::ignored_transaction::{IgnoredTransactionBuilder, IgnoredTransactionsVaultValues};
         use crate::period::{CalendarMonthPeriodConfiguration, Period};
         use crate::predicted_income::PredictedIncomeBuilder;
+        use crate::predicted_transaction::PeriodTransactionsVaultValue;
         use crate::remaining_operation::core_types::{GroupBuilder, OperandBuilder, RemainingOperation, RemainingOperationScreenGroup};
         use crate::remaining_operation::core_types::{IllustrationValue, RemainingOperationScreen, RemainingOperationScreenOperand};
         use chrono::NaiveDate;
         use pretty_assertions::assert_eq;
         use rust_decimal_macros::dec;
         use serde_json::{from_value, json};
-
-        struct TestGroupBuilder<OB: OperandBuilder> {
-            name: String,
-            operand_builders: Vec<OB>,
-        }
-
-        impl<OB: OperandBuilder> GroupBuilder<OB> for TestGroupBuilder<OB> {
-            fn build(self) -> Result<(String, Vec<OB>), String> {
-                Ok((self.name, self.operand_builders))
-            }
-        }
+        use crate::predicted_transaction::template::PredictedTransactionTemplate;
 
         #[test]
         fn test() {
@@ -721,16 +712,13 @@ mod test {
                 Some(mkdate(6,1))
             );
 
-            let accounts = TestGroupBuilder {
-                name: "Accounts".into(),
-                operand_builders: vec![
-                    account_euro_left,
-                    account_euro_right,
-                    account_yen_left,
-                    account_yen_right,
-                    account_archived,
-                ],
-            };
+            let accounts = AccountGetter::new(vec![
+                account_euro_left,
+                account_euro_right,
+                account_yen_left,
+                account_yen_right,
+                account_archived,
+            ]);
             remaining_operation.add_group(accounts).expect("Can add accounts");
 
             let bucket_must_commit: Bucket = from_value(json!({
@@ -758,14 +746,11 @@ mod test {
                 "archived_since": "2023-08-20"
             })).expect("Can deserialize bucket");
 
-            let goals = TestGroupBuilder {
-                name: "Buckets".into(),
-                operand_builders: vec![
-                    bucket_must_commit,
-                    bucket_already_committed,
-                    bucket_archived_but_affecting_result
-                ],
-            };
+            let goals: BucketsVaultValue = vec![
+                bucket_must_commit,
+                bucket_already_committed,
+                bucket_archived_but_affecting_result
+            ];
             remaining_operation.add_group(goals).expect("Can add goals");
 
             let ignored_incoming = IgnoredTransactionBuilder::default()
@@ -800,15 +785,12 @@ mod test {
                 .build()
                 .expect("Can build ignored transaction");
 
-            let ignored_transaction = TestGroupBuilder {
-                name: "Ignored transactions".to_string(),
-                operand_builders: vec![
-                    ignored_incoming,
-                    ignored_outgoing,
-                    ignored_later_this_month,
-                    ignored_last_month,
-                ],
-            };
+            let ignored_transaction: IgnoredTransactionsVaultValues = vec![
+                ignored_incoming,
+                ignored_outgoing,
+                ignored_later_this_month,
+                ignored_last_month,
+            ];
             remaining_operation.add_group(ignored_transaction).expect("Can add ignored transactions");
 
             let predicted_income = PredictedIncomeBuilder::default()
@@ -817,14 +799,7 @@ mod test {
                 .build()
                 .expect("Can build predicted income");
 
-            let predicted_incomes = TestGroupBuilder {
-                name: "Predicted Income".to_string(),
-                operand_builders: vec![
-                    predicted_income
-                ],
-            };
-
-            remaining_operation.add_group(predicted_incomes).expect("Can add predicted incomes");
+            remaining_operation.add_group(predicted_income).expect("Can add predicted incomes");
 
             let result_eur = remaining_operation.execute(&"EUR".to_string()).expect("Can execute remaining operation for yens");
 
@@ -925,7 +900,7 @@ mod test {
                             archived_operand_with_non_zero_amounts: vec!["Archived bucket".to_string()]
                         },
                         RemainingOperationScreenGroup {
-                            name: "Ignored transactions".into(),
+                            name: "Ignored Transactions".into(),
                             operands: vec![
                                 RemainingOperationScreenOperand {
                                     name: "Ignored incoming".to_string(),
