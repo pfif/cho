@@ -23,7 +23,7 @@ impl PredictedTransaction {
     pub(super) fn build_operand(self) -> Operand {
         Operand {
             name: self.name,
-            amount: self.amount,
+            amount: self.amount.flip_sign(),
             illustration: vec![],
             archived_from: None,
         }

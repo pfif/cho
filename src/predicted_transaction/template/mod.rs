@@ -7,7 +7,7 @@ use crate::amounts::exchange_rates::ExchangeRates;
 use crate::amounts::RawAmount;
 use crate::chrono_stack::ChronoStack;
 use crate::period::{Period, PeriodsConfiguration};
-use crate::predicted_transaction::PeriodTransactionsVaultValue;
+use crate::predicted_transaction::PredictedTransactionsVaultValue;
 use crate::predicted_transaction::transaction::PredictedTransaction;
 use crate::remaining_operation::core_types::{GroupBuilder, Operand, OperandBuilder};
 
@@ -138,7 +138,7 @@ impl PredictedTransactionTemplate {
     }
 }
 
-impl GroupBuilder<PredictedTransactionTemplate> for PeriodTransactionsVaultValue {
+impl GroupBuilder<PredictedTransactionTemplate> for PredictedTransactionsVaultValue {
     fn build(self) -> Result<(String, Vec<PredictedTransactionTemplate>), String> {
         let predicted_transactions_templates: Vec<PredictedTransactionTemplate> =
             self.into_iter().collect();
@@ -289,7 +289,7 @@ mod test {
         let exchange_rates = ExchangeRates::for_tests();
         let today = NaiveDate::from_ymd_opt(2026, 6, 14).expect("valid date");
 
-        let configuration: PeriodTransactionsVaultValue = from_value(json!([
+        let configuration: PredictedTransactionsVaultValue = from_value(json!([
           {
             "name": "Spotify",
             "target": {
@@ -340,17 +340,17 @@ mod test {
             "\
 Predicted Transactions
 ======================
-+-----------------------+--------+
-| Name                  | Amount |
-+================================+
-| Spotify - 2026-06     | ¥2000  |
-|-----------------------+--------|
-| Electricity - 2026-05 | ¥8000  |
-|-----------------------+--------|
-| Electricity - 2026-06 | ¥8000  |
-|-----------------------+--------|
-| Total                 | ¥18000 |
-+-----------------------+--------+"
++-----------------------+---------+
+| Name                  | Amount  |
++=================================+
+| Spotify - 2026-06     | ¥-2000  |
+|-----------------------+---------|
+| Electricity - 2026-05 | ¥-8000  |
+|-----------------------+---------|
+| Electricity - 2026-06 | ¥-8000  |
+|-----------------------+---------|
+| Total                 | ¥-18000 |
++-----------------------+---------+"
         );
     }
 

@@ -12,8 +12,8 @@ use template::PredictedTransactionTemplate;
 pub mod template;
 pub mod transaction;
 
-pub type PeriodTransactionsVaultValue = Vec<PredictedTransactionTemplate>;
-impl VaultReadable for PeriodTransactionsVaultValue {
+pub type PredictedTransactionsVaultValue = Vec<PredictedTransactionTemplate>;
+impl VaultReadable for PredictedTransactionsVaultValue {
     const KEY: &'static str = "predicted_transactions";
 }
 
