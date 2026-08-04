@@ -393,7 +393,7 @@ mod test {
                 group_name,
                 vec![operand_left.clone(), operand_right.clone()],
             )
-                .expect("Can create group");
+            .expect("Can create group");
             let result = group
                 .into_remaining_operation_screen_group(&ex, &"JPY".to_string(), &date)
                 .expect("can build RemainingOperationScreenGroup");
@@ -501,7 +501,7 @@ mod test {
                 group_name,
                 vec![operand_left.clone(), operand_right.clone()],
             )
-                .expect("Can create group");
+            .expect("Can create group");
             let result = group
                 .into_remaining_operation_screen_group(&ex, &"JPY".to_string(), &date)
                 .expect("can build RemainingOperationScreenGroup");
@@ -538,7 +538,7 @@ mod test {
                     "Default amount".to_string(),
                     IllustrationValue::Amount(ex.yen("300")),
                 )]
-                    .clone(),
+                .clone(),
                 archived_from: Some(
                     date.checked_sub_months(Months::new(1))
                         .expect("can add a month to the date"),
@@ -591,7 +591,7 @@ mod test {
                     "Default amount".to_string(),
                     IllustrationValue::Amount(ex.yen("300")),
                 )]
-                    .clone(),
+                .clone(),
                 archived_from: Some(date.clone()),
             };
 
@@ -642,7 +642,7 @@ mod test {
                     "Default amount".to_string(),
                     IllustrationValue::Amount(ex.yen("300")),
                 )]
-                    .clone(),
+                .clone(),
                 archived_from: Some(date.clone()),
             };
 
@@ -791,7 +791,7 @@ mod test {
                     "2023/07/18 DEPO ¥150"
                 ]
             }))
-                .expect("Can deserialize bucket");
+            .expect("Can deserialize bucket");
 
             let bucket_already_committed: Bucket = from_value(json!({
                 "name": "Goal already committed",
@@ -801,7 +801,7 @@ mod test {
                     "2023/08/17 DEPO ¥100"
                 ]
             }))
-                .expect("Can deserialize bucket");
+            .expect("Can deserialize bucket");
 
             let bucket_archived_but_affecting_result: Bucket = from_value(json!({
                 "name": "Archived bucket",
@@ -810,7 +810,7 @@ mod test {
                 ],
                 "archived_since": "2023-08-20"
             }))
-                .expect("Can deserialize bucket");
+            .expect("Can deserialize bucket");
 
             let goals: BucketsVaultValue = vec![
                 bucket_must_commit,
@@ -842,7 +842,7 @@ mod test {
               ]
             }
                   ]))
-                .expect("Can deserialize predicted transactions");
+            .expect("Can deserialize predicted transactions");
             remaining_operation
                 .add_group(predicted_transactions)
                 .expect("Can add predicted transactions");
