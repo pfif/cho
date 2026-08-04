@@ -1,16 +1,16 @@
-use std::marker::PhantomData;
-use std::ops::Add;
+use crate::accounts::AccountGetter;
 use crate::amounts::exchange_rates::ExchangeRates;
 use crate::amounts::{Amount, CurrencyIdent};
-use crate::period::{Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
+use crate::buckets::BucketsVaultValue;
+use crate::ignored_transaction::IgnoredTransactionsVaultValues;
+use crate::period::{Period, PeriodsConfiguration};
+use crate::predicted_income::PredictedIncome;
+use crate::vault::{Vault, VaultReadable};
 use chrono::{Local, NaiveDate};
 use group::Group;
 use rust_decimal_macros::dec;
-use crate::accounts::AccountGetter;
-use crate::buckets::BucketsVaultValue;
-use crate::ignored_transaction::IgnoredTransactionsVaultValues;
-use crate::predicted_income::PredictedIncome;
-use crate::vault::{Vault, VaultReadable};
+use std::marker::PhantomData;
+use std::ops::Add;
 
 /* Entrypoint */
 pub struct RemainingOperation<P: PeriodsConfiguration> {
@@ -145,13 +145,12 @@ impl From<Operand> for RemainingOperationScreenOperand {
 
 // The struct Group has its own module to isolate its internal attribute
 pub mod group {
-    use std::ops::Add;
+    use super::{GroupBuilder, Operand, OperandBuilder, RemainingOperationScreenGroup, RemainingOperationScreenOperand};
+    use crate::amounts::exchange_rates::ExchangeRates;
+    use crate::amounts::CurrencyIdent;
+    use crate::period::PeriodsConfiguration;
     use chrono::NaiveDate;
     use rust_decimal_macros::dec;
-    use crate::period::{PeriodConfigurationVaultValue, PeriodsConfiguration};
-    use crate::amounts::{Amount, Currency, CurrencyIdent};
-    use crate::amounts::exchange_rates::ExchangeRates;
-    use super::{GroupBuilder, Operand, OperandBuilder, RemainingOperationScreenGroup, RemainingOperationScreenOperand};
 
     #[derive(Clone, PartialEq, Eq, Debug)]
     pub struct Group {
@@ -300,11 +299,10 @@ pub struct Operand {
 #[cfg(test)]
 mod test {
     mod group_test {
-        use std::ops::Add;
-        use chrono::{Months, NaiveDate};
         use crate::amounts::exchange_rates::ExchangeRates;
         use crate::remaining_operation::core_types::group::Group;
         use crate::remaining_operation::core_types::{IllustrationValue, Operand, RemainingOperationScreenGroup, RemainingOperationScreenOperand};
+        use chrono::{Months, NaiveDate};
         use pretty_assertions::assert_eq;
 
         #[test]
@@ -620,21 +618,19 @@ mod test {
     }
 
     mod integration_test {
+        use crate::accounts::AccountJson;
+        use crate::amounts::exchange_rates::ExchangeRates;
+        use crate::amounts::Amount;
+        use crate::buckets::Bucket;
+        use crate::ignored_transaction::IgnoredTransactionBuilder;
+        use crate::period::{CalendarMonthPeriodConfiguration, Period};
+        use crate::predicted_income::PredictedIncomeBuilder;
+        use crate::remaining_operation::core_types::{GroupBuilder, OperandBuilder, RemainingOperation, RemainingOperationScreenGroup};
         use crate::remaining_operation::core_types::{IllustrationValue, RemainingOperationScreen, RemainingOperationScreenOperand};
         use chrono::NaiveDate;
-        use rust_decimal::Decimal;
-        use rust_decimal_macros::dec;
-        use crate::accounts::{AccountJson};
-        use crate::buckets::Bucket;
-        use crate::ignored_transaction::{IgnoredTransactionBuilder};
-        use crate::period::{CalendarMonthPeriodConfiguration, Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
-        use crate::predicted_income::{PredictedIncomeBuilder};
-        use crate::amounts::Amount;
-        use crate::amounts::exchange_rates::ExchangeRates;
-        use crate::remaining_operation::core_types::{GroupBuilder, Operand, OperandBuilder, RemainingOperation, RemainingOperationScreenGroup};
         use pretty_assertions::assert_eq;
+        use rust_decimal_macros::dec;
         use serde_json::{from_value, json};
-        use crate::remaining_operation::core_types::group::Group;
 
         struct TestGroupBuilder<OB: OperandBuilder> {
             name: String,

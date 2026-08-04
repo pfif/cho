@@ -1,18 +1,16 @@
-use std::fs::{read_dir, File};
+use crate::amounts::exchange_rates::ExchangeRates;
+use crate::amounts::Amount;
+use crate::period::PeriodsConfiguration;
+use crate::remaining_operation::core_types::{GroupBuilder, Operand, OperandBuilder};
+use crate::remaining_operation::operand_builders_helpers::timeline::{TimelineOperandBuilderHelper, TimelineOperandEnd};
+use crate::vault::Vault;
 use chrono::NaiveDate;
-use derive_builder::Builder;
 #[cfg(test)]
 use mockall::automock;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use serde_json::from_reader;
-use crate::period::{Period, PeriodConfigurationVaultValue, PeriodsConfiguration};
-use crate::amounts::Amount;
-use crate::amounts::exchange_rates::ExchangeRates;
-use crate::remaining_operation::core_types::{GroupBuilder, Operand, OperandBuilder};
-use crate::remaining_operation::core_types::group::Group;
-use crate::remaining_operation::operand_builders_helpers::timeline::{TimelineOperandBuilderHelper, TimelineOperandEnd};
-use crate::vault::Vault;
+use std::fs::{read_dir, File};
 
 // Public traits
 pub type Figure = u32;

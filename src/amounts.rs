@@ -1,11 +1,10 @@
-use std::cmp::{max, Ordering};
-use std::fmt::{Debug, Display, Formatter};
-use std::ops::{Add, Div, DivAssign, Sub};
-use std::str::Chars;
 use crate::amounts::amount::ImmutableAmount;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use serde::{Deserialize};
+use serde::Deserialize;
+use std::cmp::Ordering;
+use std::fmt::{Debug, Display, Formatter};
+use std::ops::{Add, Div, DivAssign, Sub};
 
 pub type Figure = Decimal;
 pub type CurrencyIdent = String;
@@ -23,9 +22,9 @@ pub struct Currency {
 pub mod exchange_rates {
     use super::{Amount, Currency, CurrencyIdent, Figure, RawAmount};
     use crate::amounts::amount::ImmutableAmount;
-    use std::collections::HashMap;
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
+    use std::collections::HashMap;
 
     #[derive(Clone)]
     pub struct ExchangeRates {

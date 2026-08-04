@@ -1,13 +1,12 @@
 #[cfg(test)]
 mod format_remaining_operation_screen_tests {
-    use chrono::NaiveDate;
-    use rust_decimal_macros::dec;
+    use crate::amounts::exchange_rates::ExchangeRates;
     use crate::cli::formatting::format_remaining_operation_screen;
     use crate::period::Period;
+    use crate::remaining_operation::core_types::{Illustration, IllustrationValue, RemainingOperationScreen, RemainingOperationScreenGroup, RemainingOperationScreenOperand};
+    use chrono::NaiveDate;
     use pretty_assertions::assert_eq;
-    use crate::amounts::exchange_rates::ExchangeRates;
-    use crate::remaining_operation::core_types::group::Group;
-    use crate::remaining_operation::core_types::{Illustration, IllustrationValue, Operand, RemainingOperationScreen, RemainingOperationScreenGroup, RemainingOperationScreenOperand};
+    use rust_decimal_macros::dec;
     const ILLUSTRATION_FIELDS : &[&str] = &["First amount", "Second amount", "Is enough", "Is luxury"];
     const ILLUSTRATION_FIELDS_WITH_EXTRA : &[&str] = &["First amount", "Second amount", "Is enough", "Is luxury", "Extra column"];
     

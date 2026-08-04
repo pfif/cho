@@ -1,12 +1,12 @@
 pub mod aggregated_amounts;
 
 use crate::amounts::exchange_rates::ExchangeRates;
-use crate::amounts::{Amount, Figure, RawAmount};
+use crate::amounts::{Amount, RawAmount};
 use crate::buckets::aggregated_amounts::AggregatedAmounts;
 use crate::chrono_stack::ChronoStack;
 use crate::line::LineWithDateVisitor;
 use crate::period::{
-    ErrorPeriodsBetween, Period, PeriodConfigurationVaultValue, PeriodsConfiguration,
+    ErrorPeriodsBetween, PeriodsConfiguration,
 };
 use crate::remaining_operation::core_types::{
     GroupBuilder, IllustrationValue, Operand, OperandBuilder,
@@ -18,7 +18,7 @@ use serde::de::{Error, Visitor};
 use serde::{Deserialize, Deserializer};
 use std::cmp::max;
 use std::fmt::Formatter;
-use std::str::{Split, SplitWhitespace};
+use std::str::SplitWhitespace;
 
 pub type BucketsVaultValue = Vec<Bucket>;
 impl VaultReadable for BucketsVaultValue {
@@ -2511,8 +2511,6 @@ mod test {
         use crate::vault::VaultImpl;
         use pretty_assertions::assert_eq;
         use serde_json::{json, Value};
-        use std::io::Write;
-        use tempfile::TempDir;
 
         #[test]
         fn nominal() {

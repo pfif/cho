@@ -1,9 +1,6 @@
-use std::ops::Sub;
+use crate::amounts::Amount;
+use crate::remaining_operation::core_types::{Illustration, IllustrationValue, Operand};
 use chrono::NaiveDate;
-use crate::period::{Period, PeriodConfigurationVaultValue};
-use crate::amounts::{Amount};
-use crate::amounts::exchange_rates::ExchangeRates;
-use crate::remaining_operation::core_types::{Illustration, IllustrationValue, Operand, OperandBuilder};
 
 pub enum TimelineOperandEnd {
     Current(Amount),

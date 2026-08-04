@@ -1,7 +1,7 @@
 use crate::period::interface::ErrorPeriodsBetween;
 use crate::period::interface::ErrorPeriodsBetween::EndBeforeStart;
 use crate::period::{Period, PeriodsConfiguration};
-use chrono::{DateTime, Datelike, Months, NaiveDate};
+use chrono::{Datelike, Months, NaiveDate};
 use serde::Deserialize;
 
 #[derive(Deserialize, Clone)]
