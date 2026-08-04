@@ -7,9 +7,9 @@ use crate::period::Period;
 
 /// A payment is a date and a period id.
 #[derive(Clone, Debug)]
-pub struct Payment(pub(super) (NaiveDate, Period));
+pub struct RawTransaction(pub(super) (NaiveDate, Period));
 
-impl<'de> Deserialize<'de> for Payment {
+impl<'de> Deserialize<'de> for RawTransaction {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -40,6 +40,6 @@ impl<'de> Deserialize<'de> for Payment {
         //                                         Note that the call to the visitor above is indirect!
         let visitor = LineWithDateVisitor::new(PeriodIDVisitor);
         let tuple = deserializer.deserialize_str(visitor)?;
-        Ok(Payment(tuple))
+        Ok(RawTransaction(tuple))
     }
 }

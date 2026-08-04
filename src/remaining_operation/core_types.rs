@@ -826,9 +826,9 @@ mod test {
               "name": "Spotify",
               "target": {
                 "starts_on": "2023-07",
-                "amount": "¥20"
+                "amount": "¥-20"
               },
-              "payments": [
+              "actual_transactions": [
                 "2023/07/21 2023-07",
               ]
             },
@@ -836,9 +836,9 @@ mod test {
               "name": "Electricity",
               "target": {
                 "starts_on": "2023-07",
-                "amount": "¥80"
+                "amount": "¥-80"
               },
-              "payments": [
+              "actual_transactions": [
                 "2023/07/30 2023-07",
                 "2023/08/19 2023-08"
               ]

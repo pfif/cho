@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use chrono::NaiveDate;
 use serde::{Deserialize, Deserializer};
 use serde::de::{Error, Visitor};
-use payment::Payment;
+use raw_transaction::RawTransaction;
 use crate::amounts::exchange_rates::ExchangeRates;
 use crate::amounts::RawAmount;
 use crate::chrono_stack::ChronoStack;
@@ -11,13 +11,13 @@ use crate::predicted_transaction::PredictedTransactionsVaultValue;
 use crate::predicted_transaction::transaction::PredictedTransaction;
 use crate::remaining_operation::core_types::{GroupBuilder, Operand, OperandBuilder};
 
-mod payment;
+mod raw_transaction;
 
 #[derive(Clone, Deserialize)]
 pub struct PredictedTransactionTemplate {
     name: String,
     target: Target,
-    payments: Vec<Payment>,
+    actual_transactions: Vec<RawTransaction>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -41,7 +41,7 @@ impl PredictedTransactionTemplate {
         //      and change ChronoStack::new to take an Into Vec<(NaiveDate, _)>
         let payment_stack = ChronoStack::new(
             &self
-                .payments
+                .actual_transactions
                 .clone()
                 .into_iter()
                 .map(|p| p.0)
@@ -173,7 +173,7 @@ mod test {
     use pretty_assertions::assert_eq;
     use serde_json::{from_value, json};
     use crate::predicted_transaction::template::Target;
-    use crate::predicted_transaction::template::payment::Payment;
+    use crate::predicted_transaction::template::raw_transaction::RawTransaction;
     use crate::predicted_transaction::transaction::PredictedTransaction;
 
     #[test]
@@ -204,7 +204,7 @@ mod test {
         struct TestCase {
             name: String,
             starting_period: Period,
-            payments: Vec<Payment>,
+            payments: Vec<RawTransaction>,
             expected_predicted_transitions: Vec<PredictedTransaction>,
         }
 
@@ -221,7 +221,7 @@ mod test {
             TestCase {
                 name: "Starts this month - One payment".to_string(),
                 starting_period: current_period.clone(),
-                payments: vec![Payment((today, current_period.clone()))],
+                payments: vec![RawTransaction((today, current_period.clone()))],
                 expected_predicted_transitions: vec![make_pred_trans(
                     current_period.clone(),
                     ex.yen("0"),
@@ -239,7 +239,7 @@ mod test {
             TestCase {
                 name: "Started last month - last month: paid today - current: not paid".to_string(),
                 starting_period: last_period.clone(),
-                payments: vec![Payment((today - Days::new(4), last_period.clone()))],
+                payments: vec![RawTransaction((today - Days::new(4), last_period.clone()))],
                 expected_predicted_transitions: vec![
                     make_pred_trans(last_period.clone(), ex.yen("0")),
                     make_pred_trans(current_period.clone(), pred_trans_target_amount.clone()),
@@ -249,7 +249,7 @@ mod test {
                 name: "Started last month - last month: paid last month - current: not paid"
                     .to_string(),
                 starting_period: last_period.clone(),
-                payments: vec![Payment((
+                payments: vec![RawTransaction((
                     last_period.start_date + Days::new(4),
                     last_period.clone(),
                 ))],
@@ -268,7 +268,7 @@ mod test {
                     starts_on: case.starting_period.clone(),
                     until: None,
                 },
-                payments: case.payments.clone(),
+                actual_transactions: case.payments.clone(),
             };
 
             let predicted_transactions = configuration
@@ -294,9 +294,9 @@ mod test {
             "name": "Spotify",
             "target": {
               "starts_on": "2026-04",
-              "amount": "¥2000"
+              "amount": "¥-2000"
             },
-            "payments": [
+            "actual_transactions": [
               "2026/04/21 2026-04",
               "2026/05/21 2026-05"
             ]
@@ -305,9 +305,9 @@ mod test {
             "name": "Electricity",
             "target": {
               "starts_on": "2026-04",
-              "amount": "¥8000"
+              "amount": "¥-8000"
             },
-            "payments": [
+            "actual_transactions": [
               "2026/04/30 2026-04"
             ]
           },
@@ -315,10 +315,10 @@ mod test {
             "name": "Archived",
             "target": {
               "starts_on": "2026-04",
-              "amount": "¥8000",
+              "amount": "¥-8000",
               "until": "2026-05"
             },
-            "payments": [
+            "actual_transactions": [
               "2026/04/30 2026-04",
               "2026/04/30 2026-05"
           ],
